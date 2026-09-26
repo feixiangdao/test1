@@ -4,6 +4,7 @@
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const IMG_BASE = 'https://image.tmdb.org/t/p';
+const OPENSUB_BASE = 'https://opensubtitles-v3.strem.io';
 const CINEJOY_REFERER = 'https://cinejoy.pk/';
 const UA = 'Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
@@ -100,6 +101,74 @@ function parseExt(ext) {
   if (!s) return {};
   if (s[0] === '{') return safeJsonParse(s, {});
   return { tmdbKey: s };
+}
+
+function subtitleMime(url) {
+  const u = String(url || '').toLowerCase().split('?')[0];
+  if (u.endsWith('.vtt')) return 'text/vtt';
+  if (u.endsWith('.srt')) return 'application/x-subrip';
+  if (u.endsWith('.ass') || u.endsWith('.ssa')) return 'text/x-ssa';
+  if (u.endsWith('.ttml') || u.endsWith('.xml')) return 'application/ttml+xml';
+  return '';
+}
+
+function resolveImdbId(type, tmdbId) {
+  try {
+    const data = tmdb('/' + type + '/' + tmdbId + '/external_ids', {});
+    return cleanText(data && data.imdb_id ? data.imdb_id : '');
+  } catch (_) {
+    return '';
+  }
+}
+
+function fetchSubtitles(type, tmdbId, season, episode) {
+  try {
+    const imdbId = resolveImdbId(type, tmdbId);
+    if (!imdbId || !/^tt\d+$/i.test(imdbId)) return [];
+
+    const mediaType = type === 'tv' ? 'series' : 'movie';
+    const videoId = type === 'tv'
+      ? imdbId + ':' + (Number(season) || 1) + ':' + (Number(episode) || 1)
+      : imdbId;
+    const url = OPENSUB_BASE + '/subtitles/' + mediaType + '/' + videoId + '.json';
+    const r = req(url, {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': UA
+      },
+      timeout: 12000
+    });
+    const code = Number(r && r.code ? r.code : 0);
+    if (!r || !r.content || code < 200 || code >= 300) return [];
+
+    const data = safeJsonParse(r.content, {});
+    const list = data && Array.isArray(data.subtitles) ? data.subtitles : [];
+    const seen = {};
+    const out = [];
+
+    list.forEach(function (s) {
+      if (!s || !s.url || out.length >= 120) return;
+      const u = String(s.url);
+      if (seen[u]) return;
+      seen[u] = true;
+
+      const lang = cleanText(s.lang || '');
+      const label = cleanText(s.label || s.name || lang || '字幕');
+      const item = {
+        url: u,
+        name: label,
+        lang: lang,
+        flag: 0
+      };
+      const format = cleanText(s.format || '') || subtitleMime(u);
+      if (format) item.format = format;
+      out.push(item);
+    });
+
+    return out;
+  } catch (_) {
+    return [];
+  }
 }
 
 function getMediaType(item, fallback) {
@@ -383,10 +452,12 @@ export default {
       const season = Number(p[4]) || 1;
       const episode = Number(p[5]) || 1;
       const url = buildEmbed(providerId, type, tmdbId, season, episode);
+      const subs = fetchSubtitles(type, tmdbId, season, episode);
 
       return JSON.stringify({
         parse: 1,
         url: url,
+        subs: subs,
         header: {
           'User-Agent': UA,
           'Referer': CINEJOY_REFERER

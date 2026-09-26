@@ -14,6 +14,7 @@ const LOCAL_TMDB_KEY = 'tmdbKey';
 let TMDB_KEY = '';
 let TMDB_TOKEN = '';
 let LANG = 'zh-CN';
+let SITE_KEY = 'Cinejoy_OKPro_v2';
 
 const PROVIDERS = [
   { id: 'cinemaos',  name: 'Aether 1',         base: 'https://cinemaos.tech' },
@@ -106,7 +107,7 @@ function deleteLocalTmdbKey() {
 function getTmdbSettingsUrl() {
   try {
     return getProxy(true)
-      + '&siteKey=Cinejoy_OKPro'
+      + '&siteKey=' + enc(SITE_KEY) + ''
       + '&kind=tmdb-form';
   } catch (_) {
     return '';
@@ -227,7 +228,7 @@ function subtitleProxyUrl(remoteUrl, index) {
   try {
     const base = getProxy(true);
     return base
-      + '&siteKey=Cinejoy_OKPro'
+      + '&siteKey=' + enc(SITE_KEY) + ''
       + '&kind=subtitle'
       + '&n=' + enc(index || 0)
       + '&sub=' + enc(remoteUrl);
@@ -481,6 +482,7 @@ export default {
 
     TMDB_TOKEN = cleanText(cfg.tmdbToken || cfg.token || '');
     LANG = cleanText(cfg.language || cfg.lang || 'zh-CN') || 'zh-CN';
+    SITE_KEY = cleanText(cfg.siteKey || 'Cinejoy_OKPro_v2') || 'Cinejoy_OKPro_v2';
   },
 
   home(filter) {
@@ -639,10 +641,10 @@ export default {
           + '<p>当前状态：<b class="' + (hasKey ? 'ok' : 'warn') + '">' + (hasKey ? '本机已保存 TMDB Key' : '本机尚未保存 TMDB Key') + '</b></p>'
           + '<p>Key 只写入 OK影视Pro 本机存储，不会写入 GitHub。</p>'
           + '<p style="font-size:13px;color:#aaa">保存后关闭此窗口即可继续使用 Cinejoy。</p>'
-          + '<form method="post" action="/proxy?do=js&siteKey=Cinejoy_OKPro&kind=tmdb-save">'
+          + '<form method="post" action="/proxy?do=js&siteKey=' + enc(SITE_KEY) + '&kind=tmdb-save">'
           + '<input type="password" name="key" autocomplete="off" placeholder="32位 TMDB API v3 Key" required>'
           + '<button type="submit">保存到本机</button></form>'
-          + '<form method="post" action="/proxy?do=js&siteKey=Cinejoy_OKPro&kind=tmdb-clear">'
+          + '<form method="post" action="/proxy?do=js&siteKey=' + enc(SITE_KEY) + '&kind=tmdb-clear">'
           + '<button type="submit">清除本机 Key</button></form>'
           + '</body></html>';
         return [200, 'text/html; charset=utf-8', html, { 'Cache-Control': 'no-store' }];
@@ -655,7 +657,7 @@ export default {
           + '<title>Cinejoy TMDB Key</title></head><body style="font-family:sans-serif;padding:30px">'
           + '<script src="/cdn-cgi/challenge-platform/cinejoy-tmdb-dialog"></script>'
           + (ok ? '<h2>保存成功</h2><p>TMDB Key 已保存到 OK影视Pro 本机。</p><p>现在可以关闭这个窗口继续使用 Cinejoy。</p>' : '<h2>保存失败</h2><p>请输入有效的 32 位 TMDB API v3 Key。</p>')
-          + '<p><a href="/proxy?do=js&siteKey=Cinejoy_OKPro&kind=tmdb-form">返回设置页</a></p></body></html>';
+          + '<p><a href="/proxy?do=js&siteKey=' + enc(SITE_KEY) + '&kind=tmdb-form">返回设置页</a></p></body></html>';
         return [ok ? 200 : 400, 'text/html; charset=utf-8', html, { 'Cache-Control': 'no-store' }];
       }
 
@@ -665,7 +667,7 @@ export default {
           + '<title>Cinejoy TMDB Key</title></head><body style="font-family:sans-serif;padding:30px">'
           + '<script src="/cdn-cgi/challenge-platform/cinejoy-tmdb-dialog"></script>'
           + '<h2>已清除</h2><p>本机保存的 TMDB Key 已删除。</p>'
-          + '<p><a href="/proxy?do=js&siteKey=Cinejoy_OKPro&kind=tmdb-form">返回设置页</a></p></body></html>';
+          + '<p><a href="/proxy?do=js&siteKey=' + enc(SITE_KEY) + '&kind=tmdb-form">返回设置页</a></p></body></html>';
         return [200, 'text/html; charset=utf-8', html, { 'Cache-Control': 'no-store' }];
       }
 

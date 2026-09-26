@@ -103,6 +103,46 @@ function deleteLocalTmdbKey() {
   }
 }
 
+function getTmdbSettingsUrl() {
+  try {
+    return getProxy(true)
+      + '&siteKey=Cinejoy_OKPro'
+      + '&kind=tmdb-form';
+  } catch (_) {
+    return '';
+  }
+}
+
+function tmdbSettingsCard() {
+  const url = getTmdbSettingsUrl();
+  const saved = !!getLocalTmdbKey();
+  return {
+    vod_id: 'settings:tmdb',
+    vod_name: '🔑 TMDB Key 设置',
+    vod_pic: url ? 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' + enc(url) : '',
+    vod_remarks: saved ? '本机已保存 · 点此查看设置入口' : '未设置 · 点此添加 Key'
+  };
+}
+
+function tmdbSettingsDetail() {
+  const url = getTmdbSettingsUrl();
+  const saved = !!getLocalTmdbKey();
+  return {
+    vod_id: 'settings:tmdb',
+    vod_name: 'TMDB Key 本地设置',
+    vod_pic: url ? 'https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=' + enc(url) : '',
+    vod_year: '',
+    vod_area: '本机',
+    vod_remarks: saved ? '当前状态：本机已保存 TMDB Key' : '当前状态：尚未设置 TMDB Key',
+    vod_actor: '',
+    vod_director: '',
+    vod_content: '请用浏览器打开下面的本机地址，或在电视端用手机扫描二维码。\n\n' + url + '\n\nKey 只保存在 OK影视Pro 本机，不会写入 GitHub。',
+    type_name: '设置',
+    vod_play_from: '',
+    vod_play_url: ''
+  };
+}
+
 function tmdb(path, params) {
   if (!TMDB_KEY && !TMDB_TOKEN) {
     throw new Error('未配置 TMDB API Key/Token');
@@ -450,7 +490,8 @@ export default {
         { type_id: 'tv', type_name: '剧集' },
         { type_id: 'top_movie', type_name: '高分电影' },
         { type_id: 'top_tv', type_name: '高分剧集' },
-        { type_id: 'upcoming', type_name: '即将上映' }
+        { type_id: 'upcoming', type_name: '即将上映' },
+        { type_id: 'settings', type_name: '设置' }
       ]
     };
     if (filter) {
@@ -465,9 +506,14 @@ export default {
   homeVod() {
     try {
       const data = tmdb('/trending/all/day', { page: 1 });
-      return JSON.stringify(listResult(data, 'movie', 1));
+      const result = listResult(data, 'movie', 1);
+      result.list.unshift(tmdbSettingsCard());
+      return JSON.stringify(result);
     } catch (e) {
-      return JSON.stringify({ list: [], msg: String(e && e.message ? e.message : e) });
+      return JSON.stringify({
+        list: [tmdbSettingsCard()],
+        msg: String(e && e.message ? e.message : e)
+      });
     }
   },
 
@@ -479,7 +525,9 @@ export default {
       let fallback = 'movie';
       const params = { page: page, include_adult: false };
 
-      if (tid === 'trending') {
+      if (tid === 'settings') {
+        return JSON.stringify({ list: [tmdbSettingsCard()], page: 1, pagecount: 1, limit: 1, total: 1 });
+      } else if (tid === 'trending') {
         path = '/trending/all/day';
       } else if (tid === 'top_movie') {
         path = '/movie/top_rated';
@@ -515,6 +563,9 @@ export default {
 
   detail(id) {
     try {
+      if (String(id || '') === 'settings:tmdb') {
+        return JSON.stringify({ list: [tmdbSettingsDetail()] });
+      }
       return JSON.stringify({ list: [detailObject(id)] });
     } catch (e) {
       return JSON.stringify({ list: [], msg: String(e && e.message ? e.message : e) });

@@ -10,6 +10,8 @@ import java.lang.reflect.Method;
 
 public class Init {
 
+    // Cinejoy host Activity bridge v2
+
     private static volatile WeakReference<Activity> activityRef = new WeakReference<>(null);
     private static volatile boolean registered = false;
 

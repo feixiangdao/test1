@@ -8,6 +8,8 @@ const OPENSUB_BASE = 'https://opensubtitles-v3.strem.io';
 const OPENSUB_LEGACY_BASE = 'https://opensubtitles.strem.io/stremio/v1';
 const CINEJOY_REFERER = 'https://cinejoy.pk/';
 const UA = 'Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+const LOCAL_RULE = 'cinejoy';
+const LOCAL_TMDB_KEY = 'tmdbKey';
 
 let TMDB_KEY = '';
 let TMDB_TOKEN = '';
@@ -64,6 +66,41 @@ function yearOf(date) {
 
 function cleanText(v) {
   return v == null ? '' : String(v).replace(/[\r\n]+/g, ' ').trim();
+}
+
+function isTmdbV3Key(v) {
+  return /^[a-f0-9]{32}$/i.test(cleanText(v));
+}
+
+function getLocalTmdbKey() {
+  try {
+    const v = cleanText(local.get(LOCAL_RULE, LOCAL_TMDB_KEY));
+    return isTmdbV3Key(v) ? v : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function setLocalTmdbKey(v) {
+  const key = cleanText(v);
+  if (!isTmdbV3Key(key)) return false;
+  try {
+    local.set(LOCAL_RULE, LOCAL_TMDB_KEY, key);
+    TMDB_KEY = key;
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function deleteLocalTmdbKey() {
+  try {
+    local.delete(LOCAL_RULE, LOCAL_TMDB_KEY);
+    TMDB_KEY = '';
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 function tmdb(path, params) {
@@ -391,7 +428,16 @@ function detailObject(vodId) {
 export default {
   init(ext) {
     const cfg = parseExt(ext);
-    TMDB_KEY = cleanText(cfg.tmdbKey || cfg.apiKey || cfg.key || '');
+    const extKey = cleanText(cfg.tmdbKey || cfg.apiKey || cfg.key || '');
+    const localKey = getLocalTmdbKey();
+
+    if (isTmdbV3Key(extKey)) {
+      setLocalTmdbKey(extKey);
+      TMDB_KEY = extKey;
+    } else {
+      TMDB_KEY = localKey;
+    }
+
     TMDB_TOKEN = cleanText(cfg.tmdbToken || cfg.token || '');
     LANG = cleanText(cfg.language || cfg.lang || 'zh-CN') || 'zh-CN';
   },
@@ -530,6 +576,43 @@ export default {
   proxy(params) {
     try {
       const p = params || {};
+
+      if (p.kind === 'tmdb-form') {
+        const hasKey = !!getLocalTmdbKey();
+        const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+          + '<title>Cinejoy TMDB Key</title><style>body{font-family:sans-serif;max-width:680px;margin:40px auto;padding:0 18px;background:#111;color:#eee}'
+          + 'input,button{font-size:16px;padding:12px;margin:8px 0;width:100%;box-sizing:border-box}button{cursor:pointer}.ok{color:#6ee7b7}.warn{color:#fbbf24}</style></head><body>'
+          + '<h2>Cinejoy · TMDB Key 本地设置</h2>'
+          + '<p>当前状态：<b class="' + (hasKey ? 'ok' : 'warn') + '">' + (hasKey ? '本机已保存 TMDB Key' : '本机尚未保存 TMDB Key') + '</b></p>'
+          + '<p>Key 只写入 OK影视Pro 本机存储，不会写入 GitHub。</p>'
+          + '<form method="post" action="/proxy?do=js&siteKey=Cinejoy_OKPro&kind=tmdb-save">'
+          + '<input type="password" name="key" autocomplete="off" placeholder="32位 TMDB API v3 Key" required>'
+          + '<button type="submit">保存到本机</button></form>'
+          + '<form method="post" action="/proxy?do=js&siteKey=Cinejoy_OKPro&kind=tmdb-clear">'
+          + '<button type="submit">清除本机 Key</button></form>'
+          + '</body></html>';
+        return [200, 'text/html; charset=utf-8', html, { 'Cache-Control': 'no-store' }];
+      }
+
+      if (p.kind === 'tmdb-save') {
+        const key = cleanText(p.key || '');
+        const ok = setLocalTmdbKey(key);
+        const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+          + '<title>Cinejoy TMDB Key</title></head><body style="font-family:sans-serif;padding:30px">'
+          + (ok ? '<h2>保存成功</h2><p>TMDB Key 已保存到 OK影视Pro 本机。</p>' : '<h2>保存失败</h2><p>请输入有效的 32 位 TMDB API v3 Key。</p>')
+          + '<p><a href="/proxy?do=js&siteKey=Cinejoy_OKPro&kind=tmdb-form">返回设置页</a></p></body></html>';
+        return [ok ? 200 : 400, 'text/html; charset=utf-8', html, { 'Cache-Control': 'no-store' }];
+      }
+
+      if (p.kind === 'tmdb-clear') {
+        deleteLocalTmdbKey();
+        const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+          + '<title>Cinejoy TMDB Key</title></head><body style="font-family:sans-serif;padding:30px">'
+          + '<h2>已清除</h2><p>本机保存的 TMDB Key 已删除。</p>'
+          + '<p><a href="/proxy?do=js&siteKey=Cinejoy_OKPro&kind=tmdb-form">返回设置页</a></p></body></html>';
+        return [200, 'text/html; charset=utf-8', html, { 'Cache-Control': 'no-store' }];
+      }
+
       if (p.kind !== 'subtitle' || !p.sub) {
         return [404, 'text/plain; charset=utf-8', 'Not found', { 'Cache-Control': 'no-cache' }];
       }

@@ -3,6 +3,8 @@ package com.github.catvod.js;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.DialogInterface;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
 import android.view.View;
 import android.view.ViewGroup;
@@ -127,13 +129,17 @@ public class Function {
 
     @JSMethod
     public String showTmdbDialog() {
-        final Activity activity = currentActivity();
-        if (activity == null) return "__ERR_NO_ACTIVITY__";
-
         final CountDownLatch shown = new CountDownLatch(1);
         final AtomicReference<String> status = new AtomicReference<>("__ERR_UNKNOWN__");
 
-        activity.runOnUiThread(() -> {
+        new Handler(Looper.getMainLooper()).post(() -> {
+            final Activity activity = currentActivity();
+            if (activity == null || activity.isFinishing()) {
+                status.set("__ERR_NO_ACTIVITY_MAIN__");
+                shown.countDown();
+                return;
+            }
+
             try {
                 EditText input = new EditText(activity);
                 input.setHint("32位 TMDB API v3 Key");
@@ -145,8 +151,8 @@ public class Function {
 
                 FrameLayout box = new FrameLayout(activity);
                 int h = dp(activity, 14);
-                int v = dp(activity, 8);
-                box.setPadding(h, v, h, 0);
+                int padV = dp(activity, 8);
+                box.setPadding(h, padV, h, 0);
                 box.addView(input, new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT

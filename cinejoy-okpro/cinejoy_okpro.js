@@ -713,7 +713,8 @@ export default {
         );
 
         const key = cleanText(value || '');
-        if (!key) return JSON.stringify({ msg: '已取消' });
+        if (key === '__CANCEL__' || !key) return JSON.stringify({ msg: '已取消' });
+        if (key.indexOf('__ERR_') === 0) return JSON.stringify({ msg: key });
         if (!isTmdbV3Key(key)) return JSON.stringify({ msg: 'TMDB Key 格式不正确，应为32位十六进制字符' });
 
         if (setLocalTmdbKey(key)) {

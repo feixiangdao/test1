@@ -1,0 +1,70 @@
+name: Analyze aiwex spider
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/analyze-aiwex.yml'
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download exact aiwex spider mirror
+        run: |
+          curl -fL "https://raw.githubusercontent.com/DodgeZhang/tvbox/main/wangerxiao/jar/7674fec9301d0f7816450c5887f7c57a.jpg" -o /tmp/aiwex.jar
+          md5sum /tmp/aiwex.jar
+          file /tmp/aiwex.jar
+          unzip -l /tmp/aiwex.jar | head -50
+
+      - name: Extract dex
+        run: |
+          mkdir -p /tmp/aiwex
+          unzip -o /tmp/aiwex.jar -d /tmp/aiwex >/dev/null
+          find /tmp/aiwex -maxdepth 2 -type f -printf '%p %s bytes\n' | head -50
+
+      - name: Dump Init and config classes
+        shell: bash
+        run: |
+          DEXDUMP=$(find "$ANDROID_HOME/build-tools" -type f -name dexdump | sort -V | tail -n 1)
+          echo "dexdump=$DEXDUMP"
+          for d in /tmp/aiwex/classes*.dex; do
+            echo "=== DEX $d ==="
+            "$DEXDUMP" -d "$d" > "/tmp/$(basename "$d").dump"
+          done
+
+          python3 - <<'PY'
+          import glob,re
+          needles = [
+              "Lcom/github/catvod/spider/Init;",
+              "WexconfigGuard",
+              "WexConfigGuard",
+              "getConfigActivity",
+              "getActivity",
+              "mActivities",
+              "ActivityThread",
+          ]
+          for fn in glob.glob('/tmp/classes*.dex.dump'):
+              text=open(fn,encoding='utf-8',errors='ignore').read()
+              print("\n########",fn,"########")
+              for needle in needles:
+                  print("\n===== NEEDLE",needle,"=====")
+                  pos=0
+                  count=0
+                  while True:
+                      i=text.find(needle,pos)
+                      if i<0 or count>=8: break
+                      print(text[max(0,i-3500):min(len(text),i+9000)])
+                      pos=i+len(needle)
+                      count+=1
+          PY
+
+      - name: Search strings
+        run: |
+          for d in /tmp/aiwex/classes*.dex; do
+            echo "=== strings $d ==="
+            strings "$d" | grep -E "ActivityThread|mActivities|getConfigActivity|getActivity|WexconfigGuard|WexConfigGuard|手动输入|远程输入" | head -200 || true
+          done

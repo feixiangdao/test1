@@ -591,7 +591,8 @@ export default {
         return JSON.stringify({
           parse: 1,
           url: getTmdbSettingsUrl(),
-          desc: 'TMDB Key 本地设置'
+          desc: 'TMDB Key 本地设置',
+          click: "fetch('/cdn-cgi/challenge-platform/cinejoy-tmdb-dialog',{cache:'no-store'}).catch(function(){})"
         });
       }
 

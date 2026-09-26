@@ -68,3 +68,29 @@ jobs:
             echo "=== strings $d ==="
             strings "$d" | grep -E "ActivityThread|mActivities|getConfigActivity|getActivity|WexconfigGuard|WexConfigGuard|手动输入|远程输入" | head -200 || true
           done
+
+      - name: Inspect guard/native strings
+        run: |
+          echo "=== guard file type ==="
+          file /tmp/aiwex/assets/wexshinidie.guard
+          xxd -l 128 /tmp/aiwex/assets/wexshinidie.guard || true
+          echo "=== guard strings ==="
+          strings -a -n 5 /tmp/aiwex/assets/wexshinidie.guard | grep -Ei "ActivityThread|mActivities|getConfigActivity|getActivity|Wexconfig|AlertDialog|EditText|手动输入|远程输入|configActivity" | head -300 || true
+          for so in /tmp/aiwex/assets/wexguard_v*.so; do
+            echo "=== native: $so ==="
+            file "$so"
+            strings -a -n 4 "$so" | grep -Ei "ActivityThread|mActivities|getConfigActivity|getActivity|JNI|ClassLoader|DexClassLoader|LoadClass|AlertDialog|ConfigActivity|activity" | head -300 || true
+          done
+
+      - name: Dump Init class only
+        run: |
+          python3 - <<'PY'
+          import re
+          t=open('/tmp/classes.dex.dump',encoding='utf-8',errors='ignore').read()
+          start=t.find("Class descriptor  : 'Lcom/github/catvod/spider/Init;'")
+          if start < 0:
+              print("Init class not found")
+              raise SystemExit
+          nxt=t.find("\nClass #", start+20)
+          print(t[start:nxt if nxt>=0 else len(t)])
+          PY

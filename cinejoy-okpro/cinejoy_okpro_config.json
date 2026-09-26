@@ -1,0 +1,18 @@
+{
+  "sites": [
+    {
+      "key": "Cinejoy_OKPro",
+      "name": "Cinejoy",
+      "type": 3,
+      "api": "./cinejoy_okpro.js",
+      "searchable": 1,
+      "quickSearch": 1,
+      "filterable": 1,
+      "changeable": 0,
+      "ext": {
+        "tmdbKey": "YOUR_TMDB_V3_API_KEY",
+        "language": "zh-CN"
+      }
+    }
+  ]
+}

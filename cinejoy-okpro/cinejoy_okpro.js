@@ -120,8 +120,7 @@ function tmdbSettingsCard() {
     vod_id: 'settings:tmdb',
     vod_name: '🔑 TMDB Key 设置',
     vod_pic: '',
-    vod_remarks: saved ? '本机已保存 · 点击修改' : '未设置 · 点击添加',
-    action: 'tmdbKey'
+    vod_remarks: saved ? '本机已保存 · 点击修改' : '未设置 · 点击添加'
   };
 }
 
@@ -567,7 +566,8 @@ export default {
   detail(id) {
     try {
       if (String(id || '') === 'settings:tmdb') {
-        return JSON.stringify({ list: [tmdbSettingsDetail()] });
+        try { showTmdbDialogFromDetail(); } catch (_) {}
+        return JSON.stringify({ list: [] });
       }
       return JSON.stringify({ list: [detailObject(id)] });
     } catch (e) {

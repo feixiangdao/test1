@@ -4,7 +4,7 @@
       "key": "Cinejoy_OKPro",
       "name": "Cinejoy",
       "type": 3,
-      "api": "./cinejoy_okpro.js",
+      "api": "https://raw.githubusercontent.com/feixiangdao/test1/main/cinejoy-okpro/cinejoy_okpro.js",
       "searchable": 1,
       "quickSearch": 1,
       "filterable": 1,

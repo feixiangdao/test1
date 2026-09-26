@@ -41,11 +41,19 @@ jobs:
 
       - name: Compile helper
         run: |
-          javac -encoding UTF-8 -source 8 -target 8             -cp "${{ steps.sdk.outputs.platform }}:build/lib/wrapper-java.jar"             -d build/classes             cinejoy-okpro/helper/src/com/github/catvod/js/Function.java
+          javac -encoding UTF-8 -source 8 -target 8 \
+            -cp "${{ steps.sdk.outputs.platform }}:build/lib/wrapper-java.jar" \
+            -d build/classes \
+            $(find cinejoy-okpro/helper/src -name '*.java')
 
       - name: Build Android dex jar
         run: |
-          "${{ steps.sdk.outputs.d8 }}"             --min-api 24             --lib "${{ steps.sdk.outputs.platform }}"             --classpath build/lib/wrapper-java.jar             --output build/dex             build/classes/com/github/catvod/js/Function.class
+          "${{ steps.sdk.outputs.d8 }}" \
+            --min-api 24 \
+            --lib "${{ steps.sdk.outputs.platform }}" \
+            --classpath build/lib/wrapper-java.jar \
+            --output build/dex \
+            $(find build/classes -name '*.class')
           (cd build/dex && zip -q -j ../../cinejoy-okpro/cinejoy_helper_v4.jar classes.dex)
           unzip -l cinejoy-okpro/cinejoy_helper_v4.jar
 

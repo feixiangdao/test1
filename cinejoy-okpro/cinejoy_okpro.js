@@ -143,6 +143,8 @@ function tmdbSettingsDetail() {
 }
 
 function tmdb(path, params) {
+  const savedKey = getLocalTmdbKey();
+  if (savedKey) TMDB_KEY = savedKey;
   if (!TMDB_KEY && !TMDB_TOKEN) {
     throw new Error('未配置 TMDB API Key/Token');
   }
@@ -703,24 +705,10 @@ export default {
   action(action) {
     try {
       if (String(action || '') === 'tmdbKey') {
-        const current = getLocalTmdbKey();
-        const value = inputDialog(
-          'TMDB Key 设置',
-          '请输入 TMDB API v3 Key。保存后仅存储在 OK影视Pro 本机，不会上传到 GitHub。',
-          '32位 TMDB API v3 Key',
-          current || '',
-          false
-        );
-
-        const key = cleanText(value || '');
-        if (key === '__CANCEL__' || !key) return JSON.stringify({ msg: '已取消' });
-        if (key.indexOf('__ERR_') === 0) return JSON.stringify({ msg: key });
-        if (!isTmdbV3Key(key)) return JSON.stringify({ msg: 'TMDB Key 格式不正确，应为32位十六进制字符' });
-
-        if (setLocalTmdbKey(key)) {
-          return JSON.stringify({ msg: 'TMDB Key 已保存到本机' });
-        }
-        return JSON.stringify({ msg: 'TMDB Key 保存失败' });
+        const status = cleanText(showTmdbDialog() || '');
+        if (status === '__SHOWN__') return JSON.stringify({ msg: '' });
+        if (status.indexOf('__ERR_') === 0) return JSON.stringify({ msg: status });
+        return JSON.stringify({ msg: status || 'TMDB Key 设置窗口未能打开' });
       }
 
       if (String(action || '') === 'tmdbClear') {

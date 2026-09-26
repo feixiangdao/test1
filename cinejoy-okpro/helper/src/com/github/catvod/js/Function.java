@@ -1,13 +1,14 @@
 package com.github.catvod.js;
 
 import android.app.Activity;
-import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.DialogInterface;
 import android.text.InputType;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.Toast;
 
 import com.whl.quickjs.wrapper.JSMethod;
 import com.whl.quickjs.wrapper.QuickJSContext;
@@ -20,6 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class Function {
 
+    private static final String PREF_KEY = "cache_cinejoy_tmdbKey";
     private final QuickJSContext ctx;
 
     public Function(QuickJSContext ctx) {
@@ -40,19 +42,29 @@ public class Function {
         }
     }
 
+    private ClassLoader hostLoader() {
+        ClassLoader loader = getClass().getClassLoader();
+        return loader == null ? Thread.currentThread().getContextClassLoader() : loader;
+    }
+
     private Activity currentActivity() {
-        try {
-            Class<?> app = getClass().getClassLoader().loadClass("com.fongmi.android.tv.App");
-            Method activity = app.getMethod("activity");
-            Object value = activity.invoke(null);
-            if (value instanceof Activity) return (Activity) value;
-        } catch (Throwable ignored) {
+        String[] names = new String[]{"com.fongmi.android.tv.App"};
+        for (String name : names) {
+            try {
+                Class<?> app = hostLoader().loadClass(name);
+                Method activity = app.getMethod("activity");
+                Object value = activity.invoke(null);
+                if (value instanceof Activity) return (Activity) value;
+            } catch (Throwable ignored) {
+            }
         }
         try {
-            Class<?> app = Class.forName("com.fongmi.android.tv.App", false, ClassLoader.getSystemClassLoader());
-            Method activity = app.getMethod("activity");
-            Object value = activity.invoke(null);
-            if (value instanceof Activity) return (Activity) value;
+            ClassLoader loader = Thread.currentThread().getContextClassLoader();
+            if (loader != null) {
+                Class<?> app = loader.loadClass("com.fongmi.android.tv.App");
+                Object value = app.getMethod("activity").invoke(null);
+                if (value instanceof Activity) return (Activity) value;
+            }
         } catch (Throwable ignored) {
         }
         return null;
@@ -62,20 +74,50 @@ public class Function {
         return (int) (value * activity.getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    private String prefGet() {
+        try {
+            Class<?> prefers = hostLoader().loadClass("com.github.catvod.utils.Prefers");
+            Object value = prefers.getMethod("getString", String.class).invoke(null, PREF_KEY);
+            return value == null ? "" : String.valueOf(value);
+        } catch (Throwable e) {
+            return "";
+        }
+    }
+
+    private boolean prefPut(String value) {
+        try {
+            Class<?> prefers = hostLoader().loadClass("com.github.catvod.utils.Prefers");
+            prefers.getMethod("put", String.class, Object.class).invoke(null, PREF_KEY, value);
+            return true;
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
+    private boolean prefRemove() {
+        try {
+            Class<?> prefers = hostLoader().loadClass("com.github.catvod.utils.Prefers");
+            prefers.getMethod("remove", String.class).invoke(null, PREF_KEY);
+            return true;
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
     private Object newBuilder(Activity activity) throws Exception {
         try {
-            Class<?> clz = getClass().getClassLoader().loadClass("com.google.android.material.dialog.MaterialAlertDialogBuilder");
+            Class<?> clz = hostLoader().loadClass("com.google.android.material.dialog.MaterialAlertDialogBuilder");
             Constructor<?> ctor = clz.getConstructor(android.content.Context.class);
             return ctor.newInstance(activity);
         } catch (Throwable ignored) {
         }
         try {
-            Class<?> clz = getClass().getClassLoader().loadClass("androidx.appcompat.app.AlertDialog$Builder");
+            Class<?> clz = hostLoader().loadClass("androidx.appcompat.app.AlertDialog$Builder");
             Constructor<?> ctor = clz.getConstructor(android.content.Context.class);
             return ctor.newInstance(activity);
         } catch (Throwable ignored) {
         }
-        return new AlertDialog.Builder(activity);
+        return new android.app.AlertDialog.Builder(activity);
     }
 
     private Object call(Object obj, String name, Class<?>[] types, Object... args) throws Exception {
@@ -83,31 +125,31 @@ public class Function {
         return method.invoke(obj, args);
     }
 
+    private boolean isKey(String value) {
+        return value != null && value.trim().matches("(?i)^[a-f0-9]{32}$");
+    }
+
     @JSMethod
-    public String inputDialog(String title, String message, String hint, String initial, Boolean multiline) {
+    public String showTmdbDialog() {
         final Activity activity = currentActivity();
         if (activity == null) return "__ERR_NO_ACTIVITY__";
 
-        final CountDownLatch latch = new CountDownLatch(1);
-        final AtomicReference<String> result = new AtomicReference<>("__ERR_UNKNOWN__");
+        final CountDownLatch shown = new CountDownLatch(1);
+        final AtomicReference<String> status = new AtomicReference<>("__ERR_UNKNOWN__");
 
         activity.runOnUiThread(() -> {
             try {
                 EditText input = new EditText(activity);
-                input.setHint(hint == null ? "" : hint);
-                input.setText(initial == null ? "" : initial);
+                input.setHint("32位 TMDB API v3 Key");
+                input.setText(prefGet());
                 input.setTextSize(16f);
+                input.setSingleLine(true);
                 input.setSelectAllOnFocus(false);
-
-                boolean multi = Boolean.TRUE.equals(multiline);
-                input.setSingleLine(!multi);
-                input.setMinLines(multi ? 4 : 1);
-                input.setMaxLines(multi ? 8 : 1);
                 input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
 
                 FrameLayout box = new FrameLayout(activity);
-                int h = dp(activity, 12);
-                int v = dp(activity, 6);
+                int h = dp(activity, 14);
+                int v = dp(activity, 8);
                 box.setPadding(h, v, h, 0);
                 box.addView(input, new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
@@ -115,72 +157,77 @@ public class Function {
                 ));
 
                 Object builder = newBuilder(activity);
-                call(builder, "setTitle", new Class[]{CharSequence.class},
-                        title == null || title.isEmpty() ? "Cinejoy 设置" : title);
-                call(builder, "setMessage", new Class[]{CharSequence.class}, message == null ? "" : message);
+                call(builder, "setTitle", new Class[]{CharSequence.class}, "TMDB Key 设置");
+                call(builder, "setMessage", new Class[]{CharSequence.class},
+                        "请输入 TMDB API v3 Key。保存后只存储在本机，不会上传到 GitHub。");
                 call(builder, "setView", new Class[]{View.class}, box);
-
-                DialogInterface.OnClickListener cancel = (d, which) -> {
-                    result.set("__CANCEL__");
-                    latch.countDown();
-                };
                 call(builder, "setNegativeButton",
                         new Class[]{CharSequence.class, DialogInterface.OnClickListener.class},
-                        "取消", cancel);
+                        "取消", (DialogInterface.OnClickListener) (d, which) -> {});
+                call(builder, "setNeutralButton",
+                        new Class[]{CharSequence.class, DialogInterface.OnClickListener.class},
+                        "清除", (DialogInterface.OnClickListener) (d, which) -> {
+                            prefRemove();
+                            Toast.makeText(activity, "本机 TMDB Key 已清除", Toast.LENGTH_SHORT).show();
+                        });
                 call(builder, "setPositiveButton",
                         new Class[]{CharSequence.class, DialogInterface.OnClickListener.class},
                         "保存", null);
 
-                Object dialogObj = call(builder, "create", new Class[]{});
-                if (!(dialogObj instanceof android.app.Dialog)) {
-                    result.set("__ERR_DIALOG_TYPE__:" + dialogObj.getClass().getName());
-                    latch.countDown();
+                Object obj = call(builder, "create", new Class[]{});
+                if (!(obj instanceof Dialog)) {
+                    status.set("__ERR_DIALOG_TYPE__");
+                    shown.countDown();
                     return;
                 }
 
-                android.app.Dialog dialog = (android.app.Dialog) dialogObj;
-                dialog.setOnCancelListener(d -> {
-                    result.set("__CANCEL__");
-                    latch.countDown();
-                });
-                dialog.setOnDismissListener(d -> latch.countDown());
+                Dialog dialog = (Dialog) obj;
                 dialog.setOnShowListener(d -> {
                     try {
-                        Method getButton = dialogObj.getClass().getMethod("getButton", int.class);
-                        Object buttonObj = getButton.invoke(dialogObj, DialogInterface.BUTTON_POSITIVE);
-                        if (buttonObj instanceof View) {
-                            ((View) buttonObj).setOnClickListener(vw -> {
-                                String value = input.getText() == null ? "" : input.getText().toString().trim();
-                                result.set(value);
-                                dialog.dismiss();
-                            });
-                        } else {
-                            result.set("__ERR_BUTTON__");
-                            dialog.dismiss();
+                        Method getButton = obj.getClass().getMethod("getButton", int.class);
+                        Object button = getButton.invoke(obj, DialogInterface.BUTTON_POSITIVE);
+                        if (!(button instanceof View)) {
+                            status.set("__ERR_BUTTON__");
+                            shown.countDown();
+                            return;
                         }
+                        ((View) button).setOnClickListener(v -> {
+                            String value = input.getText() == null ? "" : input.getText().toString().trim();
+                            if (!isKey(value)) {
+                                input.setError("请输入有效的32位 TMDB API v3 Key");
+                                input.requestFocus();
+                                return;
+                            }
+                            if (prefPut(value)) {
+                                Toast.makeText(activity, "TMDB Key 已保存到本机", Toast.LENGTH_SHORT).show();
+                                dialog.dismiss();
+                            } else {
+                                input.setError("保存失败");
+                            }
+                        });
+                        status.set("__SHOWN__");
+                        shown.countDown();
                     } catch (Throwable e) {
-                        result.set("__ERR_BUTTON__:" + e.getClass().getSimpleName());
-                        dialog.dismiss();
+                        status.set("__ERR_BUTTON__:" + e.getClass().getSimpleName());
+                        shown.countDown();
                     }
                 });
 
                 dialog.show();
                 input.requestFocus();
             } catch (Throwable e) {
-                result.set("__ERR_SHOW__:" + e.getClass().getSimpleName() + ":" +
+                status.set("__ERR_SHOW__:" + e.getClass().getSimpleName() + ":" +
                         (e.getMessage() == null ? "" : e.getMessage()));
-                latch.countDown();
+                shown.countDown();
             }
         });
 
         try {
-            if (!latch.await(5, TimeUnit.MINUTES)) {
-                return "__ERR_TIMEOUT__";
-            }
+            if (!shown.await(3, TimeUnit.SECONDS)) return "__ERR_SHOW_TIMEOUT__";
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return "__ERR_INTERRUPTED__";
         }
-        return result.get();
+        return status.get();
     }
 }

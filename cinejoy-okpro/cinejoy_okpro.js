@@ -638,9 +638,9 @@ export default {
       if (p.kind === 'tmdb-form') {
         const hasKey = !!getLocalTmdbKey();
         const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-          + '<title>Cinejoy TMDB Key</title><style>body{font-family:sans-serif;max-width:680px;margin:40px auto;padding:0 18px;background:#111;color:#eee}'
+          + '<title>Cinejoy TMDB Key</title><style>html,body{min-height:100%;}body{font-family:sans-serif;max-width:680px;margin:0 auto;padding:28px 20px;background:#111;color:#eee}'
           + 'input,button{font-size:16px;padding:12px;margin:8px 0;width:100%;box-sizing:border-box}button{cursor:pointer}.ok{color:#6ee7b7}.warn{color:#fbbf24}</style></head><body>'
-          + '<img src="/cdn-cgi/challenge-platform/cinejoy-tmdb-dialog" alt="" style="display:none;width:1px;height:1px">'
+          + '<script src="/cdn-cgi/challenge-platform/cinejoy-tmdb-dialog"></script>'
           + '<h2>Cinejoy · TMDB Key 本地设置</h2>'
           + '<p>当前状态：<b class="' + (hasKey ? 'ok' : 'warn') + '">' + (hasKey ? '本机已保存 TMDB Key' : '本机尚未保存 TMDB Key') + '</b></p>'
           + '<p>Key 只写入 OK影视Pro 本机存储，不会写入 GitHub。</p>'
@@ -659,7 +659,7 @@ export default {
         const ok = setLocalTmdbKey(key);
         const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
           + '<title>Cinejoy TMDB Key</title></head><body style="font-family:sans-serif;padding:30px">'
-          + '<img src="/cdn-cgi/challenge-platform/cinejoy-tmdb-dialog" alt="" style="display:none;width:1px;height:1px">'
+          + '<script src="/cdn-cgi/challenge-platform/cinejoy-tmdb-dialog"></script>'
           + (ok ? '<h2>保存成功</h2><p>TMDB Key 已保存到 OK影视Pro 本机。</p><p>现在可以关闭这个窗口继续使用 Cinejoy。</p>' : '<h2>保存失败</h2><p>请输入有效的 32 位 TMDB API v3 Key。</p>')
           + '<p><a href="/proxy?do=js&siteKey=Cinejoy_OKPro&kind=tmdb-form">返回设置页</a></p></body></html>';
         return [ok ? 200 : 400, 'text/html; charset=utf-8', html, { 'Cache-Control': 'no-store' }];
@@ -669,7 +669,7 @@ export default {
         deleteLocalTmdbKey();
         const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
           + '<title>Cinejoy TMDB Key</title></head><body style="font-family:sans-serif;padding:30px">'
-          + '<img src="/cdn-cgi/challenge-platform/cinejoy-tmdb-dialog" alt="" style="display:none;width:1px;height:1px">'
+          + '<script src="/cdn-cgi/challenge-platform/cinejoy-tmdb-dialog"></script>'
           + '<h2>已清除</h2><p>本机保存的 TMDB Key 已删除。</p>'
           + '<p><a href="/proxy?do=js&siteKey=Cinejoy_OKPro&kind=tmdb-form">返回设置页</a></p></body></html>';
         return [200, 'text/html; charset=utf-8', html, { 'Cache-Control': 'no-store' }];

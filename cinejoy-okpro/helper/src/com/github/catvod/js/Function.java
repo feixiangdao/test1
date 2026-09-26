@@ -12,19 +12,18 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
+import com.github.catvod.spider.Init;
 import com.whl.quickjs.wrapper.JSMethod;
 import com.whl.quickjs.wrapper.QuickJSContext;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class Function {
 
     private static final String PREF_KEY = "cache_cinejoy_tmdbKey";
     private final QuickJSContext ctx;
+    private final Handler main = new Handler(Looper.getMainLooper());
 
     public Function(QuickJSContext ctx) {
         this.ctx = ctx;
@@ -47,25 +46,6 @@ public class Function {
     private ClassLoader hostLoader() {
         ClassLoader loader = getClass().getClassLoader();
         return loader == null ? Thread.currentThread().getContextClassLoader() : loader;
-    }
-
-    private Activity currentActivity() {
-        try {
-            Class<?> init = hostLoader().loadClass("com.github.catvod.spider.Init");
-            Object value = init.getMethod("activity").invoke(null);
-            if (value instanceof Activity) return (Activity) value;
-        } catch (Throwable ignored) {
-        }
-
-        try {
-            Class<?> app = hostLoader().loadClass("com.fongmi.android.tv.App");
-            Method activity = app.getMethod("activity");
-            Object value = activity.invoke(null);
-            if (value instanceof Activity) return (Activity) value;
-        } catch (Throwable ignored) {
-        }
-
-        return null;
     }
 
     private int dp(Activity activity, int value) {
@@ -127,109 +107,118 @@ public class Function {
         return value != null && value.trim().matches("(?i)^[a-f0-9]{32}$");
     }
 
-    @JSMethod
-    public String showTmdbDialog() {
-        final CountDownLatch shown = new CountDownLatch(1);
-        final AtomicReference<String> status = new AtomicReference<>("__ERR_UNKNOWN__");
+    private void toast(String text) {
+        try {
+            if (Init.context() != null) {
+                Toast.makeText(Init.context(), text, Toast.LENGTH_LONG).show();
+            }
+        } catch (Throwable ignored) {
+        }
+    }
 
-        new Handler(Looper.getMainLooper()).post(() -> {
-            final Activity activity = currentActivity();
-            if (activity == null || activity.isFinishing()) {
-                status.set("__ERR_NO_ACTIVITY_MAIN__");
-                shown.countDown();
+    private void showDialog(Activity activity) {
+        try {
+            EditText input = new EditText(activity);
+            input.setHint("32位 TMDB API v3 Key");
+            input.setText(prefGet());
+            input.setTextSize(16f);
+            input.setSingleLine(true);
+            input.setSelectAllOnFocus(false);
+            input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+
+            FrameLayout box = new FrameLayout(activity);
+            int h = dp(activity, 14);
+            int v = dp(activity, 8);
+            box.setPadding(h, v, h, 0);
+            box.addView(input, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+
+            Object builder = newBuilder(activity);
+            call(builder, "setTitle", new Class[]{CharSequence.class}, "TMDB Key 设置");
+            call(builder, "setMessage", new Class[]{CharSequence.class},
+                    "请输入 TMDB API v3 Key。保存后只存储在本机，不会上传到 GitHub。");
+            call(builder, "setView", new Class[]{View.class}, box);
+            call(builder, "setNegativeButton",
+                    new Class[]{CharSequence.class, DialogInterface.OnClickListener.class},
+                    "取消", (DialogInterface.OnClickListener) (d, which) -> {});
+            call(builder, "setNeutralButton",
+                    new Class[]{CharSequence.class, DialogInterface.OnClickListener.class},
+                    "清除", (DialogInterface.OnClickListener) (d, which) -> {
+                        prefRemove();
+                        Toast.makeText(activity, "本机 TMDB Key 已清除", Toast.LENGTH_SHORT).show();
+                    });
+            call(builder, "setPositiveButton",
+                    new Class[]{CharSequence.class, DialogInterface.OnClickListener.class},
+                    "保存", null);
+
+            Object obj = call(builder, "create", new Class[]{});
+            if (!(obj instanceof Dialog)) {
+                toast("__ERR_DIALOG_TYPE__");
                 return;
             }
 
-            try {
-                EditText input = new EditText(activity);
-                input.setHint("32位 TMDB API v3 Key");
-                input.setText(prefGet());
-                input.setTextSize(16f);
-                input.setSingleLine(true);
-                input.setSelectAllOnFocus(false);
-                input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
-
-                FrameLayout box = new FrameLayout(activity);
-                int h = dp(activity, 14);
-                int padV = dp(activity, 8);
-                box.setPadding(h, padV, h, 0);
-                box.addView(input, new FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                ));
-
-                Object builder = newBuilder(activity);
-                call(builder, "setTitle", new Class[]{CharSequence.class}, "TMDB Key 设置");
-                call(builder, "setMessage", new Class[]{CharSequence.class},
-                        "请输入 TMDB API v3 Key。保存后只存储在本机，不会上传到 GitHub。");
-                call(builder, "setView", new Class[]{View.class}, box);
-                call(builder, "setNegativeButton",
-                        new Class[]{CharSequence.class, DialogInterface.OnClickListener.class},
-                        "取消", (DialogInterface.OnClickListener) (d, which) -> {});
-                call(builder, "setNeutralButton",
-                        new Class[]{CharSequence.class, DialogInterface.OnClickListener.class},
-                        "清除", (DialogInterface.OnClickListener) (d, which) -> {
-                            prefRemove();
-                            Toast.makeText(activity, "本机 TMDB Key 已清除", Toast.LENGTH_SHORT).show();
-                        });
-                call(builder, "setPositiveButton",
-                        new Class[]{CharSequence.class, DialogInterface.OnClickListener.class},
-                        "保存", null);
-
-                Object obj = call(builder, "create", new Class[]{});
-                if (!(obj instanceof Dialog)) {
-                    status.set("__ERR_DIALOG_TYPE__");
-                    shown.countDown();
-                    return;
-                }
-
-                Dialog dialog = (Dialog) obj;
-                dialog.setOnShowListener(d -> {
-                    try {
-                        Method getButton = obj.getClass().getMethod("getButton", int.class);
-                        Object button = getButton.invoke(obj, DialogInterface.BUTTON_POSITIVE);
-                        if (!(button instanceof View)) {
-                            status.set("__ERR_BUTTON__");
-                            shown.countDown();
+            Dialog dialog = (Dialog) obj;
+            dialog.setOnShowListener(d -> {
+                try {
+                    Method getButton = obj.getClass().getMethod("getButton", int.class);
+                    Object button = getButton.invoke(obj, DialogInterface.BUTTON_POSITIVE);
+                    if (!(button instanceof View)) {
+                        toast("__ERR_BUTTON__");
+                        return;
+                    }
+                    ((View) button).setOnClickListener(view -> {
+                        String value = input.getText() == null ? "" : input.getText().toString().trim();
+                        if (!isKey(value)) {
+                            input.setError("请输入有效的32位 TMDB API v3 Key");
+                            input.requestFocus();
                             return;
                         }
-                        ((View) button).setOnClickListener(view -> {
-                            String value = input.getText() == null ? "" : input.getText().toString().trim();
-                            if (!isKey(value)) {
-                                input.setError("请输入有效的32位 TMDB API v3 Key");
-                                input.requestFocus();
-                                return;
-                            }
-                            if (prefPut(value)) {
-                                Toast.makeText(activity, "TMDB Key 已保存到本机", Toast.LENGTH_SHORT).show();
-                                dialog.dismiss();
-                            } else {
-                                input.setError("保存失败");
-                            }
-                        });
-                        status.set("__SHOWN__");
-                        shown.countDown();
-                    } catch (Throwable e) {
-                        status.set("__ERR_BUTTON__:" + e.getClass().getSimpleName());
-                        shown.countDown();
-                    }
-                });
+                        if (prefPut(value)) {
+                            Toast.makeText(activity, "TMDB Key 已保存到本机", Toast.LENGTH_SHORT).show();
+                            dialog.dismiss();
+                        } else {
+                            input.setError("保存失败");
+                        }
+                    });
+                } catch (Throwable e) {
+                    toast("__ERR_BUTTON__:" + e.getClass().getSimpleName());
+                }
+            });
 
-                dialog.show();
-                input.requestFocus();
+            dialog.show();
+            input.requestFocus();
+        } catch (Throwable e) {
+            toast("__ERR_SHOW__:" + e.getClass().getSimpleName() + ":" +
+                    (e.getMessage() == null ? "" : e.getMessage()));
+        }
+    }
+
+    @JSMethod
+    public String showTmdbDialogFromDetail() {
+        main.post(() -> {
+            try {
+                Init.interceptActivityStart();
             } catch (Throwable e) {
-                status.set("__ERR_SHOW__:" + e.getClass().getSimpleName() + ":" +
-                        (e.getMessage() == null ? "" : e.getMessage()));
-                shown.countDown();
+                toast("__ERR_INTERCEPT__:" + e.getClass().getSimpleName());
             }
+
+            main.postDelayed(() -> {
+                try {
+                    Activity activity = Init.getConfigActivity();
+                    if (activity == null || activity.isFinishing()) {
+                        toast("__ERR_CONFIG_ACTIVITY__");
+                        return;
+                    }
+                    showDialog(activity);
+                } catch (Throwable e) {
+                    toast("__ERR_CONFIG_ACTIVITY__:" + e.getClass().getSimpleName() + ":" +
+                            (e.getMessage() == null ? "" : e.getMessage()));
+                }
+            }, 250);
         });
 
-        try {
-            if (!shown.await(3, TimeUnit.SECONDS)) return "__ERR_SHOW_TIMEOUT__";
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return "__ERR_INTERRUPTED__";
-        }
-        return status.get();
+        return "__SCHEDULED__";
     }
 }

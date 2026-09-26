@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.text.InputType;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -11,6 +12,7 @@ import android.widget.FrameLayout;
 import com.whl.quickjs.wrapper.JSMethod;
 import com.whl.quickjs.wrapper.QuickJSContext;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -32,7 +34,7 @@ public class Function {
                 try {
                     return method.invoke(this, args);
                 } catch (Throwable e) {
-                    return null;
+                    return "__ERR_INVOKE__:" + e.getClass().getSimpleName();
                 }
             });
         }
@@ -40,27 +42,54 @@ public class Function {
 
     private Activity currentActivity() {
         try {
-            Class<?> app = Class.forName("com.fongmi.android.tv.App");
+            Class<?> app = getClass().getClassLoader().loadClass("com.fongmi.android.tv.App");
             Method activity = app.getMethod("activity");
             Object value = activity.invoke(null);
-            return value instanceof Activity ? (Activity) value : null;
-        } catch (Throwable e) {
-            return null;
+            if (value instanceof Activity) return (Activity) value;
+        } catch (Throwable ignored) {
         }
+        try {
+            Class<?> app = Class.forName("com.fongmi.android.tv.App", false, ClassLoader.getSystemClassLoader());
+            Method activity = app.getMethod("activity");
+            Object value = activity.invoke(null);
+            if (value instanceof Activity) return (Activity) value;
+        } catch (Throwable ignored) {
+        }
+        return null;
     }
 
     private int dp(Activity activity, int value) {
         return (int) (value * activity.getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    private Object newBuilder(Activity activity) throws Exception {
+        try {
+            Class<?> clz = getClass().getClassLoader().loadClass("com.google.android.material.dialog.MaterialAlertDialogBuilder");
+            Constructor<?> ctor = clz.getConstructor(android.content.Context.class);
+            return ctor.newInstance(activity);
+        } catch (Throwable ignored) {
+        }
+        try {
+            Class<?> clz = getClass().getClassLoader().loadClass("androidx.appcompat.app.AlertDialog$Builder");
+            Constructor<?> ctor = clz.getConstructor(android.content.Context.class);
+            return ctor.newInstance(activity);
+        } catch (Throwable ignored) {
+        }
+        return new AlertDialog.Builder(activity);
+    }
+
+    private Object call(Object obj, String name, Class<?>[] types, Object... args) throws Exception {
+        Method method = obj.getClass().getMethod(name, types);
+        return method.invoke(obj, args);
+    }
+
     @JSMethod
     public String inputDialog(String title, String message, String hint, String initial, Boolean multiline) {
         final Activity activity = currentActivity();
-        if (activity == null) return "";
+        if (activity == null) return "__ERR_NO_ACTIVITY__";
 
         final CountDownLatch latch = new CountDownLatch(1);
-        final AtomicReference<String> result = new AtomicReference<>("");
-        final AtomicReference<AlertDialog> dialogRef = new AtomicReference<>();
+        final AtomicReference<String> result = new AtomicReference<>("__ERR_UNKNOWN__");
 
         activity.runOnUiThread(() -> {
             try {
@@ -77,55 +106,80 @@ public class Function {
                 input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
 
                 FrameLayout box = new FrameLayout(activity);
-                int h = dp(activity, 8);
-                int v = dp(activity, 4);
+                int h = dp(activity, 12);
+                int v = dp(activity, 6);
                 box.setPadding(h, v, h, 0);
                 box.addView(input, new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT
                 ));
 
-                AlertDialog dialog = new AlertDialog.Builder(activity)
-                        .setTitle(title == null || title.isEmpty() ? "Cinejoy 设置" : title)
-                        .setMessage(message == null ? "" : message)
-                        .setView(box)
-                        .setNegativeButton("取消", (d, which) -> {
-                            result.set("");
-                            latch.countDown();
-                        })
-                        .setPositiveButton("保存", null)
-                        .create();
+                Object builder = newBuilder(activity);
+                call(builder, "setTitle", new Class[]{CharSequence.class},
+                        title == null || title.isEmpty() ? "Cinejoy 设置" : title);
+                call(builder, "setMessage", new Class[]{CharSequence.class}, message == null ? "" : message);
+                call(builder, "setView", new Class[]{View.class}, box);
 
-                dialogRef.set(dialog);
+                DialogInterface.OnClickListener cancel = (d, which) -> {
+                    result.set("__CANCEL__");
+                    latch.countDown();
+                };
+                call(builder, "setNegativeButton",
+                        new Class[]{CharSequence.class, DialogInterface.OnClickListener.class},
+                        "取消", cancel);
+                call(builder, "setPositiveButton",
+                        new Class[]{CharSequence.class, DialogInterface.OnClickListener.class},
+                        "保存", null);
+
+                Object dialogObj = call(builder, "create", new Class[]{});
+                if (!(dialogObj instanceof android.app.Dialog)) {
+                    result.set("__ERR_DIALOG_TYPE__:" + dialogObj.getClass().getName());
+                    latch.countDown();
+                    return;
+                }
+
+                android.app.Dialog dialog = (android.app.Dialog) dialogObj;
                 dialog.setOnCancelListener(d -> {
-                    result.set("");
+                    result.set("__CANCEL__");
                     latch.countDown();
                 });
                 dialog.setOnDismissListener(d -> latch.countDown());
-                dialog.setOnShowListener(d -> dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(vw -> {
-                    String value = input.getText() == null ? "" : input.getText().toString().trim();
-                    result.set(value);
-                    dialog.dismiss();
-                }));
+                dialog.setOnShowListener(d -> {
+                    try {
+                        Method getButton = dialogObj.getClass().getMethod("getButton", int.class);
+                        Object buttonObj = getButton.invoke(dialogObj, DialogInterface.BUTTON_POSITIVE);
+                        if (buttonObj instanceof View) {
+                            ((View) buttonObj).setOnClickListener(vw -> {
+                                String value = input.getText() == null ? "" : input.getText().toString().trim();
+                                result.set(value);
+                                dialog.dismiss();
+                            });
+                        } else {
+                            result.set("__ERR_BUTTON__");
+                            dialog.dismiss();
+                        }
+                    } catch (Throwable e) {
+                        result.set("__ERR_BUTTON__:" + e.getClass().getSimpleName());
+                        dialog.dismiss();
+                    }
+                });
 
                 dialog.show();
                 input.requestFocus();
             } catch (Throwable e) {
+                result.set("__ERR_SHOW__:" + e.getClass().getSimpleName() + ":" +
+                        (e.getMessage() == null ? "" : e.getMessage()));
                 latch.countDown();
             }
         });
 
         try {
             if (!latch.await(5, TimeUnit.MINUTES)) {
-                activity.runOnUiThread(() -> {
-                    AlertDialog dialog = dialogRef.get();
-                    if (dialog != null && dialog.isShowing()) dialog.dismiss();
-                });
-                return "";
+                return "__ERR_TIMEOUT__";
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return "";
+            return "__ERR_INTERRUPTED__";
         }
         return result.get();
     }

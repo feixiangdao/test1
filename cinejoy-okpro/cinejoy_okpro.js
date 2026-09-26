@@ -145,24 +145,35 @@ function fetchSubtitleUrl(url) {
   }
 }
 
+function subtitleProxyUrl(remoteUrl, index) {
+  try {
+    const base = getProxy(true);
+    return base
+      + '&siteKey=Cinejoy_OKPro'
+      + '&kind=subtitle'
+      + '&n=' + enc(index || 0)
+      + '&sub=' + enc(remoteUrl);
+  } catch (_) {
+    return remoteUrl;
+  }
+}
+
 function normalizeSubs(list, out, seen) {
   (list || []).forEach(function (s) {
     if (!s || !s.url || out.length >= 120) return;
-    const u = String(s.url);
-    if (seen[u]) return;
-    seen[u] = true;
+    const remote = String(s.url);
+    if (seen[remote]) return;
+    seen[remote] = true;
 
     const lang = cleanText(s.lang || '');
     const label = cleanText(s.label || s.name || lang || '字幕');
-    const item = {
-      url: u,
+    out.push({
+      url: subtitleProxyUrl(remote, out.length + 1),
       name: label,
       lang: lang,
+      format: 'application/x-subrip',
       flag: 0
-    };
-    const format = cleanText(s.format || '') || subtitleMime(u);
-    if (format) item.format = format;
-    out.push(item);
+    });
   });
 }
 
@@ -201,7 +212,7 @@ function fetchSubtitles(type, tmdbId, season, episode) {
       normalizeSubs(r.list, result.subs, seen);
     }
 
-    result.debug = 'IMDb ' + imdbId + ' / OS ' + codes.join(',') + ' / 字幕 ' + result.subs.length;
+    result.debug = 'IMDb ' + imdbId + ' / OS ' + codes.join(',') + ' / 字幕 ' + result.subs.length + ' / 本地代理';
     return result;
   } catch (_) {
     result.debug = '字幕请求异常';
@@ -514,6 +525,42 @@ export default {
 
   isVideo(url) {
     return /(?:\.m3u8|\.mp4|\.mkv|\.flv|\.mpd)(?:\?|$)|\/video\/tos/i.test(String(url || ''));
+  },
+
+  proxy(params) {
+    try {
+      const p = params || {};
+      if (p.kind !== 'subtitle' || !p.sub) {
+        return [404, 'text/plain; charset=utf-8', 'Not found', { 'Cache-Control': 'no-cache' }];
+      }
+
+      const remote = String(p.sub);
+      const r = req(remote, {
+        headers: {
+          'Accept': 'text/plain,*/*',
+          'Referer': 'https://app.strem.io/',
+          'User-Agent': UA
+        },
+        timeout: 15000
+      });
+
+      const code = Number(r && r.code ? r.code : 0);
+      if (!r || !r.content || code < 200 || code >= 300) {
+        return [502, 'text/plain; charset=utf-8', '', { 'Cache-Control': 'no-cache' }];
+      }
+
+      return [
+        200,
+        'application/x-subrip; charset=utf-8',
+        String(r.content),
+        {
+          'Cache-Control': 'private, max-age=3600',
+          'Access-Control-Allow-Origin': '*'
+        }
+      ];
+    } catch (_) {
+      return [500, 'text/plain; charset=utf-8', '', { 'Cache-Control': 'no-cache' }];
+    }
   },
 
   action(action) {

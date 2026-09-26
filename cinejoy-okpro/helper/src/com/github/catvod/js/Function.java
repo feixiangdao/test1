@@ -191,7 +191,7 @@ public class Function {
                             shown.countDown();
                             return;
                         }
-                        ((View) button).setOnClickListener(v -> {
+                        ((View) button).setOnClickListener(view -> {
                             String value = input.getText() == null ? "" : input.getText().toString().trim();
                             if (!isKey(value)) {
                                 input.setError("请输入有效的32位 TMDB API v3 Key");

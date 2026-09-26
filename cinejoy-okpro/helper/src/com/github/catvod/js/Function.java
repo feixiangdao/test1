@@ -48,25 +48,21 @@ public class Function {
     }
 
     private Activity currentActivity() {
-        String[] names = new String[]{"com.fongmi.android.tv.App"};
-        for (String name : names) {
-            try {
-                Class<?> app = hostLoader().loadClass(name);
-                Method activity = app.getMethod("activity");
-                Object value = activity.invoke(null);
-                if (value instanceof Activity) return (Activity) value;
-            } catch (Throwable ignored) {
-            }
-        }
         try {
-            ClassLoader loader = Thread.currentThread().getContextClassLoader();
-            if (loader != null) {
-                Class<?> app = loader.loadClass("com.fongmi.android.tv.App");
-                Object value = app.getMethod("activity").invoke(null);
-                if (value instanceof Activity) return (Activity) value;
-            }
+            Class<?> init = hostLoader().loadClass("com.github.catvod.spider.Init");
+            Object value = init.getMethod("activity").invoke(null);
+            if (value instanceof Activity) return (Activity) value;
         } catch (Throwable ignored) {
         }
+
+        try {
+            Class<?> app = hostLoader().loadClass("com.fongmi.android.tv.App");
+            Method activity = app.getMethod("activity");
+            Object value = activity.invoke(null);
+            if (value instanceof Activity) return (Activity) value;
+        } catch (Throwable ignored) {
+        }
+
         return null;
     }
 

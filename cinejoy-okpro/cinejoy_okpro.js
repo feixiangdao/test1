@@ -114,13 +114,13 @@ function getTmdbSettingsUrl() {
 }
 
 function tmdbSettingsCard() {
-  const url = getTmdbSettingsUrl();
   const saved = !!getLocalTmdbKey();
   return {
     vod_id: 'settings:tmdb',
     vod_name: '🔑 TMDB Key 设置',
-    vod_pic: url ? 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' + enc(url) : '',
-    vod_remarks: saved ? '本机已保存 · 点此查看设置入口' : '未设置 · 点此添加 Key'
+    vod_pic: '',
+    vod_remarks: saved ? '本机已保存 · 点击修改' : '未设置 · 点击添加',
+    action: 'tmdbKey'
   };
 }
 
@@ -587,15 +587,6 @@ export default {
 
   play(flag, id, vipFlags) {
     try {
-      if (String(id || '') === 'settings|tmdb') {
-        return JSON.stringify({
-          parse: 1,
-          url: getTmdbSettingsUrl(),
-          desc: 'TMDB Key 本地设置',
-          click: "fetch('/cdn-cgi/challenge-platform/cinejoy-tmdb-dialog',{cache:'no-store'}).catch(function(){})"
-        });
-      }
-
       const p = String(id || '').split('|');
       if (p.length < 6 || p[0] !== 'cj') {
         return JSON.stringify({ parse: 1, url: String(id || '') });
@@ -710,7 +701,36 @@ export default {
   },
 
   action(action) {
-    return '';
+    try {
+      if (String(action || '') === 'tmdbKey') {
+        const current = getLocalTmdbKey();
+        const value = inputDialog(
+          'TMDB Key 设置',
+          '请输入 TMDB API v3 Key。保存后仅存储在 OK影视Pro 本机，不会上传到 GitHub。',
+          '32位 TMDB API v3 Key',
+          current || '',
+          false
+        );
+
+        const key = cleanText(value || '');
+        if (!key) return JSON.stringify({ msg: '已取消' });
+        if (!isTmdbV3Key(key)) return JSON.stringify({ msg: 'TMDB Key 格式不正确，应为32位十六进制字符' });
+
+        if (setLocalTmdbKey(key)) {
+          return JSON.stringify({ msg: 'TMDB Key 已保存到本机' });
+        }
+        return JSON.stringify({ msg: 'TMDB Key 保存失败' });
+      }
+
+      if (String(action || '') === 'tmdbClear') {
+        deleteLocalTmdbKey();
+        return JSON.stringify({ msg: '本机 TMDB Key 已清除' });
+      }
+
+      return JSON.stringify({ msg: '' });
+    } catch (e) {
+      return JSON.stringify({ msg: '原生输入组件加载失败，请重新加载配置后再试' });
+    }
   },
 
   destroy() {}

@@ -23,3 +23,14 @@ https://raw.githubusercontent.com/feixiangdao/test1/main/cinejoy-okpro/cinejoy_o
 ```
 
 因此即使本地 JSON 不变，后续更新 GitHub 上的 JS 后，OK影视Pro 仍然会加载最新版 Spider。
+
+
+## App 内设置 TMDB Key
+
+新版 Cinejoy 源会把 TMDB API v3 Key 保存在 OK影视Pro 本机存储中。
+
+进入 Cinejoy 后，首页最前面会显示 **🔑 TMDB Key 设置** 卡片；也可以进入 **设置** 分类。点开后会显示本机设置地址和二维码。
+
+- 手机：用浏览器打开页面中显示的 127.0.0.1 本机地址。
+- 电视：使用手机扫描详情页二维码。
+- Key 不写入 GitHub，只保存在运行 OK影视Pro 的设备上。

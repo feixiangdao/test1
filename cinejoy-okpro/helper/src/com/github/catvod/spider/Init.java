@@ -3,84 +3,68 @@ package com.github.catvod.spider;
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
-import android.os.Bundle;
 
-import java.lang.ref.WeakReference;
-import java.lang.reflect.Method;
+import java.lang.reflect.Field;
+import java.util.Map;
 
 public class Init {
 
-    // Cinejoy host Activity bridge v2
-
-    private static volatile WeakReference<Activity> activityRef = new WeakReference<>(null);
-    private static volatile boolean registered = false;
+    private static Application app;
 
     public static void init(Context context) {
-        seedFromHostApp();
         try {
-            Context appContext = context == null ? null : context.getApplicationContext();
-            if (!(appContext instanceof Application) || registered) return;
-            registered = true;
-            ((Application) appContext).registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
-                @Override
-                public void onActivityCreated(Activity activity, Bundle state) {
-                    remember(activity);
-                }
-
-                @Override
-                public void onActivityStarted(Activity activity) {
-                    remember(activity);
-                }
-
-                @Override
-                public void onActivityResumed(Activity activity) {
-                    remember(activity);
-                }
-
-                @Override
-                public void onActivityPaused(Activity activity) {
-                }
-
-                @Override
-                public void onActivityStopped(Activity activity) {
-                }
-
-                @Override
-                public void onActivitySaveInstanceState(Activity activity, Bundle state) {
-                }
-
-                @Override
-                public void onActivityDestroyed(Activity activity) {
-                    Activity current = activity();
-                    if (current == activity) activityRef = new WeakReference<>(null);
-                }
-            });
+            app = (Application) context;
         } catch (Throwable ignored) {
         }
     }
 
-    private static void remember(Activity activity) {
-        if (activity != null && !activity.isFinishing()) {
-            activityRef = new WeakReference<>(activity);
-        }
+    public static Application context() {
+        return app;
     }
 
-    private static void seedFromHostApp() {
-        try {
-            ClassLoader loader = Init.class.getClassLoader();
-            Class<?> app = loader.loadClass("com.fongmi.android.tv.App");
-            Method method = app.getMethod("activity");
-            Object value = method.invoke(null);
-            if (value instanceof Activity) remember((Activity) value);
-        } catch (Throwable ignored) {
+    public static Activity getActivity() throws Exception {
+        Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+        Object activityThread = activityThreadClass
+                .getMethod("currentActivityThread")
+                .invoke(null);
+
+        Field activitiesField = activityThreadClass.getDeclaredField("mActivities");
+        activitiesField.setAccessible(true);
+
+        Map<?, ?> activities = (Map<?, ?>) activitiesField.get(activityThread);
+        if (activities == null) return null;
+
+        for (Object activityRecord : activities.values()) {
+            if (activityRecord == null) continue;
+
+            Class<?> recordClass = activityRecord.getClass();
+
+            Field pausedField = recordClass.getDeclaredField("paused");
+            pausedField.setAccessible(true);
+
+            if (!pausedField.getBoolean(activityRecord)) {
+                Field activityField = recordClass.getDeclaredField("activity");
+                activityField.setAccessible(true);
+
+                Object value = activityField.get(activityRecord);
+                if (value instanceof Activity) {
+                    return (Activity) value;
+                }
+            }
         }
+
+        return null;
+    }
+
+    public static Activity getConfigActivity() throws Exception {
+        return getActivity();
     }
 
     public static Activity activity() {
-        Activity activity = activityRef.get();
-        if (activity != null && !activity.isFinishing()) return activity;
-        seedFromHostApp();
-        activity = activityRef.get();
-        return activity != null && !activity.isFinishing() ? activity : null;
+        try {
+            return getActivity();
+        } catch (Throwable e) {
+            return null;
+        }
     }
 }

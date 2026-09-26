@@ -10,7 +10,7 @@
       "filterable": 1,
       "changeable": 0,
       "ext": {
-        "tmdbKey": "d0c1d4cac17b6fa64b9670fcf6262356",
+        "tmdbKey": "YOUR_TMDB_V3_API_KEY",
         "language": "zh-CN"
       }
     }

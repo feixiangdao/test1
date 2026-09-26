@@ -125,21 +125,20 @@ function tmdbSettingsCard() {
 }
 
 function tmdbSettingsDetail() {
-  const url = getTmdbSettingsUrl();
   const saved = !!getLocalTmdbKey();
   return {
     vod_id: 'settings:tmdb',
     vod_name: 'TMDB Key 本地设置',
-    vod_pic: url ? 'https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=' + enc(url) : '',
+    vod_pic: '',
     vod_year: '',
     vod_area: '本机',
     vod_remarks: saved ? '当前状态：本机已保存 TMDB Key' : '当前状态：尚未设置 TMDB Key',
     vod_actor: '',
     vod_director: '',
-    vod_content: '请用浏览器打开下面的本机地址，或在电视端用手机扫描二维码。\n\n' + url + '\n\nKey 只保存在 OK影视Pro 本机，不会写入 GitHub。',
+    vod_content: '点击下面的「打开设置」即可在 OK影视Pro 内弹出设置窗口。TMDB Key 只保存在本机，不会写入 GitHub。',
     type_name: '设置',
-    vod_play_from: '',
-    vod_play_url: ''
+    vod_play_from: 'TMDB 设置',
+    vod_play_url: '打开设置$settings|tmdb'
   };
 }
 
@@ -588,6 +587,14 @@ export default {
 
   play(flag, id, vipFlags) {
     try {
+      if (String(id || '') === 'settings|tmdb') {
+        return JSON.stringify({
+          parse: 1,
+          url: getTmdbSettingsUrl(),
+          desc: 'TMDB Key 本地设置'
+        });
+      }
+
       const p = String(id || '').split('|');
       if (p.length < 6 || p[0] !== 'cj') {
         return JSON.stringify({ parse: 1, url: String(id || '') });
@@ -633,9 +640,11 @@ export default {
         const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
           + '<title>Cinejoy TMDB Key</title><style>body{font-family:sans-serif;max-width:680px;margin:40px auto;padding:0 18px;background:#111;color:#eee}'
           + 'input,button{font-size:16px;padding:12px;margin:8px 0;width:100%;box-sizing:border-box}button{cursor:pointer}.ok{color:#6ee7b7}.warn{color:#fbbf24}</style></head><body>'
+          + '<img src="/cdn-cgi/challenge-platform/cinejoy-tmdb-dialog" alt="" style="display:none;width:1px;height:1px">'
           + '<h2>Cinejoy · TMDB Key 本地设置</h2>'
           + '<p>当前状态：<b class="' + (hasKey ? 'ok' : 'warn') + '">' + (hasKey ? '本机已保存 TMDB Key' : '本机尚未保存 TMDB Key') + '</b></p>'
           + '<p>Key 只写入 OK影视Pro 本机存储，不会写入 GitHub。</p>'
+          + '<p style="font-size:13px;color:#aaa">保存后关闭此窗口即可继续使用 Cinejoy。</p>'
           + '<form method="post" action="/proxy?do=js&siteKey=Cinejoy_OKPro&kind=tmdb-save">'
           + '<input type="password" name="key" autocomplete="off" placeholder="32位 TMDB API v3 Key" required>'
           + '<button type="submit">保存到本机</button></form>'
@@ -650,7 +659,8 @@ export default {
         const ok = setLocalTmdbKey(key);
         const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
           + '<title>Cinejoy TMDB Key</title></head><body style="font-family:sans-serif;padding:30px">'
-          + (ok ? '<h2>保存成功</h2><p>TMDB Key 已保存到 OK影视Pro 本机。</p>' : '<h2>保存失败</h2><p>请输入有效的 32 位 TMDB API v3 Key。</p>')
+          + '<img src="/cdn-cgi/challenge-platform/cinejoy-tmdb-dialog" alt="" style="display:none;width:1px;height:1px">'
+          + (ok ? '<h2>保存成功</h2><p>TMDB Key 已保存到 OK影视Pro 本机。</p><p>现在可以关闭这个窗口继续使用 Cinejoy。</p>' : '<h2>保存失败</h2><p>请输入有效的 32 位 TMDB API v3 Key。</p>')
           + '<p><a href="/proxy?do=js&siteKey=Cinejoy_OKPro&kind=tmdb-form">返回设置页</a></p></body></html>';
         return [ok ? 200 : 400, 'text/html; charset=utf-8', html, { 'Cache-Control': 'no-store' }];
       }
@@ -659,6 +669,7 @@ export default {
         deleteLocalTmdbKey();
         const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
           + '<title>Cinejoy TMDB Key</title></head><body style="font-family:sans-serif;padding:30px">'
+          + '<img src="/cdn-cgi/challenge-platform/cinejoy-tmdb-dialog" alt="" style="display:none;width:1px;height:1px">'
           + '<h2>已清除</h2><p>本机保存的 TMDB Key 已删除。</p>'
           + '<p><a href="/proxy?do=js&siteKey=Cinejoy_OKPro&kind=tmdb-form">返回设置页</a></p></body></html>';
         return [200, 'text/html; charset=utf-8', html, { 'Cache-Control': 'no-store' }];

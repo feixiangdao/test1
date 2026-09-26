@@ -2,7 +2,7 @@
   "sites": [
     {
       "key": "Cinejoy_OKPro_v2",
-      "name": "Cinejoy",
+      "name": "Cinejoy v2",
       "type": 3,
       "api": "https://raw.githubusercontent.com/feixiangdao/test1/main/cinejoy-okpro/cinejoy_okpro.js",
       "searchable": 1,

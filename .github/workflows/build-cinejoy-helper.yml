@@ -51,7 +51,7 @@ jobs:
 
       - name: Commit helper jar
         run: |
-          if git diff --quiet -- cinejoy-okpro/cinejoy_helper.jar; then
+          if [ -z "$(git status --porcelain -- cinejoy-okpro/cinejoy_helper.jar)" ]; then
             echo "Helper jar unchanged."
             exit 0
           fi

@@ -1,8 +1,8 @@
 {
   "sites": [
     {
-      "key": "Cinejoy_OKPro_v3",
-      "name": "Cinejoy v3",
+      "key": "Cinejoy_OKPro_v4",
+      "name": "Cinejoy v4",
       "type": 3,
       "api": "https://raw.githubusercontent.com/feixiangdao/test1/main/cinejoy-okpro/cinejoy_okpro.js",
       "searchable": 1,
@@ -12,9 +12,9 @@
       "ext": {
         "tmdbKey": "",
         "language": "zh-CN",
-        "siteKey": "Cinejoy_OKPro_v3"
+        "siteKey": "Cinejoy_OKPro_v4"
       },
-      "jar": "https://raw.githubusercontent.com/feixiangdao/test1/main/cinejoy-okpro/cinejoy_helper_v3.jar"
+      "jar": "https://raw.githubusercontent.com/feixiangdao/test1/main/cinejoy-okpro/cinejoy_helper_v4.jar"
     }
   ]
 }

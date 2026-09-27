@@ -37,10 +37,12 @@ jobs:
               if(m.catalogs[1].name!=='Cinejoy · 剧集') throw new Error('series catalog missing');
               const h=await fetch('http://127.0.0.1:3100/configure').then(r=>r.text());
               if(!h.includes('TMDB API v3 Key')) throw new Error('configure page missing');
-              const scriptMatch=h.match(/<script>([\\s\\S]*?)<\\/script>/i);
-              if(!scriptMatch) throw new Error('configure script missing');
-              new Function(scriptMatch[1]);
-              if(!/function\\s+make\\s*\\(/.test(scriptMatch[1])) throw new Error('make() missing');
+              const scriptStart=h.indexOf('<script>');
+              const scriptEnd=h.indexOf('</script>', scriptStart + 8);
+              if(scriptStart < 0 || scriptEnd < 0) throw new Error('configure script missing');
+              const browserJs=h.slice(scriptStart + 8, scriptEnd);
+              new Function(browserJs);
+              if(!browserJs.includes('function make()')) throw new Error('make() missing');
               console.log('HTTP smoke test passed');
             } finally {
               server.close();

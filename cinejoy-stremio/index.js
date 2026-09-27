@@ -139,7 +139,7 @@ const origin=${JSON.stringify(origin)};
 function b64url(obj){
   const bytes=new TextEncoder().encode(JSON.stringify(obj));
   let bin=''; for(const b of bytes) bin+=String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  return btoa(bin).split('+').join('-').split('/').join('_').replace(/=+$/,'');
 }
 function make(){
   const tmdb=document.getElementById('tmdb').value.trim();
@@ -151,7 +151,7 @@ function make(){
   });
   const url=origin+'/'+token+'/manifest.json';
   document.getElementById('url').textContent=url;
-  document.getElementById('install').href=url.replace(/^https?:\/\//,'stremio://');
+  document.getElementById('install').href='stremio://'+url.replace('https://','').replace('http://','');
   document.getElementById('result').style.display='block';
 }
 async function copyUrl(){

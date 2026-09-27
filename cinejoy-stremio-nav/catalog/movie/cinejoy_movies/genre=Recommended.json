@@ -1,0 +1,32 @@
+{
+  "metas": [
+    {
+      "id": "tt1375666",
+      "type": "movie",
+      "name": "Inception",
+      "poster": "https://images.metahub.space/poster/medium/tt1375666/img",
+      "posterShape": "poster"
+    },
+    {
+      "id": "tt0133093",
+      "type": "movie",
+      "name": "The Matrix",
+      "poster": "https://images.metahub.space/poster/medium/tt0133093/img",
+      "posterShape": "poster"
+    },
+    {
+      "id": "tt0816692",
+      "type": "movie",
+      "name": "Interstellar",
+      "poster": "https://images.metahub.space/poster/medium/tt0816692/img",
+      "posterShape": "poster"
+    },
+    {
+      "id": "tt0111161",
+      "type": "movie",
+      "name": "The Shawshank Redemption",
+      "poster": "https://images.metahub.space/poster/medium/tt0111161/img",
+      "posterShape": "poster"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ package com.github.catvod.js;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
@@ -73,11 +74,16 @@ public class Function {
         return (int) (value * activity.getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    private SharedPreferences defaultPreferences() {
+        if (Init.context() == null) return null;
+        String name = Init.context().getPackageName() + "_preferences";
+        return Init.context().getSharedPreferences(name, android.content.Context.MODE_PRIVATE);
+    }
+
     private String prefGet(String key) {
         try {
-            Class<?> prefers = hostLoader().loadClass("com.github.catvod.utils.Prefers");
-            Object value = prefers.getMethod("getString", String.class).invoke(null, key);
-            return value == null ? "" : String.valueOf(value);
+            SharedPreferences prefs = defaultPreferences();
+            return prefs == null ? "" : prefs.getString(key, "");
         } catch (Throwable e) {
             return "";
         }
@@ -85,9 +91,8 @@ public class Function {
 
     private boolean prefPut(String key, String value) {
         try {
-            Class<?> prefers = hostLoader().loadClass("com.github.catvod.utils.Prefers");
-            prefers.getMethod("put", String.class, Object.class).invoke(null, key, value);
-            return true;
+            SharedPreferences prefs = defaultPreferences();
+            return prefs != null && prefs.edit().putString(key, value).commit();
         } catch (Throwable e) {
             return false;
         }
@@ -95,9 +100,8 @@ public class Function {
 
     private boolean prefRemove(String key) {
         try {
-            Class<?> prefers = hostLoader().loadClass("com.github.catvod.utils.Prefers");
-            prefers.getMethod("remove", String.class).invoke(null, key);
-            return true;
+            SharedPreferences prefs = defaultPreferences();
+            return prefs != null && prefs.edit().remove(key).commit();
         } catch (Throwable e) {
             return false;
         }

@@ -686,12 +686,10 @@ export default {
   homeVod() {
     try {
       const data = tmdb('/trending/all/day', { page: 1 });
-      const result = listResult(data, 'movie', 1);
-      result.list.unshift(tmdbSettingsCard());
-      return JSON.stringify(result);
+      return JSON.stringify(listResult(data, 'movie', 1));
     } catch (e) {
       return JSON.stringify({
-        list: [tmdbSettingsCard()],
+        list: [],
         msg: String(e && e.message ? e.message : e)
       });
     }

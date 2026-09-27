@@ -1,6 +1,6 @@
 # Cinejoy Stremio / Nuvio Addon
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/project?template=https://github.com/feixiangdao/test1/tree/main/cinejoy-stremio)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Ffeixiangdao%2Ftest1&root-directory=cinejoy-stremio&project-name=cinejoy-stremio)
 
 Cinejoy 的 Stremio 协议版本。当前采用“首页只保留两个 Catalog”的结构，避免多个插件安装后把首页堆满。
 

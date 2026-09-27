@@ -1,11 +1,11 @@
 const express = require('express');
-const { TmdbClient } = require('../lib/tmdb');
-const { subtitles } = require('../lib/subtitles');
-const { decodeConfig, validTmdbKey } = require('../lib/config');
+const { TmdbClient } = require('./lib/tmdb');
+const { subtitles } = require('./lib/subtitles');
+const { decodeConfig, validTmdbKey } = require('./lib/config');
 const {
   MOVIE_GENRES, TV_GENRES, MOVIE_SECTIONS, TV_SECTIONS,
   SORT_OPTIONS, yearOptions
-} = require('../lib/constants');
+} = require('./lib/constants');
 
 const app = express();
 app.disable('x-powered-by');

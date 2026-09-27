@@ -1,0 +1,69 @@
+{
+  "id": "com.feixiangdao.cinejoy.navtest",
+  "version": "0.1.0",
+  "name": "Cinejoy 导航测试",
+  "description": "验证 Stremio 一级 Cinejoy → 二级分类的导航 Catalog 方案。",
+  "resources": [
+    "catalog",
+    {
+      "name": "meta",
+      "types": [
+        "movie"
+      ],
+      "idPrefixes": [
+        "cinejoy-nav-"
+      ]
+    },
+    {
+      "name": "stream",
+      "types": [
+        "movie"
+      ],
+      "idPrefixes": [
+        "cinejoy-nav-"
+      ]
+    }
+  ],
+  "types": [
+    "movie",
+    "series"
+  ],
+  "catalogs": [
+    {
+      "type": "movie",
+      "id": "cinejoy_nav",
+      "name": "Cinejoy"
+    },
+    {
+      "type": "movie",
+      "id": "cinejoy_movies",
+      "name": "Cinejoy Movies",
+      "extra": [
+        {
+          "name": "genre",
+          "isRequired": true,
+          "options": [
+            "Recommended",
+            "Popular",
+            "NowPlaying",
+            "Upcoming"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "series",
+      "id": "cinejoy_series",
+      "name": "Cinejoy Series",
+      "extra": [
+        {
+          "name": "genre",
+          "isRequired": true,
+          "options": [
+            "Popular"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "streams": [
+    {
+      "name": "Cinejoy",
+      "description": "进入「热门电影」",
+      "externalUrl": "stremio:///discover/https%3A%2F%2Fraw.githubusercontent.com%2Ffeixiangdao%2Ftest1%2Fmain%2Fcinejoy-stremio-nav%2Fmanifest.json/movie/cinejoy_movies?genre=Popular"
+    }
+  ]
+}

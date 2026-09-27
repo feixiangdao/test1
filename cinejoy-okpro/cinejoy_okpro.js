@@ -6,10 +6,13 @@ const TMDB_BASE = 'https://api.themoviedb.org/3';
 const IMG_BASE = 'https://image.tmdb.org/t/p';
 const OPENSUB_BASE = 'https://opensubtitles-v3.strem.io';
 const OPENSUB_LEGACY_BASE = 'https://opensubtitles.strem.io/stremio/v1';
+const SUBDL_API_BASE = 'https://api.subdl.com/api/v1/subtitles';
+const SUBDL_DL_BASE = 'https://dl.subdl.com';
 const CINEJOY_REFERER = 'https://cinejoy.pk/';
 const UA = 'Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 const LOCAL_RULE = 'cinejoy';
 const LOCAL_TMDB_KEY = 'tmdbKey';
+const LOCAL_SUBDL_KEY = 'subdlKey';
 
 let TMDB_KEY = '';
 let TMDB_TOKEN = '';
@@ -102,6 +105,24 @@ function deleteLocalTmdbKey() {
   } catch (_) {
     return false;
   }
+}
+
+function getLocalSubdlKey() {
+  try {
+    return cleanText(local.get(LOCAL_RULE, LOCAL_SUBDL_KEY));
+  } catch (_) {
+    return '';
+  }
+}
+
+function subdlSettingsCard() {
+  const saved = !!getLocalSubdlKey();
+  return {
+    vod_id: 'settings:subdl',
+    vod_name: '📝 SubDL API Key 设置',
+    vod_pic: '',
+    vod_remarks: saved ? '本机已保存 · 点击修改' : '未设置 · 点击添加'
+  };
 }
 
 function getTmdbSettingsUrl() {
@@ -263,34 +284,45 @@ function fetchSubtitles(type, tmdbId, season, episode) {
   };
 
   try {
+    const seen = {};
     const imdbId = resolveImdbId(type, tmdbId);
     result.imdbId = imdbId;
-    if (!imdbId || !/^tt\d+$/i.test(imdbId)) {
-      result.debug = '无IMDb ID';
-      return result;
+
+    const osCodes = [];
+    let osCount = 0;
+
+    if (imdbId && /^tt\d+$/i.test(imdbId)) {
+      const mediaType = type === 'tv' ? 'series' : 'movie';
+      const videoId = type === 'tv'
+        ? imdbId + ':' + (Number(season) || 1) + ':' + (Number(episode) || 1)
+        : imdbId;
+
+      const urls = [
+        OPENSUB_BASE + '/subtitles/' + mediaType + '/' + videoId + '.json',
+        OPENSUB_BASE + '/subtitles/' + mediaType + '/' + videoId + '/*.json',
+        OPENSUB_LEGACY_BASE + '/subtitles/' + mediaType + '/' + videoId + '.json',
+        OPENSUB_LEGACY_BASE + '/subtitles/' + mediaType + '/' + videoId + '/*.json'
+      ];
+
+      const before = result.subs.length;
+      for (let i = 0; i < urls.length && result.subs.length === before; i++) {
+        const r = fetchSubtitleUrl(urls[i]);
+        osCodes.push(String(r.code));
+        normalizeSubs(r.list, result.subs, seen);
+      }
+      osCount = result.subs.length - before;
+    } else {
+      osCodes.push('无IMDb');
     }
 
-    const mediaType = type === 'tv' ? 'series' : 'movie';
-    const videoId = type === 'tv'
-      ? imdbId + ':' + (Number(season) || 1) + ':' + (Number(episode) || 1)
-      : imdbId;
+    const subdl = fetchSubdlSubtitles(type, tmdbId, season, episode, result.subs, seen);
 
-    const urls = [
-      OPENSUB_BASE + '/subtitles/' + mediaType + '/' + videoId + '.json',
-      OPENSUB_BASE + '/subtitles/' + mediaType + '/' + videoId + '/*.json',
-      OPENSUB_LEGACY_BASE + '/subtitles/' + mediaType + '/' + videoId + '.json',
-      OPENSUB_LEGACY_BASE + '/subtitles/' + mediaType + '/' + videoId + '/*.json'
-    ];
+    result.debug = 'IMDb ' + (imdbId || '无')
+      + ' / OS ' + osCodes.join(',') + ' (' + osCount + ')'
+      + ' / SubDL ' + subdl.code + ' (' + subdl.count + ')'
+      + ' / 总字幕 ' + result.subs.length
+      + ' / 本地代理';
 
-    const seen = {};
-    const codes = [];
-    for (let i = 0; i < urls.length && result.subs.length === 0; i++) {
-      const r = fetchSubtitleUrl(urls[i]);
-      codes.push(String(r.code));
-      normalizeSubs(r.list, result.subs, seen);
-    }
-
-    result.debug = 'IMDb ' + imdbId + ' / OS ' + codes.join(',') + ' / 字幕 ' + result.subs.length + ' / 本地代理';
     return result;
   } catch (_) {
     result.debug = '字幕请求异常';
@@ -528,7 +560,7 @@ export default {
       const params = { page: page, include_adult: false };
 
       if (tid === 'settings') {
-        return JSON.stringify({ list: [tmdbSettingsCard()], page: 1, pagecount: 1, limit: 1, total: 1 });
+        return JSON.stringify({ list: [tmdbSettingsCard(), subdlSettingsCard()], page: 1, pagecount: 1, limit: 2, total: 2 });
       } else if (tid === 'trending') {
         path = '/trending/all/day';
       } else if (tid === 'top_movie') {
@@ -567,6 +599,10 @@ export default {
     try {
       if (String(id || '') === 'settings:tmdb') {
         try { showTmdbDialogFromDetail(); } catch (_) {}
+        return JSON.stringify({ list: [] });
+      }
+      if (String(id || '') === 'settings:subdl') {
+        try { showSubdlDialogFromDetail(); } catch (_) {}
         return JSON.stringify({ list: [] });
       }
       return JSON.stringify({ list: [detailObject(id)] });
@@ -669,6 +705,31 @@ export default {
           + '<h2>已清除</h2><p>本机保存的 TMDB Key 已删除。</p>'
           + '<p><a href="/proxy?do=js&siteKey=' + enc(SITE_KEY) + '&kind=tmdb-form">返回设置页</a></p></body></html>';
         return [200, 'text/html; charset=utf-8', html, { 'Cache-Control': 'no-store' }];
+      }
+
+      if (p.kind === 'subdl-subtitle' && p.sub) {
+        try {
+          const payload = safeJsonParse(fetchSubdlPayload(
+            String(p.sub),
+            String(p.season || 0),
+            String(p.episode || 0),
+            String(p.lang || '')
+          ), {});
+          if (!payload || !payload.ok || !payload.text) {
+            return [502, 'text/plain; charset=utf-8', '', { 'Cache-Control': 'no-cache' }];
+          }
+          return [
+            200,
+            'application/x-subrip; charset=utf-8',
+            String(payload.text),
+            {
+              'Cache-Control': 'private, max-age=3600',
+              'Access-Control-Allow-Origin': '*'
+            }
+          ];
+        } catch (_) {
+          return [502, 'text/plain; charset=utf-8', '', { 'Cache-Control': 'no-cache' }];
+        }
       }
 
       if (p.kind !== 'subtitle' || !p.sub) {

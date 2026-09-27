@@ -54,18 +54,18 @@ jobs:
             --classpath build/lib/wrapper-java.jar \
             --output build/dex \
             $(find build/classes -name '*.class')
-          (cd build/dex && zip -q -j ../../cinejoy-okpro/cinejoy_helper_v4.jar classes.dex)
-          unzip -l cinejoy-okpro/cinejoy_helper_v4.jar
+          (cd build/dex && zip -q -j ../../cinejoy-okpro/cinejoy_helper_v5.jar classes.dex)
+          unzip -l cinejoy-okpro/cinejoy_helper_v5.jar
 
       - name: Commit helper jar
         run: |
-          if [ -z "$(git status --porcelain -- cinejoy-okpro/cinejoy_helper_v4.jar)" ]; then
+          if [ -z "$(git status --porcelain -- cinejoy-okpro/cinejoy_helper_v5.jar)" ]; then
             echo "Helper jar unchanged."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add cinejoy-okpro/cinejoy_helper_v4.jar
+          git add cinejoy-okpro/cinejoy_helper_v5.jar
           git commit -m "Build Cinejoy QuickJS helper"
           git pull --rebase origin main
           git push

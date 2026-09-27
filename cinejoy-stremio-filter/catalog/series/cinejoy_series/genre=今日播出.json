@@ -1,0 +1,18 @@
+{
+  "metas": [
+    {
+      "id": "tt1475582",
+      "type": "series",
+      "name": "Sherlock",
+      "poster": "https://images.metahub.space/poster/medium/tt1475582/img",
+      "posterShape": "poster"
+    },
+    {
+      "id": "tt4574334",
+      "type": "series",
+      "name": "Stranger Things",
+      "poster": "https://images.metahub.space/poster/medium/tt4574334/img",
+      "posterShape": "poster"
+    }
+  ]
+}

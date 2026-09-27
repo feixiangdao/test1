@@ -1,5 +1,7 @@
 # Cinejoy Stremio / Nuvio Addon
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/project?template=https://github.com/feixiangdao/test1/tree/main/cinejoy-stremio)
+
 Cinejoy 的 Stremio 协议版本。当前采用“首页只保留两个 Catalog”的结构，避免多个插件安装后把首页堆满。
 
 ## 首页结构
@@ -55,24 +57,22 @@ Cinejoy 自己的播放源 resolver 尚未迁移。
 
 后续可以继续把 OK影视版现有的 embed provider 做服务器端 resolver，再由本 addon 返回标准 Stremio `stream` 资源。
 
-## 部署到 Vercel
+## 最简单部署
 
-Vercel 目前可直接识别 Express 项目，无需自定义 build command。
+直接点击上面的 **Deploy with Vercel** 按钮。
 
-1. 在 Vercel 新建 Project。
-2. 导入 GitHub 仓库 `feixiangdao/test1`。
-3. Root Directory 设置为：
+Vercel 会自动：
+1. 读取 `cinejoy-stremio` 目录；
+2. 创建并部署项目；
+3. 给你一个 `https://xxx.vercel.app` 地址。
 
-   `cinejoy-stremio`
+部署完成后只需要打开：
 
-4. Framework Preset 可保持自动检测。
-5. 部署。
-6. 打开：
+`https://xxx.vercel.app/configure`
 
-   `https://你的域名/configure`
+填写 TMDB Key；需要 SubDL 时再填 SubDL Key，然后复制生成的 Manifest URL 到 Stremio / Nuvio。
 
-7. 输入 TMDB API v3 Key；需要 SubDL 时再填写 SubDL API Key。
-8. 生成 Manifest URL 后，在 Stremio / Nuvio 中添加。
+不需要手工设置 Root Directory、Build Command 或 Output Directory。
 
 ## Key 说明
 

@@ -860,7 +860,7 @@ export default {
             String(p.lang || '')
           ), {});
           if (!payload || !payload.ok || !payload.text) {
-            return [502, 'text/plain; charset=utf-8', '', { 'Cache-Control': 'no-cache' }];
+            return [500, 'text/plain; charset=utf-8', '', { 'Cache-Control': 'no-cache' }];
           }
           return [
             200,
@@ -872,7 +872,7 @@ export default {
             }
           ];
         } catch (_) {
-          return [502, 'text/plain; charset=utf-8', '', { 'Cache-Control': 'no-cache' }];
+          return [500, 'text/plain; charset=utf-8', '', { 'Cache-Control': 'no-cache' }];
         }
       }
 
@@ -892,7 +892,7 @@ export default {
 
       const code = Number(r && r.code ? r.code : 0);
       if (!r || !r.content || code < 200 || code >= 300) {
-        return [502, 'text/plain; charset=utf-8', '', { 'Cache-Control': 'no-cache' }];
+        return [500, 'text/plain; charset=utf-8', '', { 'Cache-Control': 'no-cache' }];
       }
 
       return [

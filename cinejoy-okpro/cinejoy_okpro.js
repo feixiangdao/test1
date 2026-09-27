@@ -17,7 +17,7 @@ const LOCAL_SUBDL_KEY = 'subdlKey';
 let TMDB_KEY = '';
 let TMDB_TOKEN = '';
 let LANG = 'zh-CN';
-let SITE_KEY = 'Cinejoy_OKPro_v2';
+let SITE_KEY = 'Cinejoy_OKPro_v5';
 
 const PROVIDERS = [
   { id: 'cinemaos',  name: 'Aether 1',         base: 'https://cinemaos.tech' },
@@ -330,6 +330,152 @@ function fetchSubtitles(type, tmdbId, season, episode) {
   }
 }
 
+
+function subdlLangInfo(code, text) {
+  const c = cleanText(code || '').toUpperCase();
+  const t = cleanText(text || '').toLowerCase();
+  if (c === 'ZH_BG' || /zh[-_]?hant|traditional|繁體|繁体|\bcht\b/.test(t)) {
+    return { lang: 'zh-TW', label: '繁中' };
+  }
+  if (/zh[-_]?hans|simplified|简体|簡體|\bchs\b/.test(t)) {
+    return { lang: 'zh-CN', label: '简中' };
+  }
+  return { lang: 'zh-CN', label: '中文' };
+}
+
+function subdlRemoteUrl(path) {
+  const u = cleanText(path || '');
+  if (!u) return '';
+  if (/^https?:\/\//i.test(u)) return u;
+  return SUBDL_DL_BASE + (u[0] === '/' ? u : '/' + u);
+}
+
+function subdlProxyUrl(remoteUrl, index, season, episode, lang) {
+  try {
+    return getProxy(true)
+      + '&siteKey=' + enc(SITE_KEY)
+      + '&kind=subdl-subtitle'
+      + '&n=' + enc(index || 0)
+      + '&season=' + enc(season || 0)
+      + '&episode=' + enc(episode || 0)
+      + '&lang=' + enc(lang || '')
+      + '&sub=' + enc(remoteUrl);
+  } catch (_) {
+    return remoteUrl;
+  }
+}
+
+function subdlUnpackForEpisode(files, season, episode) {
+  if (!Array.isArray(files) || !files.length) return null;
+  const s = Number(season) || 0;
+  const e = Number(episode) || 0;
+
+  function fmtScore(f) {
+    const x = cleanText(f && (f.format || f.name || '')).toLowerCase();
+    if (/srt/.test(x)) return 50;
+    if (/ass/.test(x)) return 40;
+    if (/ssa/.test(x)) return 35;
+    if (/vtt/.test(x)) return 30;
+    return 10;
+  }
+
+  let best = null;
+  let bestScore = -1;
+  files.forEach(function (f) {
+    if (!f || !f.url) return;
+    let score = fmtScore(f);
+    const fs = Number(f.season) || 0;
+    const fe = Number(f.episode) || 0;
+    const name = cleanText(f.name || f.release_name || '');
+
+    if (e > 0 && fe === e) score += 200;
+    if (s > 0 && fs === s) score += 50;
+    if (e > 0) {
+      const ee = new RegExp('e0*' + e + '(?:\\D|$)', 'i');
+      const se = new RegExp('s0*' + s + '[ ._\\-]*e0*' + e + '(?:\\D|$)', 'i');
+      if (s > 0 && se.test(name)) score += 180;
+      else if (ee.test(name)) score += 120;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = f;
+    }
+  });
+  return best;
+}
+
+function fetchSubdlSubtitles(type, tmdbId, season, episode, out, seen) {
+  const status = { code: '未配置', count: 0 };
+  const apiKey = getLocalSubdlKey();
+  if (!apiKey) return status;
+
+  try {
+    const qs = [
+      'api_key=' + enc(apiKey),
+      'tmdb_id=' + enc(tmdbId),
+      'type=' + enc(type === 'tv' ? 'tv' : 'movie'),
+      'languages=' + enc('ZH,ZH_BG'),
+      'subs_per_page=30',
+      'unpack=1',
+      'releases=1',
+      'client=custom_integration'
+    ];
+    if (type === 'tv') {
+      qs.push('season_number=' + enc(Number(season) || 1));
+      qs.push('episode_number=' + enc(Number(episode) || 1));
+    }
+
+    const r = req(SUBDL_API_BASE + '?' + qs.join('&'), {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': UA
+      },
+      timeout: 15000
+    });
+    const code = Number(r && r.code ? r.code : 0);
+    status.code = String(code || -1);
+    if (!r || !r.content || code < 200 || code >= 300) return status;
+
+    const data = safeJsonParse(r.content, {});
+    const rows = data && Array.isArray(data.subtitles) ? data.subtitles : [];
+
+    rows.forEach(function (s) {
+      if (!s || out.length >= 120) return;
+
+      const release = cleanText(s.release_name || s.name || '');
+      const li = subdlLangInfo(s.language || s.lang || '', release);
+      const unpack = subdlUnpackForEpisode(s.unpack_files || [], season, episode);
+      const raw = unpack && unpack.url ? unpack.url : s.url;
+      const remote = subdlRemoteUrl(raw);
+      if (!remote || seen[remote]) return;
+      seen[remote] = true;
+
+      const display = cleanText(
+        (unpack && (unpack.release_name || unpack.name))
+        || s.release_name
+        || s.name
+        || '字幕'
+      );
+      const shortName = display.length > 72 ? display.slice(0, 69) + '...' : display;
+
+      out.push({
+        url: subdlProxyUrl(remote, out.length + 1, season, episode, s.language || s.lang || ''),
+        name: '[SubDL] ' + li.label + (shortName ? ' · ' + shortName : ''),
+        lang: li.lang,
+        format: 'application/x-subrip',
+        flag: 0
+      });
+      status.count += 1;
+    });
+
+    return status;
+  } catch (_) {
+    status.code = '异常';
+    return status;
+  }
+}
+
 function getMediaType(item, fallback) {
   if (item && item.media_type === 'tv') return 'tv';
   if (item && item.media_type === 'movie') return 'movie';
@@ -513,7 +659,7 @@ export default {
 
     TMDB_TOKEN = cleanText(cfg.tmdbToken || cfg.token || '');
     LANG = cleanText(cfg.language || cfg.lang || 'zh-CN') || 'zh-CN';
-    SITE_KEY = cleanText(cfg.siteKey || 'Cinejoy_OKPro_v2') || 'Cinejoy_OKPro_v2';
+    SITE_KEY = cleanText(cfg.siteKey || 'Cinejoy_OKPro_v5') || 'Cinejoy_OKPro_v5';
   },
 
   home(filter) {

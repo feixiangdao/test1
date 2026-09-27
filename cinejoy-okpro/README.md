@@ -34,3 +34,21 @@ https://raw.githubusercontent.com/feixiangdao/test1/main/cinejoy-okpro/cinejoy_o
 - 手机：用浏览器打开页面中显示的 127.0.0.1 本机地址。
 - 电视：使用手机扫描详情页二维码。
 - Key 不写入 GitHub，只保存在运行 OK影视Pro 的设备上。
+
+
+## SubDL 中文字幕
+
+Cinejoy v5 新增 SubDL 字幕源，与现有 OpenSubtitles 同时聚合。
+
+使用方法：
+1. 进入 Cinejoy 的 **设置** 分类。
+2. 点击 **📝 SubDL API Key 设置**。
+3. 在原生弹窗中输入自己的 SubDL API Key 并保存。
+4. 播放影片或剧集时，会同时搜索 OpenSubtitles 与 SubDL。
+
+实现要点：
+- 使用 TMDB ID 精确查询 SubDL。
+- 中文查询包含 `ZH` 与 `ZH_BG`，用于覆盖中文和繁体中文条目。
+- 剧集查询会附带季号与集号，并优先使用 SubDL `unpack=1` 返回的单集文件。
+- 对 ZIP 字幕包提供本地解包兜底；ASS/SSA/VTT 会转换为 SRT 再交给播放器。
+- SubDL API Key 只保存在 OK影视Pro 本机，不写入 GitHub。

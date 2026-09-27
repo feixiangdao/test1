@@ -1,0 +1,22 @@
+name: Test Cinejoy Nuvio
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'cinejoy-nuvio/**'
+      - '.github/workflows/test-cinejoy-nuvio.yml'
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check cinejoy-nuvio/providers/vidlink.js
+      - run: node --check cinejoy-nuvio/providers/vidup.js
+      - run: node --check cinejoy-nuvio/providers/vidking.js
+      - name: Validate manifest
+        run: node -e "const m=require('./cinejoy-nuvio/manifest.json'); if(!m.scrapers||m.scrapers.length!==3) process.exit(1); console.log(m.scrapers.map(x=>x.name).join('\n'))"

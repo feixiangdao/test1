@@ -1,0 +1,58 @@
+{
+  "id": "com.feixiangdao.cinejoy.filtertest",
+  "version": "0.1.0",
+  "name": "Cinejoy 分类测试",
+  "description": "不使用 Deep Link。首页仅保留电影和剧集两个 Catalog，分类通过 genre 筛选。",
+  "resources": [
+    "catalog"
+  ],
+  "types": [
+    "movie",
+    "series"
+  ],
+  "catalogs": [
+    {
+      "type": "movie",
+      "id": "cinejoy_movies",
+      "name": "Cinejoy · 电影",
+      "extra": [
+        {
+          "name": "genre",
+          "isRequired": false,
+          "options": [
+            "推荐",
+            "热门",
+            "正在上映",
+            "即将上映",
+            "高评分",
+            "动作",
+            "科幻",
+            "恐怖",
+            "动画"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "series",
+      "id": "cinejoy_series",
+      "name": "Cinejoy · 剧集",
+      "extra": [
+        {
+          "name": "genre",
+          "isRequired": false,
+          "options": [
+            "推荐",
+            "热门",
+            "今日播出",
+            "本周播出",
+            "高评分",
+            "动作",
+            "科幻",
+            "动画"
+          ]
+        }
+      ]
+    }
+  ]
+}

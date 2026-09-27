@@ -1,0 +1,18 @@
+{
+  "metas": [
+    {
+      "id": "tt0816692",
+      "type": "movie",
+      "name": "Interstellar",
+      "poster": "https://images.metahub.space/poster/medium/tt0816692/img",
+      "posterShape": "poster"
+    },
+    {
+      "id": "tt0110912",
+      "type": "movie",
+      "name": "Pulp Fiction",
+      "poster": "https://images.metahub.space/poster/medium/tt0110912/img",
+      "posterShape": "poster"
+    }
+  ]
+}

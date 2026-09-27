@@ -25,3 +25,21 @@ jobs:
       - run: node --check lib/config.js
       - run: node --check lib/constants.js
       - run: node -e "require('./index.js'); console.log('Cinejoy Stremio app loaded')"
+      - name: Smoke test HTTP routes
+        run: |
+          node - <<'NODE'
+          const app=require('./index.js');
+          const server=app.listen(3100, async ()=>{
+            try {
+              const m=await fetch('http://127.0.0.1:3100/manifest.json').then(r=>r.json());
+              if(!Array.isArray(m.catalogs) || m.catalogs.length!==2) throw new Error('manifest catalogs mismatch');
+              if(m.catalogs[0].name!=='Cinejoy · 电影') throw new Error('movie catalog missing');
+              if(m.catalogs[1].name!=='Cinejoy · 剧集') throw new Error('series catalog missing');
+              const h=await fetch('http://127.0.0.1:3100/configure').then(r=>r.text());
+              if(!h.includes('TMDB API v3 Key')) throw new Error('configure page missing');
+              console.log('HTTP smoke test passed');
+            } finally {
+              server.close();
+            }
+          });
+          NODE

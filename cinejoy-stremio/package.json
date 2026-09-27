@@ -1,0 +1,13 @@
+{
+  "name": "cinejoy-stremio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cinejoy Stremio/Nuvio compatible addon",
+  "main": "api/router.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16"
+  }
+}

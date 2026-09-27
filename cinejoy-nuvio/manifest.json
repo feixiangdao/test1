@@ -1,0 +1,45 @@
+{
+  "name": "Cinejoy Local",
+  "version": "1.0.0",
+  "scrapers": [
+    {
+      "id": "cinejoy-vidlink",
+      "name": "Cinejoy · VidLink",
+      "description": "Cinejoy 本地 VidLink 解析，直接在 Nuvio 设备上获取播放地址",
+      "version": "1.0.0",
+      "author": "Cinejoy",
+      "supportedTypes": ["movie", "tv"],
+      "filename": "providers/vidlink.js",
+      "enabled": true,
+      "formats": ["mp4", "m3u8"],
+      "logo": "https://vidlink.pro/favicon.ico",
+      "contentLanguage": ["en"]
+    },
+    {
+      "id": "cinejoy-vidup",
+      "name": "Cinejoy · Titan Mesh",
+      "description": "Cinejoy 本地 VidUp/Titan Mesh 解析；用于绕过云服务器出口 403",
+      "version": "1.0.0",
+      "author": "Cinejoy",
+      "supportedTypes": ["movie", "tv"],
+      "filename": "providers/vidup.js",
+      "enabled": true,
+      "formats": ["m3u8", "mp4"],
+      "logo": "https://vidup.to/favicon.ico",
+      "contentLanguage": ["en"]
+    },
+    {
+      "id": "cinejoy-vidking",
+      "name": "Cinejoy · Nebula Stream X",
+      "description": "Cinejoy 本地 VidKing 解析，支持多清晰度",
+      "version": "1.0.0",
+      "author": "Cinejoy",
+      "supportedTypes": ["movie", "tv"],
+      "filename": "providers/vidking.js",
+      "enabled": true,
+      "formats": ["m3u8", "mp4"],
+      "logo": "https://www.vidking.net/favicon.ico",
+      "contentLanguage": ["en"]
+    }
+  ]
+}

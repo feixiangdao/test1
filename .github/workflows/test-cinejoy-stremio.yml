@@ -1,0 +1,29 @@
+name: Test Cinejoy Stremio
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'cinejoy-stremio/**'
+      - '.github/workflows/test-cinejoy-stremio.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cinejoy-stremio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: cinejoy-stremio/package-lock.json
+      - run: npm install
+      - run: node --check index.js
+      - run: node --check lib/tmdb.js
+      - run: node --check lib/subtitles.js
+      - run: node --check lib/config.js
+      - run: node --check lib/constants.js
+      - run: node -e "require('./index.js'); console.log('Cinejoy Stremio app loaded')"

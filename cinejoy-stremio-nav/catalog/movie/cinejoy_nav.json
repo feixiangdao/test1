@@ -1,0 +1,44 @@
+{
+  "metas": [
+    {
+      "id": "cinejoy-nav-recommended",
+      "type": "movie",
+      "name": "推荐电影",
+      "poster": "https://placehold.co/300x444/171717/FFFFFF/png?text=Cinejoy%0ARecommended",
+      "posterShape": "poster",
+      "description": "打开 Cinejoy「推荐电影」"
+    },
+    {
+      "id": "cinejoy-nav-popular-movies",
+      "type": "movie",
+      "name": "热门电影",
+      "poster": "https://placehold.co/300x444/171717/FFFFFF/png?text=Cinejoy%0APopular+Movies",
+      "posterShape": "poster",
+      "description": "打开 Cinejoy「热门电影」"
+    },
+    {
+      "id": "cinejoy-nav-popular-series",
+      "type": "movie",
+      "name": "热门剧集",
+      "poster": "https://placehold.co/300x444/171717/FFFFFF/png?text=Cinejoy%0APopular+Series",
+      "posterShape": "poster",
+      "description": "打开 Cinejoy「热门剧集」"
+    },
+    {
+      "id": "cinejoy-nav-now-playing",
+      "type": "movie",
+      "name": "正在上映",
+      "poster": "https://placehold.co/300x444/171717/FFFFFF/png?text=Cinejoy%0ANow+Playing",
+      "posterShape": "poster",
+      "description": "打开 Cinejoy「正在上映」"
+    },
+    {
+      "id": "cinejoy-nav-upcoming",
+      "type": "movie",
+      "name": "即将上映",
+      "poster": "https://placehold.co/300x444/171717/FFFFFF/png?text=Cinejoy%0AUpcoming",
+      "posterShape": "poster",
+      "description": "打开 Cinejoy「即将上映」"
+    }
+  ]
+}

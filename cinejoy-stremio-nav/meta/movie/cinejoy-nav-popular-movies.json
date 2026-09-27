@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "id": "cinejoy-nav-popular-movies",
+    "type": "movie",
+    "name": "热门电影",
+    "poster": "https://placehold.co/300x444/171717/FFFFFF/png?text=Cinejoy%0APopular+Movies",
+    "posterShape": "poster",
+    "description": "Cinejoy 导航入口：热门电影。点击“进入分类”后跳转到隐藏的真实 Catalog。",
+    "behaviorHints": {
+      "defaultVideoId": "cinejoy-nav-popular-movies"
+    },
+    "links": [
+      {
+        "name": "进入 热门电影",
+        "category": "Cinejoy 分类",
+        "url": "stremio:///discover/https%3A%2F%2Fraw.githubusercontent.com%2Ffeixiangdao%2Ftest1%2Fmain%2Fcinejoy-stremio-nav%2Fmanifest.json/movie/cinejoy_movies?genre=Popular"
+      }
+    ]
+  }
+}

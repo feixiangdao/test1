@@ -1,6 +1,7 @@
 {
   "name": "Cinejoy Local",
-  "version": "1.0.0",
+  "version": "1.1.0",
+  "description": "Cinejoy providers adapted for Nuvio local execution. Direct media URLs only; embed-only CinemaOS is experimental and disabled by default.",
   "scrapers": [
     {
       "id": "cinejoy-vidlink",
@@ -8,12 +9,20 @@
       "description": "Cinejoy 本地 VidLink 解析，直接在 Nuvio 设备上获取播放地址",
       "version": "1.0.0",
       "author": "Cinejoy",
-      "supportedTypes": ["movie", "tv"],
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
       "filename": "providers/vidlink.js",
       "enabled": true,
-      "formats": ["mp4", "m3u8"],
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
       "logo": "https://vidlink.pro/favicon.ico",
-      "contentLanguage": ["en"]
+      "contentLanguage": [
+        "en"
+      ]
     },
     {
       "id": "cinejoy-vidup",
@@ -21,12 +30,20 @@
       "description": "Cinejoy 本地 VidUp/Titan Mesh 解析；用于绕过云服务器出口 403",
       "version": "1.0.0",
       "author": "Cinejoy",
-      "supportedTypes": ["movie", "tv"],
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
       "filename": "providers/vidup.js",
       "enabled": true,
-      "formats": ["m3u8", "mp4"],
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
       "logo": "https://vidup.to/favicon.ico",
-      "contentLanguage": ["en"]
+      "contentLanguage": [
+        "en"
+      ]
     },
     {
       "id": "cinejoy-vidking",
@@ -34,12 +51,199 @@
       "description": "Cinejoy 本地 VidKing 解析，支持多清晰度",
       "version": "1.0.0",
       "author": "Cinejoy",
-      "supportedTypes": ["movie", "tv"],
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
       "filename": "providers/vidking.js",
       "enabled": true,
-      "formats": ["m3u8", "mp4"],
-      "logo": "https://www.vidking.net/favicon.ico",
-      "contentLanguage": ["en"]
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "en"
+      ],
+      "logo": "https://www.vidking.net/favicon.ico"
+    },
+    {
+      "id": "cinejoy-cinemaos",
+      "name": "Cinejoy · Aether 1",
+      "description": "CinemaOS 实验性本地解析。CinemaOS 当前公开集成为 embed-only；仅在页面直接暴露真实媒体 URL 时返回结果，因此默认关闭。",
+      "version": "1.0.0",
+      "author": "Cinejoy",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/cinemaos.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "logo": "https://cinemaos.tech/favicon.ico",
+      "contentLanguage": [
+        "en"
+      ],
+      "limited": true
+    },
+    {
+      "id": "cinejoy-vidsrc-to",
+      "name": "Cinejoy · Solaris Cloud",
+      "description": "VidSrc.to 本地直链解析；只返回真实媒体 URL，不把 iframe 地址伪装成播放地址。",
+      "version": "1.0.0",
+      "author": "Cinejoy",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidsrc_to.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "logo": "https://vidsrc.to/favicon.ico",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "cinejoy-vidnest",
+      "name": "Cinejoy · Chronos Node",
+      "description": "VidNest 本地解析；设备直连媒体，外部服务仅用于 AES-GCM 元数据解密。",
+      "version": "1.0.0",
+      "author": "Cinejoy",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidnest.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mkv"
+      ],
+      "logo": "https://vidnest.fun/favicon.ico",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "cinejoy-vidfast",
+      "name": "Cinejoy · Vortex Quantum",
+      "description": "VidFast 本地解析；依次兼容 vidfast.net / vidfast.vc / vidfast.pro，并返回真实媒体地址。",
+      "version": "1.0.0",
+      "author": "Cinejoy",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidfast.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "logo": "https://vidfast.net/favicon.ico",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "cinejoy-videasy",
+      "name": "Cinejoy · Elysium Edge",
+      "description": "VidEasy 本地多服务器解析，包含 Original / German / Italian / French / Spanish / Portuguese 等后端。",
+      "version": "1.0.0",
+      "author": "Cinejoy",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/videasy.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "en",
+        "de",
+        "it",
+        "fr",
+        "es",
+        "pt"
+      ],
+      "logo": "https://player.videasy.net/favicon.ico"
+    },
+    {
+      "id": "cinejoy-vidsrc-me",
+      "name": "Cinejoy · Pulsar Relay",
+      "description": "VidSrc Me / VSEmbed 本地解析；优先直链 API，失败后尝试从 embed 页面提取真实媒体 URL。",
+      "version": "1.0.0",
+      "author": "Cinejoy",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidsrc_me.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "logo": "https://vsembed.ru/favicon.ico",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "cinejoy-rivestream",
+      "name": "Cinejoy · Zenith Direct",
+      "description": "RiveStream 多 provider 本地解析，通过其 scraper API 返回 HLS/MP4 直链。",
+      "version": "1.0.0",
+      "author": "Cinejoy",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/rivestream.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "logo": "https://rivestream.org/favicon.ico",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "cinejoy-vidcore",
+      "name": "Cinejoy · Astral Core 9",
+      "description": "VidCore API-first 本地解析，支持多轮 server/source 收集与镜像回退。",
+      "version": "1.0.0",
+      "author": "Cinejoy",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidcore.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "logo": "https://vidcore.org/favicon.ico",
+      "contentLanguage": [
+        "en"
+      ]
     }
   ]
 }

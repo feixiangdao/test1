@@ -15,8 +15,27 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: node --check cinejoy-nuvio/providers/vidlink.js
-      - run: node --check cinejoy-nuvio/providers/vidup.js
-      - run: node --check cinejoy-nuvio/providers/vidking.js
+      - name: Syntax check providers
+        run: |
+          set -e
+          for f in cinejoy-nuvio/providers/*.js; do
+            echo "Checking $f"
+            node --check "$f"
+          done
       - name: Validate manifest
-        run: node -e "const m=require('./cinejoy-nuvio/manifest.json'); if(!m.scrapers||m.scrapers.length!==3) process.exit(1); console.log(m.scrapers.map(x=>x.name).join('\n'))"
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const m = require('./cinejoy-nuvio/manifest.json');
+          if (!Array.isArray(m.scrapers) || m.scrapers.length !== 11) {
+            throw new Error(`Expected 11 scrapers, got ${m.scrapers && m.scrapers.length}`);
+          }
+          const ids = new Set();
+          for (const s of m.scrapers) {
+            if (!s.id || ids.has(s.id)) throw new Error(`Duplicate/missing id: ${s.id}`);
+            ids.add(s.id);
+            if (!s.filename) throw new Error(`Missing filename: ${s.id}`);
+            if (!fs.existsSync('cinejoy-nuvio/' + s.filename)) throw new Error(`Missing file: ${s.filename}`);
+          }
+          console.log(m.scrapers.map(x => `${x.enabled ? 'ON ' : 'OFF'} ${x.name}`).join('\n'));
+          NODE

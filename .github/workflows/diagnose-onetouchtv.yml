@@ -1,0 +1,16 @@
+name: Diagnose OneTouchTV
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'stellar-nuvio/diagnose-onetouchtv.js'
+      - '.github/workflows/diagnose-onetouchtv.yml'
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node stellar-nuvio/diagnose-onetouchtv.js

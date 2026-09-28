@@ -829,6 +829,27 @@ function findBestMatch(results, query) {
     return scored[0].item;
 }
 
+
+function streamMatchesEpisode(title, seasonNum, episodeNum) {
+    var s = String(title || '');
+    var season = Number(seasonNum);
+    var episode = Number(episodeNum);
+    if (!episode) return false;
+
+    // Preferred SxxExx form: if present, both season and episode must match.
+    var se = s.match(/\bS0*(\d{1,2})\s*E0*(\d{1,3})(?!\d)/i);
+    if (se) return Number(se[1]) === season && Number(se[2]) === episode;
+
+    // DVDPlay also uses "S03 - EP1" / "Episode 1".
+    var sm = s.match(/\bS0*(\d{1,2})(?!\d)/i);
+    if (sm && season && Number(sm[1]) !== season) return false;
+    var em = s.match(/\b(?:EP|Episode)[\s._-]*0*(\d{1,3})(?!\d)/i);
+    if (em) return Number(em[1]) === episode;
+
+    // TV streams with no episode marker are unsafe: never expose them.
+    return false;
+}
+
 // Parse quality for sorting
 function parseQualityForSort(qualityString) {
     const match = (qualityString || '').match(/(\d{3,4})p/i);
@@ -988,9 +1009,17 @@ function getStreams(tmdbId, mediaType = 'movie', seasonNum = null, episodeNum = 
                     });
 
                     return Promise.all(validationPromises).then(validatedStreams => {
-                        const validStreams = validatedStreams.filter(stream => stream !== null);
+                        let validStreams = validatedStreams.filter(stream => stream !== null);
 
-                        // 8. Sort by quality (highest first)
+                        // 8. For TV, never expose files from another episode in an all-season page.
+                        if ((mediaType === 'tv' || mediaType === 'series') && episodeNum != null) {
+                            validStreams = validStreams.filter(stream =>
+                                streamMatchesEpisode(stream.title || stream.name || '', seasonNum, episodeNum)
+                            );
+                            console.log('[DVDPlay] Episode-filtered streams: ' + validStreams.length);
+                        }
+
+                        // 9. Sort by quality (highest first)
                         validStreams.sort((a, b) => {
                             const qualityA = parseQualityForSort(a.quality);
                             const qualityB = parseQualityForSort(b.quality);

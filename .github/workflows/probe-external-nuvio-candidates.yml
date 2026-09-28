@@ -16,7 +16,7 @@ jobs:
           node-version: '22'
       - name: Fetch current public provider implementations
         run: |
-          git clone --depth 1 https://github.com/yoruix/nuvio-providers.git /tmp/nuvio-providers
+          git clone --depth 1 --branch main https://github.com/yoruix/nuvio-providers.git /tmp/nuvio-providers
           cd /tmp/nuvio-providers
           npm install --ignore-scripts
       - name: Probe MovieBlast native streams

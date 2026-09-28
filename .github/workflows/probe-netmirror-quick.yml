@@ -1,0 +1,19 @@
+name: Quick NetMirror Probe
+on:
+  push:
+    paths:
+      - 'stellar-nuvio/probe-netmirror-playlist.js'
+      - '.github/workflows/probe-netmirror-quick.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe current NetMirror playlist
+        working-directory: stellar-nuvio
+        run: node probe-netmirror-playlist.js

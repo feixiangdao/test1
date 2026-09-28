@@ -1,0 +1,68 @@
+name: Resolve UHDMovies lp_go
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/resolve-uhdmovies-lp-go.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install cheerio-without-node-native@0.20.2 crypto-js@4.2.0 --no-save
+      - name: Fetch provider
+        run: |
+          mkdir -p ./_probe/providers
+          curl -fsSL https://raw.githubusercontent.com/yoruix/nuvio-providers/main/providers/uhdmovies.js -o ./_probe/providers/uhdmovies.js
+      - name: Resolve lp_go
+        run: |
+          node - <<'NODE'
+          const p=require('./_probe/providers/uhdmovies.js');
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36';
+          function parseForm(html){
+            const action=(html.match(/<form[^>]+action=["']([^"']+)["']/i)||[])[1]||'';
+            const fields={}; for(const m of html.matchAll(/<input[^>]+name=["']([^"']+)["'][^>]*value=["']([^"']*)["'][^>]*>/gi)) fields[m[1]]=m[2];
+            return {action,fields};
+          }
+          async function post(url,fields,ref,cookie=''){
+            const r=await fetch(url,{method:'POST',headers:{'User-Agent':UA,'Referer':ref,'Content-Type':'application/x-www-form-urlencoded',...(cookie?{Cookie:cookie}:{})},body:new URLSearchParams(fields).toString(),redirect:'manual',signal:AbortSignal.timeout(15000)});
+            return {r,b:Buffer.from(await r.arrayBuffer())};
+          }
+          async function resolve(start){
+            const g=await fetch(start,{headers:{'User-Agent':UA},signal:AbortSignal.timeout(15000)});
+            const h1=await g.text(); const f1=parseForm(h1);
+            const p1=await post(f1.action||start,f1.fields,start);
+            const t1=p1.b.toString('utf8'); const f2=parseForm(t1);
+            const p2=await post(f2.action,f2.fields,f1.action||start);
+            const t2=p2.b.toString('utf8');
+            const scm=t2.match(/sc\("([^"]+)","([^"]+)",(\d+)\)/);
+            const gom=t2.match(/href["']?\s*,?\s*["']https:\\/\\/en\.thenaukriadda\.in\\/\?lp_go=([^"'\\)]+)/i)||t2.match(/\?lp_go=([A-Za-z0-9_-]+)/);
+            console.log('SC',scm&&{name:scm[1],valueLen:scm[2].length,minutes:scm[3]});
+            console.log('GO',gom&&gom[1]);
+            if(!scm||!gom)return null;
+            const go='https://en.thenaukriadda.in/?lp_go='+encodeURIComponent(gom[1]);
+            const cookie=scm[1]+'='+scm[2];
+            let r=await fetch(go,{headers:{'User-Agent':UA,Referer:f2.action,Cookie:cookie},redirect:'manual',signal:AbortSignal.timeout(15000)});
+            let b=Buffer.from(await r.arrayBuffer());
+            console.log('GO1',r.status,r.headers.get('content-type'),'loc',r.headers.get('location'),'bytes',b.length,'prefix',b.subarray(0,300).toString('utf8').replace(/\s+/g,' '));
+            if(r.status>=300&&r.status<400&&r.headers.get('location')){
+              const u=new URL(r.headers.get('location'),go).toString();
+              console.log('FINALURL',u);
+              const mr=await fetch(u,{headers:{'User-Agent':UA,Range:'bytes=0-4095',Referer:go},redirect:'manual',signal:AbortSignal.timeout(15000)});
+              const mb=Buffer.from(await mr.arrayBuffer());
+              console.log('MEDIA',mr.status,mr.headers.get('content-type'),new URL(u).host,'bytes',mb.length,'prefix',mb.subarray(0,100).toString('utf8').replace(/\s+/g,' '));
+              return;
+            }
+            const t=b.toString('utf8');
+            const urls=[...new Set(t.match(/https?:\/\/[^"'<>\s)]+/g)||[])].filter(x=>!/thenaukriadda|schema|wordpress|w3|yoast|google|facebook|twitter/i.test(x));
+            console.log('URLS',JSON.stringify(urls.slice(0,40),null,2));
+            console.log('BODY',t.slice(0,3000).replace(/\s+/g,' '));
+          }
+          (async()=>{const rows=await p.getStreams('550','movie'); await resolve(rows[0].url)})().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

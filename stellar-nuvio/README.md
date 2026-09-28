@@ -45,3 +45,15 @@ MovieBox 已改为当前 v4.0.02 移动端协议：
 `MovieBox · Signed DASH · 720p/480p · HEVC`
 
 并把 CloudFront / Edge-Cache Cookie 作为播放请求头交给 Nuvio。
+
+
+### VAPlayer
+
+新增 **Stellar · VAPlayer**。它使用 `streamdata.vaplayer.ru` 的 IMDb API 返回多镜像 HLS，电影和剧集都支持。
+
+已真实验证：
+
+- Fight Club：3 条 HLS，master playlist HTTP 200；
+- Game of Thrones S01E01：3 条 HLS，master playlist HTTP 200；
+- HLS 使用 H.264/AVC + AAC，兼容性较好；
+- 插件会读取 master playlist 中最高 `RESOLUTION`，显示为 `up to 1080p/720p...`。

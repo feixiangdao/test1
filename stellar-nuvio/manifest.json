@@ -86,6 +86,26 @@
         "en",
         "hi"
       ]
+    },
+    {
+      "id": "stellar-vaplayer",
+      "name": "Stellar · VAPlayer",
+      "description": "VAPlayer 本地 HLS 直链。支持电影/剧集，多镜像 HLS，H.264/AAC，附带上游字幕。",
+      "version": "1.0.0",
+      "author": "Stellar Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vaplayer.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
     }
   ]
 }

@@ -29,6 +29,12 @@ jobs:
       - name: MovieBox signed live probe
         working-directory: stellar-nuvio
         run: node live-moviebox-mobile.js
+      - name: VAPlayer helper tests
+        working-directory: stellar-nuvio
+        run: node test-vaplayer.js
+      - name: VAPlayer live probe
+        working-directory: stellar-nuvio
+        run: node live-vaplayer.js
       - name: Diagnose PrimeSrc and VAPlayer
         working-directory: stellar-nuvio
         run: node diagnose-new-sources.js

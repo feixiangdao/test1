@@ -384,7 +384,7 @@ function tagAttr(tag, name) {
 }
 
 function urlOrigin(url) {
-  var m = String(url || "").match(/^(https?:\\/\\/[^/]+)/i);
+  var m = String(url || "").match(/^(https?:\/\/[^/]+)/i);
   return m ? m[1] : "";
 }
 
@@ -396,7 +396,7 @@ function urlDir(url) {
 
 function joinUrl(base, relative) {
   var r = xmlDecode(relative);
-  if (/^https?:\\/\\//i.test(r)) return r;
+  if (/^https?:\/\//i.test(r)) return r;
   if (r.indexOf("//") === 0) {
     return String(base).indexOf("https://") === 0 ? "https:" + r : "http:" + r;
   }
@@ -406,8 +406,8 @@ function joinUrl(base, relative) {
 
 function firstDashInitUrl(mpdUrl, xml) {
   var text = String(xml || "");
-  var rep = text.match(/<Representation\\b[^>]*>/i);
-  var tmpl = text.match(/<SegmentTemplate\\b[^>]*\\binitialization=\"[^\"]+\"[^>]*>/i);
+  var rep = text.match(/<Representation\b[^>]*>/i);
+  var tmpl = text.match(/<SegmentTemplate\b[^>]*\binitialization="[^"]+"[^>]*>/i);
   if (!tmpl) return "";
 
   var init = tagAttr(tmpl[0], "initialization");
@@ -416,10 +416,10 @@ function firstDashInitUrl(mpdUrl, xml) {
   var repId = rep ? tagAttr(rep[0], "id") : "";
   var bandwidth = rep ? tagAttr(rep[0], "bandwidth") : "";
   init = init
-    .replace(/\\$RepresentationID\\$/g, repId)
-    .replace(/\\$Bandwidth\\$/g, bandwidth);
+    .replace(/\$RepresentationID\$/g, repId)
+    .replace(/\$Bandwidth\$/g, bandwidth);
 
-  var baseMatch = text.match(/<BaseURL(?:\\s[^>]*)?>([^<]+)<\\/BaseURL>/i);
+  var baseMatch = text.match(/<BaseURL(?:\s[^>]*)?>([^<]+)<\/BaseURL>/i);
   var base = baseMatch ? joinUrl(mpdUrl, xmlDecode(baseMatch[1])) : mpdUrl;
   return joinUrl(base, init);
 }

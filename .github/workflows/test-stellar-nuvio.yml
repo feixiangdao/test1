@@ -50,6 +50,9 @@ jobs:
       - name: Diagnose VidRock
         working-directory: stellar-nuvio
         run: node diagnose-vidrock.js
+      - name: Probe next Stellar sources
+        working-directory: stellar-nuvio
+        run: node probe-next-sources.js
       - name: Validate manifest
         run: |
           node - <<'NODE'

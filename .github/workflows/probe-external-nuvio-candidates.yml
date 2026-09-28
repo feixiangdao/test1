@@ -1,0 +1,63 @@
+name: Probe External Nuvio Candidates
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-external-nuvio-candidates.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch current public provider implementations
+        run: |
+          git clone --depth 1 https://github.com/yoruix/nuvio-providers.git /tmp/nuvio-providers
+          cd /tmp/nuvio-providers
+          npm install --ignore-scripts
+      - name: Probe MovieBlast native streams
+        working-directory: /tmp/nuvio-providers
+        run: |
+          node - <<'NODE'
+          const p=require('./providers/movieblast.js');
+          async function media(label,row){
+            if(!row||!row.url)return;
+            try{
+              const r=await fetch(row.url,{headers:{...(row.headers||{}),Range:'bytes=0-4095'},redirect:'manual'});
+              const b=Buffer.from(await r.arrayBuffer());
+              console.log('MEDIA',label,r.status,r.headers.get('content-type'),new URL(row.url).host,'bytes',b.length,'prefix',b.subarray(0,100).toString('utf8').replace(/\s+/g,' '));
+            }catch(e){console.log('MEDIA',label,'ERR',e.message)}
+          }
+          (async()=>{
+            for(const q of [
+              ['movie','550',null,null],
+              ['tv','1399',1,1]
+            ]){
+              const rows=await p.getStreams(q[1],q[0],q[2],q[3]);
+              console.log('ROWS',q[0],rows.length,rows.map(x=>({name:x.name,title:x.title,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return ''}})()})));
+              for(const x of rows.slice(0,8)) await media(q[0]+' '+(x.quality||''),x);
+            }
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE
+      - name: Probe AllMovieLand native streams
+        working-directory: /tmp/nuvio-providers
+        run: |
+          node - <<'NODE'
+          const p=require('./providers/allmovieland.js');
+          async function one(type,id,s,e){
+            const rows=await p.getStreams(id,type,s,e);
+            console.log('ROWS',type,rows.length,rows.map(x=>({title:x.title,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return ''}})()})));
+            for(const x of rows.slice(0,6)){
+              try{
+                const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-4095'},redirect:'manual'});
+                const t=Buffer.from(await r.arrayBuffer()).subarray(0,140).toString('utf8').replace(/\s+/g,' ');
+                console.log('MEDIA',type,x.quality,r.status,r.headers.get('content-type'),new URL(x.url).host,t);
+              }catch(e){console.log('MEDIA',type,'ERR',e.message)}
+            }
+          }
+          (async()=>{await one('movie','550');await one('tv','1399',1,1)})().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

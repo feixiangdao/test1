@@ -5,7 +5,7 @@
 var CryptoJS=require("crypto-js");
 var BASE="https://player.zxcprime.xyz";
 var TMDB="https://api.themoviedb.org/3";
-var TMDB_KEY="68e094699525b18a70bab2f86b1fa706";
+var TMDB_KEY=(typeof globalThis!=="undefined"&&globalThis.TMDB_API_KEY)?globalThis.TMDB_API_KEY:"68e094699525b18a70bab2f86b1fa706";
 var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36";
 var LINK_KEY="7f4c9e2a81d63b05c4f7a9e8126d3b50e1a8c7f23d9465ab0c6e9f1d4a7b832c";
 

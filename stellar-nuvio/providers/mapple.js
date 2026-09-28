@@ -81,24 +81,8 @@ var PLAYBACK_HEADERS = {
 };
 var HOSTERS = [
   { name: "Zeus", key: "mapple" },
-  { name: "Poseidon", key: "s25" },
-  { name: "Athena", key: "s2" },
-  { name: "Hera", key: "s4" },
-  { name: "Persephone", key: "s12" },
-  { name: "Apollo", key: "s19" },
-  { name: "Artemis", key: "s13" },
-  { name: "Hermes", key: "s26" },
-  { name: "Ares", key: "s24" },
-  { name: "Aphrodite", key: "s6" },
-  { name: "Hephaestus", key: "s15" },
-  { name: "Demeter", key: "s7" },
-  { name: "Dionysus", key: "s8" },
-  { name: "Hestia", key: "s3" },
-  { name: "Hades", key: "s16" },
-  { name: "Nike", key: "s5" },
-  { name: "Atlas", key: "s1" },
-  { name: "Prometheus", key: "s10" }
-];
+  { name: "Athena", key: "s2" }
+]
 
 // src/mapple/pow.js
 var import_crypto_js = __toESM(require("crypto-js"));
@@ -221,26 +205,9 @@ function fetchMediaDetails(tmdbId, mediaType) {
     }
   });
 }
-function fetchSubtitles(tmdbId, mediaType, seasonNum = null, episodeNum = null) {
-  return __async(this, null, function* () {
-    try {
-      const isMovie = mediaType !== "tv";
-      const url = isMovie ? `${SUBTITLE_BASE}/search?id=${tmdbId}` : `${SUBTITLE_BASE}/search?id=${tmdbId}&season=${seasonNum}&episode=${episodeNum}`;
-      const res = yield fetch(url, { headers: { "Accept": "application/json" } });
-      if (!res.ok)
-        return [];
-      const data = yield res.json();
-      if (!Array.isArray(data))
-        return [];
-      return data.map((sub) => ({
-        url: sub.url,
-        language: sub.language || "Unknown",
-        name: sub.isHearingImpaired ? `${sub.language} (CC)` : sub.language || "Subtitle"
-      }));
-    } catch (e) {
-      return [];
-    }
-  });
+function fetchSubtitles() {
+  // Wyzie currently returns 401 for this integration; avoid an unnecessary failed request.
+  return Promise.resolve([]);
 }
 function parseHlsMaster(masterUrl, hosterName, mediaTitle, playbackHeaders) {
   return __async(this, null, function* () {

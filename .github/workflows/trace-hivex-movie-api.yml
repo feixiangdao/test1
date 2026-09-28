@@ -1,0 +1,67 @@
+name: Trace HiveX Movie API
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/trace-hivex-movie-api.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Trace search and detail
+        run: |
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36';
+          const BASE='https://hivex.stream';
+          async function get(path){
+            const u=path.startsWith('http')?path:BASE+path;
+            const r=await fetch(u,{headers:{'User-Agent':UA,'Accept':'*/*','Referer':BASE+'/'},redirect:'follow',signal:AbortSignal.timeout(15000)});
+            const t=await r.text();
+            console.log('GET',u,'=>',r.status,r.url,r.headers.get('content-type'),'len',t.length);
+            return {r,t,u:r.url};
+          }
+          function urls(s){return [...new Set((s.match(/https?:\\?\/\\?\/[^"'<>\\s)]+/g)||[]).map(x=>x.replace(/\\\//g,'/')))]}
+          (async()=>{
+            const sr=await get('/api/movies/search?query='+encodeURIComponent('Fight Club'));
+            console.log('SEARCHBODY',sr.t.slice(0,12000));
+            let data=null;try{data=JSON.parse(sr.t)}catch(_){}
+            console.log('SEARCHJSON',JSON.stringify(data,null,2).slice(0,20000));
+            const arr=Array.isArray(data)?data:(data&&Array.isArray(data.results)?data.results:(data&&Array.isArray(data.movies)?data.movies:[]));
+            const hit=arr.find(x=>JSON.stringify(x).toLowerCase().includes('fight club'))||arr[0];
+            console.log('HIT',JSON.stringify(hit,null,2));
+            if(!hit)return;
+            const vals=[hit.slug,hit.id,hit.tmdbId,hit.tmdb_id,hit.uuid].filter(Boolean).map(String);
+            const paths=[];
+            for(const v of vals){
+              paths.push('/movie/'+encodeURIComponent(v),'/movies/'+encodeURIComponent(v),'/watch/'+encodeURIComponent(v),'/title/'+encodeURIComponent(v));
+            }
+            for(const p of [...new Set(paths)]){
+              try{
+                const rr=await get(p);
+                if(rr.r.status!==200)continue;
+                const scripts=[...new Set([...rr.t.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)].map(m=>new URL(m[1],rr.u).toString()))];
+                console.log('DETAIL',p,'scripts',JSON.stringify(scripts,null,2),'urls',JSON.stringify(urls(rr.t).slice(0,50)));
+                for(const su of scripts){
+                  if(!/_next\/static\/chunks\/(app\/|\d)/.test(su))continue;
+                  const js=await get(su);
+                  const hits=[];
+                  for(const re of [
+                    /\/api\/[A-Za-z0-9_/?=&.{}:,-]{2,220}/g,
+                    /(?:stream|playback|source|video|watch|episode|server)[A-Za-z0-9_./?=&:{}'"()-]{0,220}/gi,
+                    /\.m3u8[^"'\s)]*/gi,
+                    /\.mpd[^"'\s)]*/gi
+                  ]) for(const h of (js.t.match(re)||[])) hits.push(h);
+                  const uq=[...new Set(hits)].filter(x=>x.length<400).slice(0,180);
+                  if(uq.length) console.log('CHUNKHITS',su,JSON.stringify(uq,null,2));
+                }
+              }catch(e){console.log('PATHERR',p,e.message)}
+            }
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

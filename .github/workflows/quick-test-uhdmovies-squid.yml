@@ -1,0 +1,33 @@
+name: Quick Test UHDMovies Squid Token
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/quick-test-uhdmovies-squid.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install cheerio-without-node-native@0.20.2 crypto-js@4.2.0 --no-save
+      - name: Probe Squid Game only
+        run: |
+          node - <<'NODE'
+          const p=require('./stellar-nuvio/providers/uhdmovies.js');
+          (async()=>{
+            const rows=await p.getStreams('93405','tv',1,1);
+            console.log('ROWS',rows.length,rows.map(x=>({name:x.name,quality:x.quality,url:x.url,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+            for(const x of rows){
+              try{
+                const r=await fetch(x.url,{method:'HEAD',headers:{...(x.headers||{}),'User-Agent':'Mozilla/5.0'},redirect:'manual',signal:AbortSignal.timeout(10000)});
+                console.log('HEAD',x.quality,r.status,r.headers.get('content-type'),r.headers.get('content-length'),new URL(x.url).host);
+              }catch(e){console.log('HEADERR',e.message)}
+            }
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

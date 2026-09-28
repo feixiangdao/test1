@@ -38,6 +38,9 @@ jobs:
       - name: Diagnose PrimeSrc and VAPlayer
         working-directory: stellar-nuvio
         run: node diagnose-new-sources.js
+      - name: Diagnose CineVibe
+        working-directory: stellar-nuvio
+        run: node diagnose-cinevibe.js
       - name: Validate manifest
         run: |
           node - <<'NODE'

@@ -1,6 +1,6 @@
 {
   "name": "Stellar Local",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
   "scrapers": [
     {
@@ -105,6 +105,26 @@
         "multi"
       ],
       "limited": true
+    },
+    {
+      "id": "stellar-castletv",
+      "name": "Stellar · CastleTV",
+      "description": "CastleTV AES API 本地解析。标题+年份精确匹配，按语言与实际清晰度返回签名 HLS。",
+      "version": "1.0.0",
+      "author": "Stellar Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/castletv.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
     }
   ]
 }

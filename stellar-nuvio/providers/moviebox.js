@@ -523,8 +523,10 @@ function playInfo(subjectId, mediaType, season, episode) {
           probeDash(manifest, headers).then(function(probe) {
             var codec = clean(stream.codecName || stream.codec || stream.format);
             var topQ = qualityValue(stream);
-            var label = "MovieBox · " + networkLabel(probe) +
-              " · 最高" + topQ + " · 自适应" +
+            var net = networkLabel(probe);
+            var netOk = probe && probe.mpdOk && (probe.initOk || !probe.initUrl);
+            var label = "MovieBox · " +
+              (netOk ? "Auto · Max " + topQ : net + " · Auto · Max " + topQ) +
               (codec ? " · " + codec.toUpperCase() : "");
 
             console.log(

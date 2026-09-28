@@ -29,6 +29,12 @@ jobs:
       - name: MovieBox signed live probe
         working-directory: stellar-nuvio
         run: node live-moviebox-mobile.js
+      - name: CastleTV helper tests
+        working-directory: stellar-nuvio
+        run: node test-castletv.js
+      - name: CastleTV live probe
+        working-directory: stellar-nuvio
+        run: node live-castletv.js
       - name: VAPlayer helper tests
         working-directory: stellar-nuvio
         run: node test-vaplayer.js

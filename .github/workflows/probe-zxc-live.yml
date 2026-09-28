@@ -1,0 +1,20 @@
+name: Probe ZXC Live
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'stellar-nuvio/probe-zxc-live.js'
+      - '.github/workflows/probe-zxc-live.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install crypto-js --no-save
+      - run: NODE_PATH="$PWD/node_modules" node stellar-nuvio/probe-zxc-live.js

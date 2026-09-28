@@ -58,6 +58,15 @@ jobs:
               const anchors=$('a[href]').get().map(el=>({text:$(el).text().trim().slice(0,80),href:$(el).attr('href')})).filter(x=>/lp|go=|continue|download|next|redirect/i.test((x.text||'')+' '+(x.href||'')));
               const metas=$('meta[http-equiv="refresh"]').get().map(el=>$(el).attr('content')||'');
               console.log('SIGNALS',step,JSON.stringify({scripts:scripts.slice(0,12),anchors:anchors.slice(0,30),metas},null,2));
+              const lpGo=t.match(/setAttribute\(\s*['"]href['"]\s*,\s*["']([^"']*\?lp_go=[^"']+)["']\s*\)/i);
+              const lpCookie=t.match(/\bsc\(\s*["']([^"']+)["']\s*,\s*["']([^"']+)["']\s*,\s*\d+\s*\)/i);
+              if(lpGo && lpCookie){
+                const ck=lpCookie[1],cv=lpCookie[2].replace(/\\\//g,'/');
+                jar[ck]=cv;
+                const go=lpGo[1].replace(/\\\//g,'/');
+                console.log('LP-GO',step,ck,go);
+                referer=url;url=absolutize(go,url);method='GET';body=null;continue;
+              }
               const forms=$('form').get().map(el=>{
                 const $f=$(el), data={};
                 $f.find('input[name]').each((_,inp)=>{data[$(inp).attr('name')]=$(inp).attr('value')||''});

@@ -797,12 +797,29 @@ function getStreams(tmdbId, mediaType = "movie", season = null, episode = null) 
       const searchResults = yield search(searchQuery);
       if (searchResults.length === 0)
         return [];
-      const bestMatch = findBestTitleMatch(mediaInfo, searchResults, mediaType, season);
-      if (!bestMatch) {
-        console.log(`[HDHub4u/Strict] Rejecting search results: no sufficiently accurate title/season match`);
+      const wantedTitle = normalizeTitle(mediaInfo.title);
+      const selectedMedia = searchResults.find((result) => {
+        const raw = String(result.title || "");
+        const candidateTitle = normalizeTitle(raw);
+        const titleOk = candidateTitle === wantedTitle || candidateTitle.startsWith(wantedTitle + " ");
+        if (!titleOk) return false;
+        if (mediaType === "movie") {
+          const y = Number(mediaInfo.year) || 0;
+          const ry = Number(result.year) || 0;
+          return !y || !ry || y === ry;
+        }
+        if (mediaType === "tv" && season) {
+          const seasonMatches = [...raw.matchAll(/(?:season\s*|\bs)(\d{1,2})\b/gi)].map((m) => parseInt(m[1], 10));
+          if (!seasonMatches.length) return season === 1 ? false : false;
+          return seasonMatches.some((n) => n === Number(season)) &&
+            seasonMatches.every((n) => n === Number(season));
+        }
+        return true;
+      });
+      if (!selectedMedia) {
+        console.log(`[HDHub4u/Strict] Rejecting search results: no exact title/year/season match`);
         return [];
       }
-      const selectedMedia = bestMatch;
       console.log(`[HDHub4u] Selected: "${selectedMedia.title}" (${selectedMedia.url})`);
       const result = yield getDownloadLinks(selectedMedia.url);
       const finalLinks = result.finalLinks;

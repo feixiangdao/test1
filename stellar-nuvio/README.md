@@ -57,3 +57,12 @@ MovieBox 已改为当前 v4.0.02 移动端协议：
 - Game of Thrones S01E01：3 条 HLS，master playlist HTTP 200；
 - HLS 使用 H.264/AVC + AAC，兼容性较好；
 - 插件会读取 master playlist 中最高 `RESOLUTION`，显示为 `up to 1080p/720p...`。
+
+
+### VidRock
+
+新增 **Stellar · VidRock**（仅电影）。
+
+它直接调用 `vidrock.ru/api/movie/{TMDB}/`，再在 Nuvio 本机使用 WebCrypto AES-GCM 解密最终媒体 URL。真实联网测试《Fight Club》返回 3 条媒体流，三条均 HTTP 200，其中包含 HLS master 和 1080p 线路。
+
+当前 VidRock 的 TV endpoint 实测返回 404，因此 manifest 明确只声明 `movie`，不会在剧集里制造空播放源。

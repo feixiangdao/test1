@@ -1,0 +1,43 @@
+name: Probe VideoSeed Token API
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-videoseed-token.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe token API
+        run: |
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36';
+          const tokens=[
+            '09d20492044ac025d63bdd1f5554a24c7b487738d146844a1e0fe70aadcfa32dec4de4143bfa6ee99bf9eecad6c227beaf1f4d1a9f4855325ba25e92d896c046a0f0e7e4106a7d5d0f3841012f07e34b::598b3854318d18001b1ccf8b7bf9b636',
+            '5ffc942d955005798bd03b8bc3576e9ccbb2e6ca0966ac54f15b9f319a50f90b58c66f0f93cdd8c5ca295c19d650010315bbf1de7e2fadba36599c41e3824ede31dbbde37ba842188d1ed113a95263a9::74c06e4e1d2f8d330befe58838d6275c'
+          ];
+          const hosts=['video-seed.dev','video-seed.xyz','video-seed.pro'];
+          (async()=>{
+            for(const host of hosts){
+              for(const token of tokens){
+                try{
+                  const r=await fetch('https://'+host+'/api',{
+                    method:'POST',
+                    headers:{'User-Agent':UA,'Content-Type':'application/x-www-form-urlencoded','x-token':host,'Referer':'https://'+host+'/?url='+encodeURIComponent(token)},
+                    body:'keys='+encodeURIComponent(token),
+                    signal:AbortSignal.timeout(12000)
+                  });
+                  const t=await r.text();
+                  console.log('API',host,r.status,r.headers.get('content-type'),'len',t.length,'body',t.slice(0,1200).replace(/\s+/g,' '));
+                }catch(e){console.log('ERR',host,e.message)}
+              }
+            }
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

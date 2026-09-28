@@ -56,7 +56,7 @@ jobs:
           const fs=require('fs');
           const m=JSON.parse(fs.readFileSync('stellar-nuvio/manifest.json','utf8'));
           if(m.name!=='Stellar Local') throw new Error('unexpected manifest name');
-          if(!Array.isArray(m.scrapers)||m.scrapers.length!==5) throw new Error('expected 5 scrapers');
+          if(!Array.isArray(m.scrapers)||m.scrapers.length!==6) throw new Error('expected 6 scrapers');
           const ids=new Set();
           for(const s of m.scrapers){
             if(ids.has(s.id)) throw new Error('duplicate id '+s.id);

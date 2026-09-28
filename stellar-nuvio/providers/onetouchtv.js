@@ -5,7 +5,7 @@ var CryptoJS=require("crypto-js");
 var BASE="https://api3.devcorp.me";
 var SITE="https://onetouchtv.xyz";
 var TMDB="https://api.themoviedb.org/3";
-var TMDB_KEY="68e094699525b18a70bab2f86b1fa706";
+var TMDB_KEY=(typeof globalThis!=="undefined"&&globalThis.TMDB_API_KEY)?globalThis.TMDB_API_KEY:"68e094699525b18a70bab2f86b1fa706";
 var UA="Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/137 Mobile Safari/537.36";
 var KEY=CryptoJS.enc.Utf8.parse("im72charPasswordofdInitVectorStm");
 var IV=CryptoJS.enc.Utf8.parse("im72charPassword");

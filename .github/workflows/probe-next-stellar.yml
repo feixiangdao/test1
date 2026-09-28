@@ -1,0 +1,28 @@
+name: Probe Next Stellar Sources
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'stellar-nuvio/probe-next-sources.js'
+      - 'stellar-nuvio/probe-next-sources-2.js'
+      - 'stellar-nuvio/diagnose-onetouchtv.js'
+      - '.github/workflows/probe-next-stellar.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Probe StreamFlix HDGhar ZXC
+        working-directory: stellar-nuvio
+        run: node probe-next-sources.js
+      - name: Probe StreamFlix v2 and ZXC v2
+        working-directory: stellar-nuvio
+        run: node probe-next-sources-2.js
+      - name: Probe OneTouchTV
+        working-directory: stellar-nuvio
+        run: node diagnose-onetouchtv.js

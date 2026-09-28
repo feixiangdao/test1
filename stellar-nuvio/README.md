@@ -27,6 +27,7 @@
 - Stellar · Vidlink
 - Stellar · ZXCStreams
 - Stellar · OneTouchTV
+- Stellar · DVDPlay
 
 MP4Hydra 当前上游处于维护状态，没有加入。
 
@@ -132,3 +133,27 @@ Resshin 虽然 API 能返回 MP4，但最终 `api1.zxcstream.xyz` 当前实测 H
 - Squid Game S03E01：1 条 HLS，HTTP 200，有效 `#EXTM3U`。
 
 因此该源标记为 `limited: true`：宁可缺源，也不返回错片。
+
+
+### DVDPlay v1.15
+
+新增 **Stellar · DVDPlay**，定位为“电影为主、部分亚洲剧集”的直文件补充源。
+
+正式 Provider 只保留已经解析成可直接读取媒体的线路：
+
+- Pixeldrain；
+- Cloudflare R2；
+- Googleusercontent 直接下载地址。
+
+HubCloud / Gofile 等仍需网页跳转或当前返回 302/429 的线路全部过滤，不交给 Nuvio 播放器。
+
+真实联网抽样：
+
+- Fight Club：Pixeldrain / R2 1080p，Range 请求 HTTP 206；
+- Inception：R2 / Pixeldrain 1080p，HTTP 206；
+- Titanic：R2 / Pixeldrain 1080p，HTTP 206；
+- The Dark Knight：R2 / Pixeldrain 1080p，HTTP 206；
+- Squid Game S01E01：1080p / 720p Pixeldrain MKV，HTTP 206；
+- Game of Thrones、Breaking Bad 当前无结果。
+
+因此标记为 `limited: true`，但已有结果属于真正的直文件，不依赖 iframe 或外部网页播放器。

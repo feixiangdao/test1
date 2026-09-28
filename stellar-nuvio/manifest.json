@@ -1,6 +1,6 @@
 {
   "name": "Stellar Local",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
   "scrapers": [
     {
@@ -157,6 +157,26 @@
         "tv"
       ],
       "filename": "providers/cineby.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
+    },
+    {
+      "id": "stellar-movix",
+      "name": "Stellar · Movix",
+      "description": "Movix 本地 HLS。TMDB 直连接口，返回前验证 #EXTM3U；电影/剧集均已实测，支持多音轨。",
+      "version": "1.0.0",
+      "author": "Stellar Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/movix.js",
       "enabled": true,
       "formats": [
         "m3u8"

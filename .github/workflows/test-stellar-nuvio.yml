@@ -65,6 +65,12 @@ jobs:
       - name: Cineby live local-style probe
         working-directory: stellar-nuvio
         run: node live-cineby.js
+      - name: Movix helper tests
+        working-directory: stellar-nuvio
+        run: node test-movix.js
+      - name: Movix live probe
+        working-directory: stellar-nuvio
+        run: node live-movix.js
       - name: NetMirror helper tests
         working-directory: stellar-nuvio
         run: node test-netmirror.js

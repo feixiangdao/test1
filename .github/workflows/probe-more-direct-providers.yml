@@ -1,0 +1,68 @@
+name: Probe More Direct Providers
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-more-direct-providers.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Clone current Nuvio providers
+        run: |
+          git clone --depth 1 --branch main https://github.com/yoruix/nuvio-providers.git /tmp/nuvio-providers
+          cd /tmp/nuvio-providers
+          npm install --ignore-scripts
+      - name: Probe candidates
+        working-directory: /tmp/nuvio-providers
+        run: |
+          node - <<'NODE'
+          const specs=[
+            ['hdhub4u','./providers/hdhub4u.js'],
+            ['moviesdrive','./providers/moviesdrive.js'],
+            ['moviesmod','./providers/moviesmod.js'],
+            ['xprime','./providers/xprime.js'],
+            ['vidnest','./providers/vidnest.js'],
+            ['dahmermovies','./providers/dahmermovies.js']
+          ];
+          async function media(name,label,x){
+            if(!x||!x.url)return;
+            try{
+              const h={...(x.headers||{}),Range:'bytes=0-4095','User-Agent':(x.headers&&x.headers['User-Agent'])||'Mozilla/5.0'};
+              const r=await fetch(x.url,{headers:h,redirect:'manual',signal:AbortSignal.timeout(15000)});
+              const b=Buffer.from(await r.arrayBuffer()),ct=r.headers.get('content-type')||'';
+              const txt=b.subarray(0,180).toString('utf8').replace(/\s+/g,' ');
+              const ok=(r.ok||r.status===206)&&(
+                /#EXTM3U/.test(txt)||/<MPD/i.test(txt)||/video\//i.test(ct)||
+                /application\/(octet-stream|x-matroska)/i.test(ct)||b.length>=4096
+              );
+              console.log('MEDIA',name,label,x.name||'',x.quality||'',r.status,ct,new URL(x.url).host,'OK='+ok,'bytes='+b.length,'prefix='+txt);
+            }catch(e){console.log('MEDIAERR',name,label,e.message)}
+          }
+          async function runProvider(name,path){
+            let p;
+            try{p=require(path)}catch(e){console.log('LOADERR',name,e.message);return}
+            const fn=p.getStreams||p.getDahmermoviesStreams||p.getXprimeStreams||p.getVidnestStreams;
+            if(typeof fn!=='function'){console.log('NOFN',name,Object.keys(p));return}
+            for(const q of [
+              ['movie','550',null,null,'Fight Club'],
+              ['movie','27205',null,null,'Inception'],
+              ['tv','1399',1,1,'GOT S1E1'],
+              ['tv','93405',1,1,'Squid Game S1E1']
+            ]){
+              try{
+                const rows=await fn(q[1],q[0],q[2],q[3]);
+                console.log('ROWS',name,q[4],Array.isArray(rows)?rows.length:'nonarray',(rows||[]).slice(0,12).map(x=>({name:x.name,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+                for(const x of (rows||[]).slice(0,6))await media(name,q[4],x);
+              }catch(e){console.log('PROVIDERERR',name,q[4],e.stack||e.message)}
+            }
+          }
+          (async()=>{for(const s of specs)await runProvider(s[0],s[1])})().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

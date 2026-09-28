@@ -1,0 +1,46 @@
+name: Probe OneTouchTV Exact
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-onetouchtv-exact.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe exact Asian catalog entries
+        run: |
+          node - <<'NODE'
+          const {createDecipheriv}=require('crypto');
+          const BASE='https://api3.devcorp.me';
+          const KEY=Buffer.from('im72charPasswordofdInitVectorStm','utf8');
+          const IV=Buffer.from('im72charPassword','utf8');
+          const H={'User-Agent':'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124 Mobile Safari/537.36','Referer':'https://onetouchtv.xyz/'};
+          function dec(s){s=String(s).replace(/-_\./g,'/').replace(/@/g,'+').replace(/\s+/g,'');if(s.length%4)s+='='.repeat(4-s.length%4);const d=createDecipheriv('aes-256-cbc',KEY,IV);return JSON.parse(Buffer.concat([d.update(Buffer.from(s,'base64')),d.final()]).toString('utf8')).result}
+          async function get(path){const r=await fetch(BASE+path,{headers:H,signal:AbortSignal.timeout(15000)});const t=await r.text();console.log('HTTP',r.status,path);if(!r.ok)return null;return dec(t)}
+          async function media(x,label){try{const r=await fetch(x.url,{headers:{...H,Referer:BASE+'/',Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(12000)});const b=Buffer.from(await r.arrayBuffer());console.log('MEDIA',label,x.name,x.quality,x.type,r.status,r.headers.get('content-type'),new URL(x.url).host,b.subarray(0,120).toString('utf8').replace(/\s+/g,' '))}catch(e){console.log('MEDIA',label,'ERR',e.message)}}
+          async function one(id,ep,label){
+            const d=await get('/vod/'+encodeURIComponent(id)+'/detail');
+            const eps=(d&&d.episodes)||[];
+            console.log('DETAIL',label,'count',eps.length,'sample',eps.slice(-5).concat(eps.slice(0,5)).map(x=>({episode:x.episode,playId:x.playId,id:x.id})));
+            const target=eps.find(x=>String(parseInt(x.episode,10))===String(ep))||eps[eps.length-1]||eps[0];
+            console.log('TARGET',label,target);
+            if(!target)return;
+            const sd=await get('/vod/'+encodeURIComponent(id)+'/episode/'+encodeURIComponent(target.playId));
+            console.log('SOURCES',label,(sd&&sd.sources||[]).map(x=>({name:x.name,quality:x.quality,type:x.type,url:x.url})));
+            for(const x of (sd&&sd.sources||[]))if(x.url)await media(x,label);
+          }
+          (async()=>{
+            await one('978626-squid-game-2021',1,'Squid Game S1E1');
+            await one('moving-2021',1,'Moving E1');
+            await one('queen-of-tears',1,'Queen of Tears E1');
+            await one('272202-parasite-2019',1,'Parasite 2019');
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

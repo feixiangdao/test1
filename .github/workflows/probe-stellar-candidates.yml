@@ -1,0 +1,19 @@
+name: Quick Stellar Candidates
+on:
+  push:
+    paths:
+      - 'research/probe-stellar-candidates.js'
+      - '.github/workflows/probe-stellar-candidates.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe Goated and Cineby
+        run: node research/probe-stellar-candidates.js

@@ -38,7 +38,7 @@ async function probeZxc(){
   }
   const urls=new Set();
   for(const {t} of js){
-    for(const m of t.matchAll(/https?:\\/\\/[^"'\\s)\\]}]+/g)) urls.add(m[0]);
+    for(const m of t.matchAll(new RegExp("https?://[^\\\"'\\\\s)\\\\]}]+","g"))) urls.add(m[0]);
   }
   console.log('\nABS URLS', [...urls].filter(x=>/zxc|api|stream|cdn|movie|video/i.test(x)).slice(0,100));
 }

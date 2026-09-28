@@ -1,0 +1,16 @@
+name: Diagnose CastleTV
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'stellar-nuvio/diagnose-castletv.js'
+      - '.github/workflows/diagnose-castletv.yml'
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node stellar-nuvio/diagnose-castletv.js

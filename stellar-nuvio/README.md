@@ -32,3 +32,16 @@ https://raw.githubusercontent.com/feixiangdao/test1/main/stellar-nuvio/manifest.
 2. 再测试一集常见剧集，例如 Game of Thrones S01E01。
 3. 分别确认 VidZee / VixSrc / MovieBox 是否出现。
 4. MovieBox 会区分 `Play` 和 `Download` 两组地址，便于确认哪组 CDN 在你的网络可用。
+
+
+### MovieBox v1.2
+
+MovieBox 已改为当前 v4.0.02 移动端协议：
+
+`anonymous bootstrap → x-user guest token → signed search → play-info → signCookie → index.mpd`
+
+不会再把 `bcdnw/bcdnxw` 或 `macdn ... b164...` 的表面 MP4 地址交给播放器。播放结果名称会直接显示为：
+
+`MovieBox · Signed DASH · 720p/480p · HEVC`
+
+并把 CloudFront / Edge-Cache Cookie 作为播放请求头交给 Nuvio。

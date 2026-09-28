@@ -1,6 +1,6 @@
 {
   "name": "Stellar Local",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
   "scrapers": [
     {
@@ -32,8 +32,8 @@
     {
       "id": "stellar-moviebox",
       "name": "Stellar · MovieBox",
-      "description": "MovieBox Mobile Signed DASH 本地解析。使用移动端 play-info/v2 与 signCookie 生成真实 DASH，并把签名 Cookie 交给 Nuvio 播放器。",
-      "version": "1.1.0",
+      "description": "MovieBox v4.0.02 Signed DASH 本地解析。动态 guest bootstrap 后从 play-info 的 signCookie 生成真实 DASH，并把签名 Cookie 交给 Nuvio 播放器。",
+      "version": "1.2.0",
       "author": "Stellar Local",
       "supportedTypes": ["movie", "tv"],
       "filename": "providers/moviebox.js",

@@ -1,0 +1,16 @@
+name: Diagnose Stellar Candidates
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'stellar-nuvio/diagnose-candidates.js'
+      - '.github/workflows/diagnose-stellar-candidates.yml'
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node stellar-nuvio/diagnose-candidates.js

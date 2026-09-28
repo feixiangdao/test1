@@ -1,0 +1,56 @@
+name: Probe DooFlix Xprime
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-dooflix-xprime.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch upstream providers
+        run: |
+          mkdir -p /tmp/nuvio-providers/providers
+          curl -fsSL https://raw.githubusercontent.com/yoruix/nuvio-providers/main/providers/dooflix.js -o /tmp/nuvio-providers/providers/dooflix.js
+          curl -fsSL https://raw.githubusercontent.com/yoruix/nuvio-providers/main/providers/xprime.js -o /tmp/nuvio-providers/providers/xprime.js
+      - name: Probe
+        run: |
+          node - <<'NODE'
+          async function media(name,label,x){
+            if(!x||!x.url)return;
+            try{
+              const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(15000)});
+              const b=Buffer.from(await r.arrayBuffer());
+              console.log('MEDIA',name,label,x.quality||'',r.status,r.headers.get('content-type'),new URL(x.url).host,'bytes',b.length,'prefix',b.subarray(0,100).toString('utf8').replace(/\s+/g,' '));
+            }catch(e){console.log('MEDIAERR',name,label,e.message)}
+          }
+          async function test(name,path){
+            let p;try{p=require(path)}catch(e){console.log('LOADERR',name,e.message);return}
+            const fn=p.getStreams||p.default?.getStreams;
+            if(!fn){console.log('NOFN',name);return}
+            const qs=[
+              ['550','movie',null,null,'Fight Club'],
+              ['27205','movie',null,null,'Inception'],
+              ['1399','tv',1,1,'GOT S1E1'],
+              ['93405','tv',1,1,'Squid Game S1E1']
+            ];
+            for(const q of qs){
+              try{
+                const rows=await fn(q[0],q[1],q[2],q[3]);
+                console.log('ROWS',name,q[4],(rows||[]).length,(rows||[]).slice(0,12).map(x=>({name:x.name,title:x.title,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+                for(const x of (rows||[]).slice(0,6))await media(name,q[4],x);
+              }catch(e){console.log('ERR',name,q[4],e.stack||e.message)}
+            }
+          }
+          (async()=>{
+            await test('dooflix','/tmp/nuvio-providers/providers/dooflix.js');
+            await test('xprime','/tmp/nuvio-providers/providers/xprime.js');
+          })().catch(e=>{console.error('FATAL',e.stack||e);process.exitCode=1});
+          NODE

@@ -1,5 +1,5 @@
 name: Probe HDHub4U Strict
-# rerun after candidate block repair
+# rerun after exact title/year/season matcher
 
 on:
   workflow_dispatch:

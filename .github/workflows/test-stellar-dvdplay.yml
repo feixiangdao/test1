@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install runtime dependency
+        run: npm install cheerio-without-node-native@0.20.2 --no-save
       - name: Probe strict matches
         run: |
           node - <<'NODE'

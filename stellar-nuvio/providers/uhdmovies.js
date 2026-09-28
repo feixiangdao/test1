@@ -328,7 +328,21 @@ function extractDriveseedPage(url) {
         if (text.includes("instant download")) {
           const instantRes = yield fetch(href, { headers: HEADERS, redirect: "follow" });
           if (instantRes.url && instantRes.url.includes("url=")) {
-            streams.push({ name: "Driveseed Instant", url: instantRes.url.split("url=")[1], quality, size });
+            let directUrl = "";
+            try {
+              directUrl = new URL(instantRes.url).searchParams.get("url") || "";
+            } catch (_) {
+              directUrl = instantRes.url.split("url=")[1] || "";
+            }
+            try { directUrl = decodeURIComponent(directUrl); } catch (_) {}
+            if (/^https?:\/\//i.test(directUrl)) {
+              streams.push({ name: "Driveseed Instant", url: directUrl, quality, size });
+            } else {
+              const resolvedVideoSeed = yield extractVideoSeed(instantRes.url);
+              if (resolvedVideoSeed) {
+                streams.push({ name: "Driveseed Instant", url: resolvedVideoSeed, quality, size });
+              }
+            }
           }
         } else if (text.includes("resume cloud")) {
           const cloudRes = yield fetch(baseDomain + href, { headers: HEADERS });

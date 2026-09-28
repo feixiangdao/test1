@@ -1,0 +1,40 @@
+name: Test OneTouchTV Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'stellar-nuvio/providers/onetouchtv.js'
+      - '.github/workflows/test-onetouchtv-candidate.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install crypto-js --no-save
+      - name: Strict match and final media test
+        run: |
+          NODE_PATH="$PWD/node_modules" node - <<'NODE'
+          const p=require('./stellar-nuvio/providers/onetouchtv.js');
+          async function one(type,id,s,e,label){
+            const rows=await p.getStreams(id,type,s,e);
+            console.log('RESULT',label,type,rows.length,rows.map(x=>({name:x.name,quality:x.quality,host:new URL(x.url).host})));
+            for(const x of rows.slice(0,5)){
+              const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-2047'},redirect:'manual'});
+              const b=Buffer.from(await r.arrayBuffer());
+              console.log('MEDIA',label,r.status,r.headers.get('content-type'),new URL(x.url).host,b.subarray(0,100).toString('utf8').replace(/\s+/g,' '));
+            }
+          }
+          (async()=>{
+            await one('movie','597',null,null,'Titanic 1997');
+            await one('movie','27205',null,null,'Inception 2010');
+            await one('tv','1399',1,1,'GOT should be empty if absent');
+            await one('tv','93405',1,1,'Squid Game S1');
+            await one('tv','93405',2,1,'Squid Game S2');
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

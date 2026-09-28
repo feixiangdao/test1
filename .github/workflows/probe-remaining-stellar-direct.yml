@@ -1,0 +1,156 @@
+name: Probe Remaining Stellar Direct
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-remaining-stellar-direct.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Probe OneTouchTV without TMDB
+        continue-on-error: true
+        run: |
+          node - <<'NODE'
+          const {createDecipheriv}=require('crypto');
+          const MAIN='https://api3.devcorp.me';
+          const KEY=Buffer.from('im72charPasswordofdInitVectorStm','utf8');
+          const IV=Buffer.from('im72charPassword','utf8');
+          const H={'User-Agent':'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124 Mobile Safari/537.36','Referer':'https://onetouchtv.xyz/'};
+          function decrypt(encoded){
+            let s=String(encoded).replace(/-_\./g,'/').replace(/@/g,'+').replace(/\s+/g,'');
+            const pad=s.length%4;if(pad)s+='='.repeat(4-pad);
+            const d=createDecipheriv('aes-256-cbc',KEY,IV);
+            const out=Buffer.concat([d.update(Buffer.from(s,'base64')),d.final()]).toString('utf8');
+            return JSON.parse(out);
+          }
+          async function enc(path){
+            const url=MAIN+path;
+            const r=await fetch(url,{headers:H,signal:AbortSignal.timeout(15000)});
+            const t=await r.text();
+            console.log('ONETOUCH HTTP',r.status,path,'ct',r.headers.get('content-type'),'len',t.length,'prefix',t.slice(0,80).replace(/\s+/g,' '));
+            if(!r.ok)return null;
+            try{return decrypt(t).result}catch(e){console.log('ONETOUCH DECRYPT ERR',path,e.message);return null}
+          }
+          async function media(url,label){
+            try{
+              const r=await fetch(url,{headers:{...H,Referer:MAIN+'/',Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(12000)});
+              const b=Buffer.from(await r.arrayBuffer());
+              console.log('ONETOUCH MEDIA',label,r.status,r.headers.get('content-type'),new URL(url).host,'prefix',b.subarray(0,120).toString('utf8').replace(/\s+/g,' '));
+            }catch(e){console.log('ONETOUCH MEDIA',label,'ERR',e.message)}
+          }
+          async function one(title,type,epNum){
+            const s=await enc('/vod/search?keyword='+encodeURIComponent(title));
+            const arr=Array.isArray(s)?s:[];
+            console.log('ONETOUCH SEARCH',title,arr.slice(0,8).map(x=>({id:x.id,title:x.title,type:x.type,year:x.year})));
+            const hit=arr.find(x=>String(x.title||'').toLowerCase()===title.toLowerCase() && (type==='movie'?x.type==='movie':x.type!=='movie')) || arr.find(x=>type==='movie'?x.type==='movie':x.type!=='movie');
+            if(!hit)return;
+            const d=await enc('/vod/'+encodeURIComponent(hit.id)+'/detail');
+            console.log('ONETOUCH DETAIL',hit.title,d&&{episodes:(d.episodes||[]).slice(0,5)});
+            const eps=(d&&d.episodes)||[];
+            const target=type==='movie'?eps[0]:eps.find(x=>parseInt(x.episode,10)===epNum)||eps[0];
+            if(!target){console.log('ONETOUCH NO TARGET');return}
+            const sd=await enc('/vod/'+encodeURIComponent(hit.id)+'/episode/'+encodeURIComponent(target.playId));
+            console.log('ONETOUCH SOURCES',title,sd&&sd.sources&&sd.sources.map(x=>({name:x.name,quality:x.quality,type:x.type,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+            for(const x of (sd&&sd.sources||[]).slice(0,6)) if(x.url) await media(x.url,title+' '+(x.quality||x.name||''));
+          }
+          (async()=>{await one('Fight Club','movie',1);await one('Game of Thrones','tv',1)})().catch(e=>{console.error('ONETOUCH FATAL',e.stack||e);process.exitCode=1});
+          NODE
+
+      - name: Probe ZXCStreams without TMDB
+        continue-on-error: true
+        run: |
+          node - <<'NODE'
+          const {createHash}=require('crypto');
+          const SALT='3435443433';
+          const PORTALS=['https://zxcstream.xyz','https://zxcprime.xyz'];
+          const SUBS=['r1','r2','r3','r4','r5','r6','v4','cdn','api','stream'];
+          const SERVERS=['icarus','berkas','orion','athena'];
+          const F={id:'rgrwsdsdfgwrwrwwr',fToken:'xfgdfgdsffgrwgrwyjhkjt',ts:'rdghhdghhfssft',token:'ZDDVHJFGHYRHG',title:'TUKTHFSSFGDGHJS',year:'53653TRFG647GF',season:'adkljfhdahfladhfjahfjlahfhfljkadfdf',episode:'546745ygy46ytfgty',imdbId:'564745ygtuy5yi75yuy'};
+          const H={'User-Agent':'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36','Accept':'application/json,text/plain,*/*'};
+          const sha=s=>createHash('sha512').update(s).digest('hex');
+          async function verify(base){
+            const rt=Date.now(),xt=sha(rt+':'+SALT+':550').slice(0,64);
+            const r=await fetch(base+'/backend/token',{method:'POST',headers:{...H,Origin:base,'Content-Type':'application/json',Referer:base+'/player/movie/550'},body:JSON.stringify({[F.id]:'550',[F.fToken]:xt,[F.ts]:rt}),signal:AbortSignal.timeout(8000)});
+            const t=await r.text();
+            console.log('ZXC VERIFY',base,r.status,r.headers.get('content-type'),t.slice(0,120).replace(/\s+/g,' '));
+            if(!r.ok)return null;
+            try{const d=JSON.parse(t);return d[F.token]?base:null}catch(_){return null}
+          }
+          async function discover(){
+            for(const p of PORTALS){
+              try{
+                const r=await fetch(p,{headers:H,redirect:'follow',signal:AbortSignal.timeout(8000)});
+                console.log('ZXC PORTAL',p,r.status,r.url);
+                const o=new URL(r.url).origin;if(o!==new URL(p).origin){const v=await verify(o);if(v)return v}
+              }catch(e){console.log('ZXC PORTAL ERR',p,e.message)}
+            }
+            for(const s of SUBS){try{const v=await verify('https://'+s+'.zxcstream.xyz');if(v)return v}catch(e){console.log('ZXC SUB ERR',s,e.message)}}
+            return 'https://r1.zxcstream.xyz';
+          }
+          async function token(base,id,ref){
+            const rt=Date.now(),xt=sha(rt+':'+SALT+':'+id).slice(0,64);
+            const r=await fetch(base+'/backend/token',{method:'POST',headers:{...H,Origin:base,'Content-Type':'application/json',Referer:ref},body:JSON.stringify({[F.id]:id,[F.fToken]:xt,[F.ts]:rt}),signal:AbortSignal.timeout(10000)});
+            const t=await r.text();console.log('ZXC TOKEN',id,r.status,t.slice(0,120).replace(/\s+/g,' '));
+            if(!r.ok)throw new Error('token '+r.status);
+            const d=JSON.parse(t);return {serverToken:d[F.token],serverTs:d[F.ts],xt};
+          }
+          async function one(meta,type,s,e){
+            const base=await discover();
+            const ref=base+'/player/'+type+'/'+meta.tmdbId+(s!=null?'/'+s+'/'+e:'');
+            const tok=await token(base,meta.tmdbId,ref);
+            for(const server of SERVERS){
+              const p={[F.id]:meta.tmdbId,b:type,[F.ts]:String(tok.serverTs),[F.token]:tok.serverToken,[F.fToken]:tok.xt,[F.title]:meta.title,[F.year]:meta.year,date:meta.releaseDate,[F.imdbId]:meta.imdbId};
+              if(s!=null){p[F.season]=String(s);p[F.episode]=String(e)}
+              const u=base+'/backend_/servers/'+server+'?'+new URLSearchParams(p);
+              try{
+                const r=await fetch(u,{headers:{...H,Origin:base,Referer:ref},signal:AbortSignal.timeout(12000)});
+                const t=await r.text();
+                console.log('ZXC SERVER',meta.title,server,r.status,r.headers.get('content-type'),t.slice(0,160).replace(/\s+/g,' '));
+                if(!r.ok)continue;
+                let d;try{d=JSON.parse(t)}catch(_){continue}
+                for(const l of (d.links||[]).slice(0,5)){
+                  if(!l.link)continue;
+                  try{
+                    const mr=await fetch(l.link,{headers:{...H,Origin:base,Referer:ref,Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(12000)});
+                    const b=Buffer.from(await mr.arrayBuffer());
+                    console.log('ZXC MEDIA',meta.title,server,l.resolution,l.type,mr.status,mr.headers.get('content-type'),new URL(l.link).host,b.subarray(0,120).toString('utf8').replace(/\s+/g,' '));
+                  }catch(err){console.log('ZXC MEDIA',meta.title,server,'ERR',err.message)}
+                }
+              }catch(err){console.log('ZXC SERVER ERR',meta.title,server,err.message)}
+            }
+          }
+          (async()=>{
+            await one({tmdbId:'550',title:'Fight Club',year:'1999',releaseDate:'1999-10-15',imdbId:'tt0137523'},'movie');
+            await one({tmdbId:'1399',title:'Game of Thrones',year:'2011',releaseDate:'2011-04-17',imdbId:'tt0944947'},'tv',1,1);
+          })().catch(e=>{console.error('ZXC FATAL',e.stack||e);process.exitCode=1});
+          NODE
+
+      - name: Recheck StreamFlix and HDGhar response details
+        continue-on-error: true
+        run: |
+          node - <<'NODE'
+          async function p(url,headers){
+            try{
+              const r=await fetch(url,{headers,redirect:'manual',signal:AbortSignal.timeout(12000)});
+              const t=await r.text();
+              console.log('CHECK',url,'=>',r.status,'ct',r.headers.get('content-type'),'server',r.headers.get('server'),'loc',r.headers.get('location'),'len',t.length,'prefix',t.slice(0,220).replace(/\s+/g,' '));
+            }catch(e){console.log('CHECK ERR',url,e.message)}
+          }
+          const mobile={'User-Agent':'Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36','Accept':'application/json,text/plain,*/*','Accept-Language':'en-US,en;q=0.9','Origin':'https://streamflix.app','Referer':'https://streamflix.app/'};
+          const desktop={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/137 Safari/537.36','Accept':'application/json,*/*','Referer':'https://hdghartv.cc/'};
+          (async()=>{
+            await p('https://api.streamflix.app/data.json',mobile);
+            await p('https://api.streamflix.app/config/config-streamflixapp.json',mobile);
+            await p('https://hdghartv.cc/api/search?q=Fight%20Club',desktop);
+            await p('https://hdghartv.cc/api/search?q=Game%20of%20Thrones',desktop);
+          })();
+          NODE

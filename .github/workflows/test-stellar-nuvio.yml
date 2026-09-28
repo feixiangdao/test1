@@ -59,6 +59,9 @@ jobs:
       - name: Probe next Stellar sources v2
         working-directory: stellar-nuvio
         run: node probe-next-sources-2.js
+      - name: NetMirror corrected live probe
+        working-directory: stellar-nuvio
+        run: node probe-netmirror-corrected.js
       - name: Validate manifest
         run: |
           node - <<'NODE'

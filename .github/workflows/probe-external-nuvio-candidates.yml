@@ -118,3 +118,23 @@ jobs:
           }
           (async()=>{await one('movie','550');await one('tv','1399',1,1)})().catch(e=>{console.error(e.stack||e);process.exitCode=1});
           NODE
+      - name: Probe VideoEasy native streams
+        continue-on-error: true
+        timeout-minutes: 3
+        working-directory: /tmp/nuvio-providers
+        run: |
+          node - <<'NODE'
+          const p=require('./providers/videasy.js');
+          async function one(type,id,s,e){
+            const rows=await p.getStreams(id,type,s,e);
+            console.log('ROWS',type,rows.length,rows.slice(0,20).map(x=>({name:x.name,title:x.title,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return ''}})()})));
+            for(const x of rows.slice(0,12)){
+              try{
+                const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-4095'},redirect:'manual'});
+                const b=Buffer.from(await r.arrayBuffer());
+                console.log('MEDIA',type,x.name,x.quality,r.status,r.headers.get('content-type'),new URL(x.url).host,b.subarray(0,120).toString('utf8').replace(/\s+/g,' '));
+              }catch(err){console.log('MEDIA',type,x.name,'ERR',err.message)}
+            }
+          }
+          (async()=>{await one('movie','550');await one('tv','1399',1,1)})().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

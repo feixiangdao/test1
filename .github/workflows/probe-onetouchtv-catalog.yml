@@ -1,0 +1,69 @@
+name: Probe OneTouchTV Catalog
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-onetouchtv-catalog.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe catalog and both API hosts
+        run: |
+          node - <<'NODE'
+          const {createDecipheriv}=require('crypto');
+          const HOSTS=['https://api3.devcorp.me','https://onetouchtv.devcorp.me'];
+          const KEY=Buffer.from('im72charPasswordofdInitVectorStm','utf8');
+          const IV=Buffer.from('im72charPassword','utf8');
+          const H={'User-Agent':'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124 Mobile Safari/537.36','Referer':'https://onetouchtv.xyz/'};
+          function dec(s){
+            s=String(s).replace(/-_\./g,'/').replace(/@/g,'+').replace(/\s+/g,'');
+            if(s.length%4)s+='='.repeat(4-s.length%4);
+            const d=createDecipheriv('aes-256-cbc',KEY,IV);
+            return JSON.parse(Buffer.concat([d.update(Buffer.from(s,'base64')),d.final()]).toString('utf8')).result;
+          }
+          async function get(base,path){
+            try{
+              const r=await fetch(base+path,{headers:H,signal:AbortSignal.timeout(12000)});
+              const t=await r.text();
+              if(!r.ok){console.log('HTTPFAIL',base,path,r.status,t.slice(0,100).replace(/\s+/g,' '));return null}
+              try{return dec(t)}catch(e){console.log('DECFAIL',base,path,e.message,t.slice(0,100));return null}
+            }catch(e){console.log('FETCHFAIL',base,path,e.message);return null}
+          }
+          async function media(base,url,label){
+            try{
+              const r=await fetch(url,{headers:{...H,Referer:base+'/',Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(12000)});
+              const b=Buffer.from(await r.arrayBuffer());
+              console.log('MEDIA',label,r.status,r.headers.get('content-type'),new URL(url).host,b.subarray(0,120).toString('utf8').replace(/\s+/g,' '));
+            }catch(e){console.log('MEDIA',label,'ERR',e.message)}
+          }
+          (async()=>{
+            for(const base of HOSTS){
+              console.log('=== HOST',base,'===');
+              for(const q of ['Squid Game','Breaking Bad','The Last of Us','Avatar','Inception','Parasite','Moving','Queen of Tears','Fight Club','Game of Thrones']){
+                const arr=await get(base,'/vod/search?keyword='+encodeURIComponent(q));
+                console.log('SEARCH',q,Array.isArray(arr)?arr.slice(0,6).map(x=>({id:x.id,title:x.title,type:x.type,year:x.year})):arr);
+              }
+              const candidates=['squid-game','breaking-bad','parasite','moving','queen-of-tears'];
+              for(const id of candidates){
+                const d=await get(base,'/vod/'+id+'/detail');
+                if(!d)continue;
+                console.log('DETAIL',id,'keys',Object.keys(d),'episodes',Array.isArray(d.episodes)?d.episodes.slice(0,5):d.episodes,'seasons',Array.isArray(d.seasons)?d.seasons.slice(0,3):d.seasons);
+                const eps=d.episodes||[];
+                const ep=Array.isArray(eps)?eps[0]:null;
+                if(ep&&ep.playId){
+                  const sd=await get(base,'/vod/'+id+'/episode/'+encodeURIComponent(ep.playId));
+                  console.log('SOURCES',id,sd&&sd.sources&&sd.sources.map(x=>({name:x.name,quality:x.quality,type:x.type,url:x.url})));
+                  for(const x of (sd&&sd.sources||[]).slice(0,4)) if(x.url) await media(base,x.url,id+' '+(x.quality||x.name||''));
+                }
+              }
+            }
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

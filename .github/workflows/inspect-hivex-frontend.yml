@@ -1,0 +1,48 @@
+name: Inspect HiveX Frontend
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/inspect-hivex-frontend.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect current scripts
+        run: |
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36';
+          (async()=>{
+            const r=await fetch('https://hivex.stream/',{headers:{'User-Agent':UA},signal:AbortSignal.timeout(15000)});
+            const html=await r.text();
+            console.log('HOME',r.status,r.url,'len',html.length);
+            const srcs=[...new Set([...html.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)].map(m=>new URL(m[1],r.url).toString()))];
+            console.log('SCRIPTS',JSON.stringify(srcs,null,2));
+            for(const u of srcs.slice(0,30)){
+              try{
+                const rr=await fetch(u,{headers:{'User-Agent':UA,Referer:r.url},signal:AbortSignal.timeout(15000)});
+                const t=await rr.text();
+                const hits=[];
+                const regs=[
+                  /\/api\/[A-Za-z0-9_/?=&.-]{1,160}/g,
+                  /stream\/fetch[^"'\s]{0,200}/g,
+                  /fingerprint[^,;)}]{0,250}/gi,
+                  /session[^,;)}]{0,250}/gi,
+                  /token[^,;)}]{0,250}/gi,
+                  /server[=:][^,;)}]{0,180}/gi,
+                  /cinebox[^,;)}]{0,180}/gi
+                ];
+                for(const re of regs) for(const h of (t.match(re)||[])) hits.push(h);
+                const uniq=[...new Set(hits)].slice(0,100);
+                if(uniq.length) console.log('\nJS',u,'status',rr.status,'len',t.length,'\nHITS',JSON.stringify(uniq,null,2));
+              }catch(e){console.log('ERR',u,e.message)}
+            }
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

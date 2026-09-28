@@ -41,6 +41,9 @@ jobs:
       - name: Diagnose CineVibe
         working-directory: stellar-nuvio
         run: node diagnose-cinevibe.js
+      - name: Diagnose VidRock
+        working-directory: stellar-nuvio
+        run: node diagnose-vidrock.js
       - name: Validate manifest
         run: |
           node - <<'NODE'

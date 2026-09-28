@@ -1,0 +1,36 @@
+name: Quick HDHub4U Strict
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/quick-hdhub4u-strict.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save cheerio-without-node-native crypto-js
+      - name: Resolve strict candidate
+        run: |
+          node - <<'NODE'
+          const p=require('./research/hdhub4u-strict.js');
+          async function one(type,id,s,e,label){
+            const rows=await p.getStreams(id,type,s,e);
+            console.log('QROWS',label,rows.length,rows.slice(0,20).map(x=>({
+              name:x.name,title:x.title,quality:x.quality,
+              host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()
+            })));
+          }
+          (async()=>{
+            await one('movie','550',null,null,'Fight Club');
+            await one('movie','27205',null,null,'Inception');
+            await one('tv','1399',1,1,'GOT S1E1');
+            await one('tv','93405',1,1,'Squid Game S1E1');
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

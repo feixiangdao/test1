@@ -1,0 +1,52 @@
+name: Probe DooFlix
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-dooflix.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Clone current Nuvio providers
+        run: |
+          git clone --depth 1 --branch main https://github.com/yoruix/nuvio-providers.git /tmp/nuvio-providers
+          cd /tmp/nuvio-providers
+          npm install --ignore-scripts
+      - name: Probe DooFlix direct media
+        working-directory: /tmp/nuvio-providers
+        run: |
+          node - <<'NODE'
+          const p=require('./providers/dooflix.js');
+          async function one(type,id,s,e,label){
+            const rows=await p.getStreams(id,type,s,e);
+            console.log('ROWS',label,rows.length,rows.slice(0,20).map(x=>({
+              name:x.name,title:x.title,quality:x.quality,
+              host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()
+            })));
+            let good=0;
+            for(const x of rows.slice(0,12)){
+              try{
+                const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(15000)});
+                const b=Buffer.from(await r.arrayBuffer());
+                const pfx=b.subarray(0,140).toString('utf8').replace(/\s+/g,' ');
+                const ct=r.headers.get('content-type')||'';
+                const ok=(r.ok||r.status===206)&&(/#EXTM3U/.test(pfx)||/<MPD/.test(pfx)||/video\//i.test(ct)||b.length>1000);
+                if(ok)good++;
+                console.log('MEDIA',label,x.name,r.status,ct,new URL(x.url).host,'OK='+ok,'bytes='+b.length,pfx);
+              }catch(err){console.log('MEDIA ERR',label,x.name,err.message)}
+            }
+            console.log('GOOD',label,good);
+          }
+          (async()=>{
+            await one('movie','550',null,null,'Fight Club');
+            await one('tv','1399',1,1,'GOT S1E1');
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

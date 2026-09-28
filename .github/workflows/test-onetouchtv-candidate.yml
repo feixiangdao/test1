@@ -35,6 +35,7 @@ jobs:
             await one('movie','27205',null,null,'Inception 2010');
             await one('tv','1399',1,1,'GOT should be empty if absent');
             await one('tv','93405',1,1,'Squid Game S1');
-            await one('tv','93405',2,1,'Squid Game S2');
+            await one('tv','93405',2,1,'Squid Game S2 upstream-empty');
+            await one('tv','93405',3,1,'Squid Game S3');
           })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
           NODE

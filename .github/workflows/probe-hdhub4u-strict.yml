@@ -1,5 +1,5 @@
 name: Probe HDHub4U Strict
-# rerun after candidate syntax fix
+# rerun after candidate block repair
 
 on:
   workflow_dispatch:

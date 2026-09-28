@@ -1,6 +1,6 @@
 {
   "name": "Stellar Local",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
   "scrapers": [
     {
@@ -137,6 +137,26 @@
         "tv"
       ],
       "filename": "providers/netmirror.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
+    },
+    {
+      "id": "stellar-cineby",
+      "name": "Stellar · Cineby",
+      "description": "Cineby / VidKing 多后端本地 HLS。共享 seed 解密 Yoru/Breach/hdmovie，并在手机端先验证 #EXTM3U；被 Cloudflare 拦截的 CDN 自动隐藏。",
+      "version": "1.0.0",
+      "author": "Stellar Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/cineby.js",
       "enabled": true,
       "formats": [
         "m3u8"

@@ -1,6 +1,6 @@
 {
   "name": "Stellar Local",
-  "version": "1.15.0",
+  "version": "1.15.1",
   "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
   "scrapers": [
     {
@@ -262,27 +262,6 @@
       "enabled": true,
       "formats": [
         "m3u8"
-      ],
-      "contentLanguage": [
-        "multi"
-      ],
-      "limited": true
-    },
-    {
-      "id": "stellar-dvdplay",
-      "name": "Stellar · DVDPlay",
-      "description": "DVDPlay 本地直文件补充源。只保留已解析到 Pixeldrain / Cloudflare R2 / Googleusercontent 的直接媒体链接，过滤 HubCloud/Gofile 等中转页；电影覆盖较好，剧集覆盖有限。",
-      "version": "1.0.0",
-      "author": "Stellar Local",
-      "supportedTypes": [
-        "movie",
-        "tv"
-      ],
-      "filename": "providers/dvdplay.js",
-      "enabled": true,
-      "formats": [
-        "mkv",
-        "mp4"
       ],
       "contentLanguage": [
         "multi"

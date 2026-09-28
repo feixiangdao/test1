@@ -1,0 +1,47 @@
+name: Quick Screen MalluMV
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/quick-screen-mallumv.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install cheerio-without-node-native@0.20.2 --no-save
+      - name: Fetch provider
+        run: |
+          mkdir -p ./_probe/providers
+          curl -fsSL https://raw.githubusercontent.com/yoruix/nuvio-providers/main/providers/mallumv.js -o ./_probe/providers/mallumv.js
+      - name: Probe
+        run: |
+          node - <<'NODE'
+          const p=require('./_probe/providers/mallumv.js');
+          async function one(label,id,type,s,e){
+            try{
+              const rows=await Promise.race([
+                p.getStreams(id,type,s,e),
+                new Promise((_,rej)=>setTimeout(()=>rej(new Error('provider timeout')),50000))
+              ]);
+              console.log('ROWS',label,(rows||[]).length,(rows||[]).slice(0,10).map(x=>({name:x.name,title:x.title,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+              for(const x of (rows||[]).slice(0,5)){
+                try{
+                  const r=await fetch(x.url,{method:'HEAD',headers:{...(x.headers||{}),'User-Agent':'Mozilla/5.0'},redirect:'manual',signal:AbortSignal.timeout(10000)});
+                  console.log('HEAD',label,x.quality||'',r.status,r.headers.get('content-type'),r.headers.get('content-length'),new URL(x.url).host);
+                }catch(err){console.log('HEADERR',label,err.message)}
+              }
+            }catch(e){console.log('ERR',label,e.message)}
+          }
+          (async()=>{
+            await one('Fight Club','550','movie');
+            await one('Inception','27205','movie');
+            await one('Squid Game S3E1','93405','tv',3,1);
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

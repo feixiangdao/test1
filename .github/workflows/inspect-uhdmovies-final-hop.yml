@@ -25,22 +25,28 @@ jobs:
           node - <<'NODE'
           const cheerio=require('cheerio-without-node-native');
           const p=require('./_probe/providers/uhdmovies.js');
-          function cookieFrom(res){
-            try{return (res.headers.getSetCookie?res.headers.getSetCookie():[]).map(x=>x.split(';')[0]).join('; ')}catch(_){return ''}
+          function updateJar(jar,res){
+            let arr=[]; try{arr=res.headers.getSetCookie?res.headers.getSetCookie():[]}catch(_){}
+            for(const raw of arr){
+              const first=raw.split(';')[0]; const p=first.indexOf('='); if(p<0)continue;
+              const k=first.slice(0,p).trim(),v=first.slice(p+1).trim();
+              if(!v||/deleted/i.test(v)) delete jar[k]; else jar[k]=v;
+            }
           }
+          function jarText(jar){return Object.entries(jar).map(([k,v])=>k+'='+v).join('; ')}
           function absolutize(u,base){try{return new URL(u,base).toString()}catch(_){return u}}
           async function walk(start){
-            let url=start, method='GET', body=null, cookie='', referer='';
+            let url=start, method='GET', body=null, jar={}, referer='';
             for(let step=0;step<8;step++){
               const headers={'User-Agent':'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36','Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'};
-              if(cookie)headers.Cookie=cookie;
+              const cookie=jarText(jar); if(cookie)headers.Cookie=cookie;
               if(referer)headers.Referer=referer;
               if(method==='POST')headers['Content-Type']='application/x-www-form-urlencoded';
               const r=await fetch(url,{method,headers,body,redirect:'manual',signal:AbortSignal.timeout(12000)});
-              const sc=cookieFrom(r); if(sc)cookie=cookie?cookie+'; '+sc:sc;
+              updateJar(jar,r);
               const loc=r.headers.get('location');
               const ct=r.headers.get('content-type')||'';
-              console.log('STEP',step,method,r.status,ct,'url',url,'loc',loc,'cookie',cookie);
+              console.log('STEP',step,method,r.status,ct,'url',url,'loc',loc,'cookie',jarText(jar));
               if(loc){referer=url;url=absolutize(loc,url);method='GET';body=null;continue}
               if(!ct.toLowerCase().includes('text/html')){
                 console.log('FINAL-NONHTML',url,r.status,ct);return url;
@@ -48,13 +54,19 @@ jobs:
               const t=await r.text();
               console.log('HTML',step,t.slice(0,2500).replace(/\n/g,'\\n'));
               const $=cheerio.load(t);
-              const form=$('form').first();
-              if(form.length){
+              const forms=$('form').get().map(el=>{
+                const $f=$(el), data={};
+                $f.find('input[name]').each((_,inp)=>{data[$(inp).attr('name')]=$(inp).attr('value')||''});
+                return {el,id:$f.attr('id')||'',action:$f.attr('action')||'',method:($f.attr('method')||'GET').toUpperCase(),data};
+              });
+              console.log('FORMS',step,forms.map(f=>({id:f.id,action:f.action,method:f.method,names:Object.keys(f.data)})));
+              const chosen=forms.find(f=>Object.keys(f.data).some(k=>k.indexOf('_lp_')===0)||/^lp-/i.test(f.id));
+              if(chosen){
+                const form=$(chosen.el);
                 const action=absolutize(form.attr('action')||url,url);
-                const data={};
-                form.find('input[name]').each((_,el)=>{data[$(el).attr('name')]=$(el).attr('value')||''});
-                console.log('FORM',step,form.attr('id')||'',action,JSON.stringify(data));
-                referer=url;url=action;method=(form.attr('method')||'GET').toUpperCase();
+                const data=chosen.data;
+                console.log('FORM',step,chosen.id,action,JSON.stringify(data));
+                referer=url;url=action;method=chosen.method;
                 if(method==='POST')body=new URLSearchParams(data).toString();
                 else {const u=new URL(url);Object.entries(data).forEach(([k,v])=>u.searchParams.set(k,v));url=u.toString();body=null}
                 continue;

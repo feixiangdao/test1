@@ -15,5 +15,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Probe Moonflix and Purstream
+      - name: Probe Moonflix Purstream and 1Shows
         run: node research/probe-moonflix-purstream.js

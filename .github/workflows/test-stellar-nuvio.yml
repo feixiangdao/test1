@@ -1,0 +1,39 @@
+name: Test Stellar Nuvio
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'stellar-nuvio/**'
+      - '.github/workflows/test-stellar-nuvio.yml'
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check providers
+        run: |
+          for f in stellar-nuvio/providers/*.js; do
+            echo "Checking $f"
+            node --check "$f"
+          done
+      - name: Validate manifest
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const m=JSON.parse(fs.readFileSync('stellar-nuvio/manifest.json','utf8'));
+          if(m.name!=='Stellar Local') throw new Error('unexpected manifest name');
+          if(!Array.isArray(m.scrapers)||m.scrapers.length!==3) throw new Error('expected 3 scrapers');
+          const ids=new Set();
+          for(const s of m.scrapers){
+            if(ids.has(s.id)) throw new Error('duplicate id '+s.id);
+            ids.add(s.id);
+            const p='stellar-nuvio/'+s.filename;
+            if(!fs.existsSync(p)) throw new Error('missing '+p);
+          }
+          console.log('Stellar Local manifest OK');
+          NODE

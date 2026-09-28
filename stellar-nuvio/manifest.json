@@ -1,0 +1,46 @@
+{
+  "name": "Stellar Local",
+  "version": "1.0.0",
+  "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
+  "scrapers": [
+    {
+      "id": "stellar-vidzee",
+      "name": "Stellar · VidZee",
+      "description": "VidZee 本地直链解析。请求和最终播放都由 Nuvio 设备直接完成。",
+      "version": "1.0.0",
+      "author": "Stellar Local",
+      "supportedTypes": ["movie", "tv"],
+      "filename": "providers/vidzee.js",
+      "enabled": true,
+      "formats": ["mp4", "m3u8"],
+      "logo": "https://player.vidzee.wtf/favicon.ico",
+      "contentLanguage": ["en", "hi"]
+    },
+    {
+      "id": "stellar-vixsrc",
+      "name": "Stellar · VixSrc",
+      "description": "VixSrc 本地签名 HLS 解析，绕过 Vercel 出口被上游限制的问题。",
+      "version": "1.0.0",
+      "author": "Stellar Local",
+      "supportedTypes": ["movie", "tv"],
+      "filename": "providers/vixsrc.js",
+      "enabled": true,
+      "formats": ["m3u8"],
+      "logo": "https://vixsrc.to/favicon.ico",
+      "contentLanguage": ["multi"]
+    },
+    {
+      "id": "stellar-moviebox",
+      "name": "Stellar · MovieBox",
+      "description": "MovieBox 本地取链。API 取链与媒体播放来自同一设备网络，用于避免远程 Addon 的 CDN 429/区域绑定问题。",
+      "version": "1.0.0",
+      "author": "Stellar Local",
+      "supportedTypes": ["movie", "tv"],
+      "filename": "providers/moviebox.js",
+      "enabled": true,
+      "formats": ["mp4", "m3u8"],
+      "contentLanguage": ["multi"],
+      "limited": false
+    }
+  ]
+}

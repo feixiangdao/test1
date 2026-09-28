@@ -1,3 +1,4 @@
+// focused-probe-trigger
 const crypto=require('crypto');
 const BASE='https://api3.devcorp.me';
 const KEY=Buffer.from('im72charPasswordofdInitVectorStm','utf8');

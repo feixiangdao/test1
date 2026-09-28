@@ -22,13 +22,13 @@ jobs:
             echo "Checking $f"
             node --check "$f"
           done
-      - name: Validate manifest
+      - name: Test Jellyfin Direct\n        run: node cinejoy-nuvio/test-jellyfin-direct.js\n      - name: Validate manifest
         run: |
           node - <<'NODE'
           const fs = require('fs');
           const m = require('./cinejoy-nuvio/manifest.json');
-          if (!Array.isArray(m.scrapers) || m.scrapers.length !== 11) {
-            throw new Error(`Expected 11 scrapers, got ${m.scrapers && m.scrapers.length}`);
+          if (!Array.isArray(m.scrapers) || m.scrapers.length !== 12) {
+            throw new Error(`Expected 12 scrapers, got ${m.scrapers && m.scrapers.length}`);
           }
           const ids = new Set();
           for (const s of m.scrapers) {

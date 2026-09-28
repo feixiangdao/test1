@@ -1,7 +1,7 @@
 {
   "name": "Cinejoy Local",
-  "version": "1.1.0",
-  "description": "Cinejoy providers adapted for Nuvio local execution. Direct media URLs only; embed-only CinemaOS is experimental and disabled by default.",
+  "version": "1.2.0",
+  "description": "Cinejoy providers adapted for Nuvio local execution. Direct media URLs only, plus optional user-authorized Jellyfin Direct.",
   "scrapers": [
     {
       "id": "cinejoy-vidlink",
@@ -244,6 +244,29 @@
       "contentLanguage": [
         "en"
       ]
+    },
+    {
+      "id": "cinejoy-jellyfin-direct",
+      "name": "Cinejoy · Jellyfin Direct",
+      "description": "连接你自己的 Jellyfin 媒体库；按 TMDB ID 匹配并把原始媒体流直接交给 Nuvio 原生播放器。需要在插件设置中填写服务器地址和 Access Token。",
+      "version": "1.0.0",
+      "author": "Cinejoy",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/jellyfin_direct.js",
+      "enabled": false,
+      "formats": [
+        "mkv",
+        "mp4",
+        "webm",
+        "ts"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
     }
   ]
-}
+}\n

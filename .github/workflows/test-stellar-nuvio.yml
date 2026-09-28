@@ -15,12 +15,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Install crypto-js for MovieBox tests
+        run: npm install --no-save crypto-js
       - name: Syntax check providers
         run: |
           for f in stellar-nuvio/providers/*.js; do
             echo "Checking $f"
             node --check "$f"
           done
+      - name: MovieBox helper tests
+        working-directory: stellar-nuvio
+        run: node test-moviebox-mobile.js
+      - name: MovieBox signed live probe
+        working-directory: stellar-nuvio
+        run: node live-moviebox-mobile.js
       - name: Validate manifest
         run: |
           node - <<'NODE'

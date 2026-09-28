@@ -1,6 +1,6 @@
 {
   "name": "Stellar Local",
-  "version": "1.17.0",
+  "version": "1.18.0",
   "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
   "scrapers": [
     {
@@ -300,6 +300,26 @@
         "tv"
       ],
       "filename": "providers/uhdmovies.js",
+      "enabled": true,
+      "formats": [
+        "mkv",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "stellar-dvdplay",
+      "name": "Stellar · DVDPlay",
+      "description": "DVDPlay 新剧季直链补充源。修复搜索错片问题，严格匹配真实剧名与季号，并在网络预检前先按集号过滤；已验证 Squid Game S03E01/E02 可返回 Pixeldrain 1080p/720p MKV。旧季链接覆盖不完整。",
+      "version": "1.0.0",
+      "author": "Stellar Local",
+      "supportedTypes": [
+        "tv"
+      ],
+      "filename": "providers/dvdplay.js",
       "enabled": true,
       "formats": [
         "mkv",

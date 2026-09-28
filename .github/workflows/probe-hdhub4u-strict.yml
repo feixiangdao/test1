@@ -1,0 +1,42 @@
+name: Probe HDHub4U Strict
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'research/hdhub4u-strict.js'
+      - '.github/workflows/probe-hdhub4u-strict.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save cheerio-without-node-native crypto-js
+      - name: Probe strict candidate
+        run: |
+          node - <<'NODE'
+          const p=require('./research/hdhub4u-strict.js');
+          async function one(type,id,s,e,label){
+            const rows=await p.getStreams(id,type,s,e);
+            console.log('STRICT ROWS',label,rows.length,rows.slice(0,12).map(x=>({name:x.name,title:x.title,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+            for(const x of rows.slice(0,4)){
+              try{
+                const r=await fetch(x.url,{method:'HEAD',headers:{...(x.headers||{}),'User-Agent':'Mozilla/5.0'},redirect:'manual',signal:AbortSignal.timeout(12000)});
+                console.log('STRICT HEAD',label,x.quality,r.status,r.headers.get('content-type'),r.headers.get('content-length'),new URL(x.url).host);
+              }catch(err){console.log('STRICT HEAD ERR',label,err.message)}
+            }
+          }
+          (async()=>{
+            await one('movie','550',null,null,'Fight Club');
+            await one('movie','27205',null,null,'Inception');
+            await one('tv','1399',1,1,'GOT S1E1');
+            await one('tv','1399',8,1,'GOT S8E1');
+            await one('tv','93405',1,1,'Squid Game S1E1');
+            await one('tv','93405',3,1,'Squid Game S3E1');
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

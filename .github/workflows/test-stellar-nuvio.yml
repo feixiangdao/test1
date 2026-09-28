@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: '20'
       - name: Install crypto-js for MovieBox tests
-        run: npm install --no-save crypto-js cheerio-without-node-native
+        run: npm install --no-save crypto-js
       - name: Syntax check providers
         run: |
           for f in stellar-nuvio/providers/*.js; do
@@ -66,10 +66,6 @@ jobs:
         continue-on-error: true
         working-directory: stellar-nuvio
         run: node live-netmirror.js
-      - name: DVDPlay live probe
-        continue-on-error: true
-        working-directory: stellar-nuvio
-        run: node live-dvdplay.js
       - name: Validate manifest
         run: |
           node - <<'NODE'

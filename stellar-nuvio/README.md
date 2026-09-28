@@ -26,6 +26,7 @@
 - Stellar · Mapple
 - Stellar · Vidlink
 - Stellar · ZXCStreams
+- Stellar · OneTouchTV
 
 MP4Hydra 当前上游处于维护状态，没有加入。
 
@@ -108,3 +109,26 @@ Resshin 虽然 API 能返回 MP4，但最终 `api1.zxcstream.xyz` 当前实测 H
 - Game of Thrones S01E01：返回 8 条流，抽样验证 8/8 最终媒体可读；
 - HLS 返回有效 `#EXTM3U`，DASH 返回有效 `<MPD>`；
 - 不使用 iframe、网页播放器或外部跳转。
+
+
+### OneTouchTV v1.14
+
+新增 **Stellar · OneTouchTV**，作为覆盖有限的补充 HLS 源。
+
+为避免站内搜索的近似错配，Provider 使用严格匹配策略：
+
+- 电影要求归一化标题一致，并尽量要求年份一致；
+- 剧集 Season 2+ 优先匹配明确的 `Title Season N` 条目；
+- 不使用“第一条搜索结果”兜底；
+- 最终 HLS 返回前必须能读取有效 `#EXTM3U`。
+
+真实联网测试：
+
+- Titanic (1997)：1 条 HLS，HTTP 206，有效 `#EXTM3U`；
+- Inception (2010)：站内只有 2001 同名片，正确拒绝，0 条；
+- Game of Thrones S01E01：站内无可靠匹配，正确返回 0；
+- Squid Game S01E01：1 条 HLS，HTTP 206，有效 `#EXTM3U`；
+- Squid Game S02E01：上游 Season 2 条目标记 upcoming 且 episodes 为空，因此返回 0；
+- Squid Game S03E01：1 条 HLS，HTTP 200，有效 `#EXTM3U`。
+
+因此该源标记为 `limited: true`：宁可缺源，也不返回错片。

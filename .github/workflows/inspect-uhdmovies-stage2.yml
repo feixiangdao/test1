@@ -1,0 +1,64 @@
+name: Inspect UHDMovies Stage2 Script
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/inspect-uhdmovies-stage2.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install cheerio-without-node-native@0.20.2 crypto-js@4.2.0 --no-save
+      - name: Fetch provider
+        run: |
+          mkdir -p ./_probe/providers
+          curl -fsSL https://raw.githubusercontent.com/yoruix/nuvio-providers/main/providers/uhdmovies.js -o ./_probe/providers/uhdmovies.js
+      - name: Inspect stage2
+        run: |
+          node - <<'NODE'
+          const p=require('./_probe/providers/uhdmovies.js');
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36';
+          function form(html){
+            const action=(html.match(/<form[^>]+action=["']([^"']+)["']/i)||[])[1]||'';
+            const fields={}; for(const m of html.matchAll(/<input[^>]+name=["']([^"']+)["'][^>]*value=["']([^"']*)["'][^>]*>/gi)) fields[m[1]]=m[2];
+            return {action,fields};
+          }
+          async function post(url,fields,ref){
+            const r=await fetch(url,{method:'POST',headers:{'User-Agent':UA,'Referer':ref,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(fields).toString(),redirect:'manual',signal:AbortSignal.timeout(15000)});
+            return {r,t:await r.text()};
+          }
+          (async()=>{
+            const rows=await p.getStreams('550','movie');
+            const start=rows[0].url;
+            const g=await fetch(start,{headers:{'User-Agent':UA},signal:AbortSignal.timeout(15000)});
+            const h1=await g.text(); const f1=form(h1);
+            const p1=await post(f1.action||start,f1.fields,start);
+            const f2=form(p1.t);
+            console.log('F2',JSON.stringify({action:f2.action,fields:Object.keys(f2.fields)}));
+            const p2=await post(f2.action,f2.fields,f1.action||start);
+            console.log('P2',p2.r.status,p2.r.headers.get('content-type'),'len',p2.t.length);
+            const pats=[
+              /_lp_[A-Za-z0-9_]+/g,
+              /https?:\/\/[^"'<>\s)]+/g,
+              /window\.location[^;]{0,300}/gi,
+              /location\.href[^;]{0,300}/gi,
+              /fetch\([^)]{0,500}\)/gi,
+              /XMLHttpRequest[^<]{0,700}/gi,
+              /ajax[^<]{0,700}/gi,
+              /setTimeout[^<]{0,700}/gi
+            ];
+            for(const re of pats){
+              const a=[...new Set((p2.t.match(re)||[]))];
+              console.log('MATCH',re.toString(),JSON.stringify(a.slice(0,80),null,2));
+            }
+            const suspicious=p2.t.split(/\n/).filter(x=>/_lp_|redirect|location|fetch\(|ajax|download|driveseed|video-seed|workers\.dev|r2\.dev|pixeldrain|hubcloud|gofile/i.test(x));
+            console.log('LINES',suspicious.slice(0,220).join('\n'));
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

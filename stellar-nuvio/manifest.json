@@ -1,6 +1,6 @@
 {
   "name": "Stellar Local",
-  "version": "1.16.0",
+  "version": "1.17.0",
   "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
   "scrapers": [
     {
@@ -279,6 +279,27 @@
         "tv"
       ],
       "filename": "providers/4khdhub.js",
+      "enabled": true,
+      "formats": [
+        "mkv",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "stellar-uhdmovies",
+      "name": "Stellar · UHDMovies",
+      "description": "UHDMovies 本地直链补充源。新增 LinkPilot 两段 POST + Cookie/lp_go 解析，自动进入 DriveSeed；已验证电影与部分剧集可返回 1080p/2160p Google 视频 MKV。失效 VideoSeed token 自动丢弃。",
+      "version": "1.0.0",
+      "author": "Stellar Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/uhdmovies.js",
       "enabled": true,
       "formats": [
         "mkv",

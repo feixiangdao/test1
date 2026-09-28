@@ -1,0 +1,105 @@
+name: Resolve UHDMovies POST Chain
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/resolve-uhdmovies-post-chain.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install cheerio-without-node-native@0.20.2 crypto-js@4.2.0 --no-save
+      - name: Fetch provider
+        run: |
+          mkdir -p ./_probe/providers
+          curl -fsSL https://raw.githubusercontent.com/yoruix/nuvio-providers/main/providers/uhdmovies.js -o ./_probe/providers/uhdmovies.js
+      - name: Resolve chain
+        run: |
+          node - <<'NODE'
+          const p=require('./_probe/providers/uhdmovies.js');
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36';
+          function pickForm(html){
+            const action=(html.match(/<form[^>]+action=["']([^"']+)["']/i)||[])[1]||'';
+            const method=((html.match(/<form[^>]+method=["']([^"']+)["']/i)||[])[1]||'GET').toUpperCase();
+            const fields={};
+            for(const m of html.matchAll(/<input[^>]+name=["']([^"']+)["'][^>]*value=["']([^"']*)["'][^>]*>/gi)) fields[m[1]]=m[2];
+            return {action,method,fields};
+          }
+          async function req(url,opt={}){
+            const r=await fetch(url,{
+              method:opt.method||'GET',
+              headers:{'User-Agent':UA,'Accept':'*/*',...(opt.headers||{})},
+              body:opt.body,
+              redirect:'manual',
+              signal:AbortSignal.timeout(15000)
+            });
+            const b=Buffer.from(await r.arrayBuffer());
+            return {r,b,text:b.toString('utf8')};
+          }
+          async function resolve(start){
+            let url=start, referer='';
+            for(let step=0;step<6;step++){
+              let {r,b,text}=await req(url,{headers:referer?{Referer:referer}:{}});
+              const ct=(r.headers.get('content-type')||'').toLowerCase();
+              console.log('STEP',step,'GET',r.status,ct,'url',url,'loc',r.headers.get('location'),'bytes',b.length);
+              if((r.status>=300&&r.status<400)&&r.headers.get('location')){
+                referer=url; url=new URL(r.headers.get('location'),url).toString(); continue;
+              }
+              if(ct.includes('video/')||ct.includes('octet-stream')||ct.includes('matroska')) return url;
+              const f=pickForm(text);
+              console.log('FORM',step,JSON.stringify({action:f.action,method:f.method,fields:Object.keys(f.fields)}));
+              if(!Object.keys(f.fields).length) {
+                const js=(text.match(/(?:location(?:\.href)?|window\.location)\s*=\s*["']([^"']+)["']/i)||[])[1];
+                if(js){referer=url;url=new URL(js,url).toString();continue}
+                console.log('HTML',text.slice(0,1800).replace(/\s+/g,' ')); return null;
+              }
+              const target=f.action?new URL(f.action,url).toString():url;
+              const body=new URLSearchParams(f.fields).toString();
+              let pr=await req(target,{method:f.method==='GET'?'GET':'POST',headers:{Referer:url,'Content-Type':'application/x-www-form-urlencoded'},body:f.method==='GET'?undefined:body});
+              const pct=(pr.r.headers.get('content-type')||'').toLowerCase();
+              console.log('STEP',step,'POST',pr.r.status,pct,'target',target,'loc',pr.r.headers.get('location'),'bytes',pr.b.length);
+              if(pr.r.status>=300&&pr.r.status<400&&pr.r.headers.get('location')){
+                referer=target;url=new URL(pr.r.headers.get('location'),target).toString();continue;
+              }
+              if(pct.includes('video/')||pct.includes('octet-stream')||pct.includes('matroska')) return target;
+              const f2=pickForm(pr.text);
+              if(Object.keys(f2.fields).length){
+                console.log('POSTFORM',JSON.stringify({action:f2.action,method:f2.method,fields:Object.keys(f2.fields)}));
+                referer=target; url=target;
+                // carry forward by turning returned HTML's form into synthetic next POST
+                const t2=f2.action?new URL(f2.action,target).toString():target;
+                const b2=new URLSearchParams(f2.fields).toString();
+                const rr=await req(t2,{method:f2.method==='GET'?'GET':'POST',headers:{Referer:target,'Content-Type':'application/x-www-form-urlencoded'},body:f2.method==='GET'?undefined:b2});
+                console.log('EXTRA',rr.r.status,rr.r.headers.get('content-type'),rr.r.headers.get('location'),'url',t2,'bytes',rr.b.length,'prefix',rr.text.slice(0,180).replace(/\s+/g,' '));
+                if(rr.r.status>=300&&rr.r.status<400&&rr.r.headers.get('location')){referer=t2;url=new URL(rr.r.headers.get('location'),t2).toString();continue;}
+              }
+              console.log('POSTHTML',pr.text.slice(0,2200).replace(/\s+/g,' '));return null;
+            }
+            return null;
+          }
+          async function media(url){
+            if(!url)return;
+            try{
+              const r=await fetch(url,{headers:{'User-Agent':UA,Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(15000)});
+              const b=Buffer.from(await r.arrayBuffer());
+              console.log('MEDIA',r.status,r.headers.get('content-type'),new URL(url).host,'bytes',b.length,'prefix',b.subarray(0,90).toString('utf8').replace(/\s+/g,' '));
+            }catch(e){console.log('MEDIAERR',e.message)}
+          }
+          (async()=>{
+            const rows=await p.getStreams('550','movie');
+            console.log('ROWS',rows.length);
+            for(const x of rows.slice(0,3)){
+              console.log('START',x.quality,x.url);
+              const u=await resolve(x.url);
+              console.log('FINAL',u);
+              await media(u);
+            }
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

@@ -1,0 +1,20 @@
+name: Probe CineVibe Current
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'stellar-nuvio/cinevibe-candidate.js'
+      - 'stellar-nuvio/diagnose-cinevibe.js'
+      - '.github/workflows/probe-cinevibe-current.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node stellar-nuvio/diagnose-cinevibe.js

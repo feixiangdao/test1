@@ -1,0 +1,27 @@
+name: Quick Cineby Probe
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'stellar-nuvio/providers/cineby.js'
+      - 'stellar-nuvio/test-cineby.js'
+      - 'stellar-nuvio/live-cineby.js'
+      - '.github/workflows/quick-cineby.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax
+        run: node --check stellar-nuvio/providers/cineby.js
+      - name: Helper test
+        working-directory: stellar-nuvio
+        run: node test-cineby.js
+      - name: Live local-style probe
+        working-directory: stellar-nuvio
+        run: node live-cineby.js

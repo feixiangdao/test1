@@ -23,18 +23,58 @@ jobs:
       - name: Inspect final hop
         run: |
           node - <<'NODE'
+          const cheerio=require('cheerio-without-node-native');
           const p=require('./_probe/providers/uhdmovies.js');
+          function cookieFrom(res){
+            try{return (res.headers.getSetCookie?res.headers.getSetCookie():[]).map(x=>x.split(';')[0]).join('; ')}catch(_){return ''}
+          }
+          function absolutize(u,base){try{return new URL(u,base).toString()}catch(_){return u}}
+          async function walk(start){
+            let url=start, method='GET', body=null, cookie='', referer='';
+            for(let step=0;step<8;step++){
+              const headers={'User-Agent':'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36','Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'};
+              if(cookie)headers.Cookie=cookie;
+              if(referer)headers.Referer=referer;
+              if(method==='POST')headers['Content-Type']='application/x-www-form-urlencoded';
+              const r=await fetch(url,{method,headers,body,redirect:'manual',signal:AbortSignal.timeout(12000)});
+              const sc=cookieFrom(r); if(sc)cookie=cookie?cookie+'; '+sc:sc;
+              const loc=r.headers.get('location');
+              const ct=r.headers.get('content-type')||'';
+              console.log('STEP',step,method,r.status,ct,'url',url,'loc',loc,'cookie',cookie);
+              if(loc){referer=url;url=absolutize(loc,url);method='GET';body=null;continue}
+              if(!ct.toLowerCase().includes('text/html')){
+                console.log('FINAL-NONHTML',url,r.status,ct);return url;
+              }
+              const t=await r.text();
+              console.log('HTML',step,t.slice(0,2500).replace(/\n/g,'\\n'));
+              const $=cheerio.load(t);
+              const form=$('form').first();
+              if(form.length){
+                const action=absolutize(form.attr('action')||url,url);
+                const data={};
+                form.find('input[name]').each((_,el)=>{data[$(el).attr('name')]=$(el).attr('value')||''});
+                console.log('FORM',step,form.attr('id')||'',action,JSON.stringify(data));
+                referer=url;url=action;method=(form.attr('method')||'GET').toUpperCase();
+                if(method==='POST')body=new URLSearchParams(data).toString();
+                else {const u=new URL(url);Object.entries(data).forEach(([k,v])=>u.searchParams.set(k,v));url=u.toString();body=null}
+                continue;
+              }
+              const meta=$('meta[http-equiv="refresh"]').attr('content')||'';
+              const mm=meta.match(/url\s*=\s*(.+)$/i);
+              if(mm){referer=url;url=absolutize(mm[1].replace(/^['"]|['"]$/g,''),url);method='GET';body=null;continue}
+              const js=t.match(/(?:location(?:\.href)?\s*=|replace\()\s*['"]([^'"]+)['"]/i);
+              if(js){referer=url;url=absolutize(js[1],url);method='GET';body=null;continue}
+              console.log('STOP-NO-NEXT',url);return null;
+            }
+            return null;
+          }
           (async()=>{
             const rows=await p.getStreams('550','movie');
             console.log('ROWS',rows.length);
-            for(const [i,x] of rows.slice(0,5).entries()){
+            for(const [i,x] of rows.slice(0,3).entries()){
               console.log('ROW',i,JSON.stringify(x));
-              try{
-                const r=await fetch(x.url,{headers:{...(x.headers||{}),'User-Agent':'Mozilla/5.0'},redirect:'manual',signal:AbortSignal.timeout(12000)});
-                const t=await r.text();
-                console.log('RESP',i,'status',r.status,'ct',r.headers.get('content-type'),'loc',r.headers.get('location'),'url',r.url);
-                console.log('BODY',i,t.slice(0,3000).replace(/\n/g,'\\n'));
-              }catch(e){console.log('ERR',i,e.stack||e.message)}
+              try{const final=await walk(x.url);console.log('FINAL',i,final)}
+              catch(e){console.log('ERR',i,e.stack||e.message)}
             }
           })().catch(e=>{console.error(e);process.exitCode=1});
           NODE

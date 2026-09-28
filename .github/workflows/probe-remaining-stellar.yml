@@ -1,0 +1,114 @@
+name: Probe Remaining Stellar Providers
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-remaining-stellar.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Clone TMDB Embed API v1.3.0
+        run: |
+          git clone --depth 1 --branch v1.3.0 https://github.com/Inside4ndroid/TMDB-Embed-API.git /tmp/embed
+          cd /tmp/embed
+          npm install --ignore-scripts
+
+      - name: Probe StreamFlix endpoints and media
+        continue-on-error: true
+        run: |
+          node - <<'NODE'
+          const H={'User-Agent':'Mozilla/5.0','Accept':'application/json,*/*'};
+          async function probeMedia(url,label){
+            try{
+              const r=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0',Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(12000)});
+              const b=Buffer.from(await r.arrayBuffer());
+              console.log('MEDIA',label,r.status,r.headers.get('content-type'),new URL(url).host,'bytes',b.length,'prefix',b.subarray(0,80).toString('utf8').replace(/\s+/g,' '));
+            }catch(e){console.log('MEDIA',label,'ERR',e.message)}
+          }
+          (async()=>{
+            const [dr,cr]=await Promise.all([
+              fetch('https://api.streamflix.app/data.json',{headers:H,signal:AbortSignal.timeout(15000)}),
+              fetch('https://api.streamflix.app/config/config-streamflixapp.json',{headers:H,signal:AbortSignal.timeout(15000)})
+            ]);
+            console.log('STREAMFLIX HTTP',dr.status,cr.status);
+            const d=await dr.json(), c=await cr.json();
+            const items=(d&&d.data)||[], bases=(c&&c.download)||[];
+            const m=items.find(x=>String(x.tmdb)==='550');
+            console.log('STREAMFLIX MOVIE MATCH',!!m,m&&{name:m.moviename,key:m.moviekey,link:m.movielink},'bases',bases);
+            if(m&&m.movielink) for(const [i,b] of bases.slice(0,3).entries()) await probeMedia(b+m.movielink,'movie mirror'+i);
+            const tv=items.find(x=>String(x.tmdb)==='1399');
+            console.log('STREAMFLIX TV MATCH',!!tv,tv&&{name:tv.moviename,key:tv.moviekey});
+            if(tv&&tv.moviekey){
+              const er=await fetch('https://chilflix-410be-default-rtdb.asia-southeast1.firebasedatabase.app/Data/'+encodeURIComponent(tv.moviekey)+'/seasons/1/episodes.json',{headers:H,signal:AbortSignal.timeout(15000)});
+              console.log('STREAMFLIX EP HTTP',er.status);
+              const eps=await er.json(); const ep=(eps&&eps[0])||(eps&&eps['0'])||(eps&&eps[1])||(eps&&eps['1']);
+              console.log('STREAMFLIX EP',ep&&{name:ep.name,link:ep.link});
+              if(ep&&ep.link) for(const [i,b] of bases.slice(0,3).entries()) await probeMedia(b+ep.link,'tv mirror'+i);
+            }
+          })().catch(e=>{console.error('STREAMFLIX FATAL',e.stack||e);process.exitCode=1});
+          NODE
+
+      - name: Probe HDGharTV endpoints and media
+        continue-on-error: true
+        run: |
+          node - <<'NODE'
+          const BASE='https://hdghartv.cc/api';
+          const H={'User-Agent':'Mozilla/5.0','Accept':'application/json,*/*','Referer':'https://hdghartv.cc/'};
+          async function j(url){const r=await fetch(url,{headers:H,signal:AbortSignal.timeout(12000)});console.log('HTTP',r.status,url);if(!r.ok)return null;return r.json()}
+          async function media(x,label){try{const r=await fetch(x.url,{headers:{...H,Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(12000)});const b=Buffer.from(await r.arrayBuffer());console.log('MEDIA',label,x.quality,r.status,r.headers.get('content-type'),new URL(x.url).host,'prefix',b.subarray(0,100).toString('utf8').replace(/\s+/g,' '))}catch(e){console.log('MEDIA',label,'ERR',e.message)}}
+          (async()=>{
+            for(const q of [{title:'Fight Club',kind:'movie'},{title:'Game of Thrones',kind:'series'}]){
+              const s=await j(BASE+'/search?q='+encodeURIComponent(q.title));
+              const arr=(s&&s[q.kind==='movie'?'movies':'series'])||[];
+              console.log('HDGHAR SEARCH',q.kind,arr.slice(0,5).map(x=>({id:x._id,title:x.title})));
+              const hit=arr.find(x=>(x.title||'').toLowerCase()===q.title.toLowerCase())||arr[0]; if(!hit)continue;
+              const d=await j(BASE+'/'+(q.kind==='movie'?'movies/public/':'series/public/')+hit._id);
+              let links=[];
+              if(q.kind==='movie') links=(d&&d.streamingLinks)||[];
+              else {const ss=(d&&d.seasons||[]).find(x=>x.seasonNumber===1);const ep=ss&&ss.episodes&&ss.episodes.find(x=>x.episodeNumber===1);links=(ep&&ep.streamingLinks)||[]}
+              links=links.filter(x=>x&&x.isActive&&x.url);
+              console.log('HDGHAR LINKS',q.kind,links.map(x=>({quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+              for(const x of links.slice(0,5)) await media(x,q.kind);
+            }
+          })().catch(e=>{console.error('HDGHAR FATAL',e.stack||e);process.exitCode=1});
+          NODE
+
+      - name: Probe OneTouchTV provider
+        continue-on-error: true
+        working-directory: /tmp/embed
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: |
+          node - <<'NODE'
+          const p=require('./providers/onetouchtv.js');
+          async function one(type,id,s,e){
+            const rows=await p.getOnetouchtvStreams(id,type,s,e);
+            console.log('ONETOUCH ROWS',type,rows.length,rows.slice(0,12).map(x=>({name:x.name,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+            for(const x of rows.slice(0,8)){try{const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(12000)});const b=Buffer.from(await r.arrayBuffer());console.log('ONETOUCH MEDIA',type,x.quality,r.status,r.headers.get('content-type'),new URL(x.url).host,b.subarray(0,100).toString('utf8').replace(/\s+/g,' '))}catch(err){console.log('ONETOUCH MEDIA',type,'ERR',err.message)}}
+          }
+          (async()=>{await one('movie','550');await one('tv','1399',1,1)})().catch(e=>{console.error('ONETOUCH FATAL',e.stack||e);process.exitCode=1});
+          NODE
+
+      - name: Probe ZXCStreams provider
+        continue-on-error: true
+        working-directory: /tmp/embed
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: |
+          node - <<'NODE'
+          const p=require('./providers/zxcstreams.js');
+          async function one(type,id,s,e){
+            const rows=await p.getZxcstreamsStreams(id,type,s,e);
+            console.log('ZXC ROWS',type,rows.length,rows.slice(0,16).map(x=>({name:x.name,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+            for(const x of rows.slice(0,8)){try{const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(12000)});const b=Buffer.from(await r.arrayBuffer());console.log('ZXC MEDIA',type,x.name,x.quality,r.status,r.headers.get('content-type'),new URL(x.url).host,b.subarray(0,100).toString('utf8').replace(/\s+/g,' '))}catch(err){console.log('ZXC MEDIA',type,x.name,'ERR',err.message)}}
+          }
+          (async()=>{await one('movie','550');await one('tv','1399',1,1)})().catch(e=>{console.error('ZXC FATAL',e.stack||e);process.exitCode=1});
+          NODE

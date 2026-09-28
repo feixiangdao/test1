@@ -77,7 +77,8 @@ jobs:
       - name: NetMirror helper tests
         working-directory: stellar-nuvio
         run: node test-netmirror.js
-      - name: NetMirror live probe
+      - name: NetMirror live probe (informational)
+        continue-on-error: true
         working-directory: stellar-nuvio
         run: node live-netmirror.js
       - name: Validate manifest

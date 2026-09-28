@@ -1,0 +1,39 @@
+name: Inspect DVDPlay Search Cards
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/inspect-dvdplay-search.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect search result HTML
+        run: |
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/137 Safari/537.36';
+          async function one(q){
+            const u='https://dvdplay.cv/search.php?q='+encodeURIComponent(q).replace(/%20/g,'+');
+            const r=await fetch(u,{headers:{'User-Agent':UA},signal:AbortSignal.timeout(12000)});
+            const t=await r.text();
+            console.log('\n===',q,r.status,'len',t.length,'===');
+            const re=/<a href="([^"]+)"[^>]*>\s*<p class="home">/g;
+            let m,n=0;
+            while((m=re.exec(t))&&n<15){
+              const a=Math.max(0,m.index-500), b=Math.min(t.length,m.index+1800);
+              console.log('\nCARD',n,'HREF',m[1],'\n',t.slice(a,b).replace(/\s+/g,' '));
+              n++;
+            }
+            console.log('COUNT',n);
+          }
+          (async()=>{
+            for(const q of ['Fight Club','Inception','Game of Thrones','Squid Game']) await one(q);
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

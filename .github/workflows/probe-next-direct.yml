@@ -1,0 +1,84 @@
+name: Probe Next Direct Sources
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-next-direct.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Clone current Nuvio providers
+        run: |
+          git clone --depth 1 --branch main https://github.com/yoruix/nuvio-providers.git /tmp/nuvio-providers
+          cd /tmp/nuvio-providers
+          npm install --ignore-scripts
+
+      - name: Probe MyFlixer final HLS
+        continue-on-error: true
+        working-directory: /tmp/nuvio-providers
+        run: |
+          node - <<'NODE'
+          const MyFlixer=require('./providers/myflixer-extractor.js');
+          const p=new MyFlixer();
+          async function one(title,season,episode){
+            const rows=await p.extractM3u8Links(title,episode||null,season||null);
+            console.log('MYFLIXER ROWS',title,rows.length,rows.map(x=>({source:x.source,host:(()=>{try{return new URL(x.m3u8Url).host}catch(_){return''}})(),qualities:(x.qualities||[]).map(q=>q.quality)})));
+            for(const x of rows.slice(0,6)){
+              try{
+                const r=await fetch(x.m3u8Url,{headers:{...(x.headers||{}),Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(15000)});
+                const b=Buffer.from(await r.arrayBuffer());
+                console.log('MYFLIXER MEDIA',title,r.status,r.headers.get('content-type'),new URL(x.m3u8Url).host,b.subarray(0,140).toString('utf8').replace(/\s+/g,' '));
+              }catch(e){console.log('MYFLIXER MEDIA ERR',title,e.message)}
+            }
+          }
+          (async()=>{await one('Fight Club');await one('Game of Thrones',1,1)})().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE
+
+      - name: Probe DVDPlay direct media
+        continue-on-error: true
+        working-directory: /tmp/nuvio-providers
+        run: |
+          node - <<'NODE'
+          const p=require('./providers/dvdplay.js');
+          async function one(type,id,s,e,label){
+            const rows=await p.getStreams(id,type,s,e);
+            console.log('DVDPLAY ROWS',label,rows.length,rows.slice(0,20).map(x=>({name:x.name,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+            for(const x of rows.slice(0,10)){
+              try{
+                const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(15000)});
+                const b=Buffer.from(await r.arrayBuffer()),ct=r.headers.get('content-type')||'';
+                console.log('DVDPLAY MEDIA',label,x.name,r.status,ct,new URL(x.url).host,'bytes='+b.length,b.subarray(0,140).toString('utf8').replace(/\s+/g,' '));
+              }catch(err){console.log('DVDPLAY MEDIA ERR',label,x.name,err.message)}
+            }
+          }
+          (async()=>{await one('movie','550',null,null,'Fight Club');await one('tv','1399',1,1,'GOT S1E1')})().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE
+
+      - name: Probe UHDMovies direct media
+        continue-on-error: true
+        working-directory: /tmp/nuvio-providers
+        run: |
+          node - <<'NODE'
+          const p=require('./providers/uhdmovies.js');
+          async function one(type,id,s,e,label){
+            const rows=await p.getStreams(id,type,s,e);
+            console.log('UHD ROWS',label,rows.length,rows.slice(0,20).map(x=>({name:x.name,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+            for(const x of rows.slice(0,10)){
+              try{
+                const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(15000)});
+                const b=Buffer.from(await r.arrayBuffer()),ct=r.headers.get('content-type')||'';
+                const pfx=b.subarray(0,140).toString('utf8').replace(/\s+/g,' ');
+                console.log('UHD MEDIA',label,x.name,r.status,ct,new URL(x.url).host,'bytes='+b.length,pfx);
+              }catch(err){console.log('UHD MEDIA ERR',label,x.name,err.message)}
+            }
+          }
+          (async()=>{await one('movie','550',1,1,'Fight Club');await one('tv','1399',1,1,'GOT S1E1')})().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

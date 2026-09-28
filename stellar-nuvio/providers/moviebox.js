@@ -522,9 +522,10 @@ function playInfo(subjectId, mediaType, season, episode) {
         tasks.push(
           probeDash(manifest, headers).then(function(probe) {
             var codec = clean(stream.codecName || stream.codec || stream.format);
-            var qLabel = qualityLabel(stream);
-            var label = "MovieBox · " + networkLabel(probe) + " · " + cookieMode(signCookie) +
-              " · " + qLabel + (codec ? " · " + codec.toUpperCase() : "");
+            var topQ = qualityValue(stream);
+            var label = "MovieBox · " + networkLabel(probe) +
+              " · 最高" + topQ + " · 自适应" +
+              (codec ? " · " + codec.toUpperCase() : "");
 
             console.log(
               "[Stellar/MovieBox] preflight mpd=" + probe.mpdStatus +

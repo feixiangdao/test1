@@ -1,6 +1,6 @@
 {
   "name": "Stellar Local",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
   "scrapers": [
     {
@@ -65,27 +65,6 @@
         "multi"
       ],
       "limited": false
-    },
-    {
-      "id": "stellar-dooflix",
-      "name": "Stellar · DooFlix",
-      "description": "DooFlix TMDB 直链源。本机请求链接 API、解析最终重定向并预检媒体可达性后交给 Nuvio。",
-      "version": "1.0.0",
-      "author": "Stellar Local",
-      "supportedTypes": [
-        "movie",
-        "tv"
-      ],
-      "filename": "providers/dooflix.js",
-      "enabled": true,
-      "formats": [
-        "m3u8",
-        "mp4"
-      ],
-      "contentLanguage": [
-        "en",
-        "hi"
-      ]
     },
     {
       "id": "stellar-vaplayer",

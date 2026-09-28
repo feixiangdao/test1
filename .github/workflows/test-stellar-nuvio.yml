@@ -38,19 +38,13 @@ jobs:
       - name: Diagnose PrimeSrc and VAPlayer
         working-directory: stellar-nuvio
         run: node diagnose-new-sources.js
-      - name: DooFlix helper tests
-        working-directory: stellar-nuvio
-        run: node test-dooflix.js
-      - name: DooFlix live probe
-        working-directory: stellar-nuvio
-        run: node live-dooflix.js
       - name: Validate manifest
         run: |
           node - <<'NODE'
           const fs=require('fs');
           const m=JSON.parse(fs.readFileSync('stellar-nuvio/manifest.json','utf8'));
           if(m.name!=='Stellar Local') throw new Error('unexpected manifest name');
-          if(!Array.isArray(m.scrapers)||m.scrapers.length!==5) throw new Error('expected 5 scrapers');
+          if(!Array.isArray(m.scrapers)||m.scrapers.length!==4) throw new Error('expected 4 scrapers');
           const ids=new Set();
           for(const s of m.scrapers){
             if(ids.has(s.id)) throw new Error('duplicate id '+s.id);

@@ -34,3 +34,11 @@ const picked=m.chooseSubject(
 assert(picked&&picked.subjectId==='2');
 
 console.log('MovieBox v4 helper tests passed');
+
+const sampleMpd='<MPD><BaseURL>https://cdn.example.test/dash/abc/</BaseURL><Period><AdaptationSet><SegmentTemplate initialization="init-$RepresentationID$.m4s" media="chunk-$RepresentationID$-$Number$.m4s"/><Representation id="v1" bandwidth="1000"/></AdaptationSet></Period></MPD>';
+assert.equal(
+  m.firstDashInitUrl('https://cdn.example.test/dash/abc/index.mpd',sampleMpd),
+  'https://cdn.example.test/dash/abc/init-v1.m4s'
+);
+assert.equal(m.networkLabel({mpdOk:true,mpdStatus:200,initUrl:'x',initOk:true,initStatus:206}),'NET✓200/206');
+console.log('MovieBox DASH preflight helper tests passed');

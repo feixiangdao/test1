@@ -1,4 +1,4 @@
-// Stellar · MovieBox — Nuvio local scraper v1.2
+// Stellar · MovieBox — Nuvio local scraper v1.3
 // MovieBox v4.0.02: anonymous bootstrap -> signed search -> play-info -> signCookie -> real DASH.
 // The raw MP4 field can be an anti-scraper dummy and is intentionally ignored.
 
@@ -361,6 +361,114 @@ function cleanCookie(value) {
     .join("; ");
 }
 
+function cookieMode(value) {
+  var s = String(value || "");
+  if (s.indexOf("Edge-Cache-Cookie=") >= 0) return "Edge";
+  if (s.indexOf("CloudFront-Policy=") >= 0) return "CF";
+  return "Signed";
+}
+
+function xmlDecode(value) {
+  return String(value || "")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+function tagAttr(tag, name) {
+  var re = new RegExp("\\b" + name + "=\"([^\"]*)\"", "i");
+  var m = String(tag || "").match(re);
+  return m ? xmlDecode(m[1]) : "";
+}
+
+function urlOrigin(url) {
+  var m = String(url || "").match(/^(https?:\\/\\/[^/]+)/i);
+  return m ? m[1] : "";
+}
+
+function urlDir(url) {
+  var s = String(url || "").split("#")[0].split("?")[0];
+  var i = s.lastIndexOf("/");
+  return i >= 0 ? s.slice(0, i + 1) : s;
+}
+
+function joinUrl(base, relative) {
+  var r = xmlDecode(relative);
+  if (/^https?:\\/\\//i.test(r)) return r;
+  if (r.indexOf("//") === 0) {
+    return String(base).indexOf("https://") === 0 ? "https:" + r : "http:" + r;
+  }
+  if (r.indexOf("/") === 0) return urlOrigin(base) + r;
+  return urlDir(base) + r;
+}
+
+function firstDashInitUrl(mpdUrl, xml) {
+  var text = String(xml || "");
+  var rep = text.match(/<Representation\\b[^>]*>/i);
+  var tmpl = text.match(/<SegmentTemplate\\b[^>]*\\binitialization=\"[^\"]+\"[^>]*>/i);
+  if (!tmpl) return "";
+
+  var init = tagAttr(tmpl[0], "initialization");
+  if (!init) return "";
+
+  var repId = rep ? tagAttr(rep[0], "id") : "";
+  var bandwidth = rep ? tagAttr(rep[0], "bandwidth") : "";
+  init = init
+    .replace(/\\$RepresentationID\\$/g, repId)
+    .replace(/\\$Bandwidth\\$/g, bandwidth);
+
+  var baseMatch = text.match(/<BaseURL(?:\\s[^>]*)?>([^<]+)<\\/BaseURL>/i);
+  var base = baseMatch ? joinUrl(mpdUrl, xmlDecode(baseMatch[1])) : mpdUrl;
+  return joinUrl(base, init);
+}
+
+function probeDash(manifest, headers) {
+  var result = {
+    mpdStatus: 0,
+    mpdOk: false,
+    initStatus: 0,
+    initOk: false,
+    initUrl: ""
+  };
+
+  return fetch(manifest, { headers: headers }).then(function(r) {
+    result.mpdStatus = Number(r.status) || 0;
+    return r.text().then(function(xml) {
+      result.mpdOk = !!r.ok && xml.indexOf("<MPD") >= 0;
+      if (!result.mpdOk) return result;
+
+      var initUrl = firstDashInitUrl(manifest, xml);
+      result.initUrl = initUrl;
+      if (!initUrl) return result;
+
+      var initHeaders = {};
+      Object.keys(headers || {}).forEach(function(k) { initHeaders[k] = headers[k]; });
+      initHeaders.Range = "bytes=0-2047";
+
+      return fetch(initUrl, { headers: initHeaders }).then(function(ir) {
+        result.initStatus = Number(ir.status) || 0;
+        result.initOk = ir.ok || result.initStatus === 206;
+        // Consume only enough to force the network request in runtimes that lazy-read bodies.
+        return ir.arrayBuffer().then(function() { return result; }).catch(function() { return result; });
+      }).catch(function() {
+        return result;
+      });
+    });
+  }).catch(function() {
+    return result;
+  });
+}
+
+function networkLabel(probe) {
+  if (!probe) return "NET?";
+  if (!probe.mpdOk) return "MPD✗" + (probe.mpdStatus || "ERR");
+  if (!probe.initUrl) return "MPD✓" + probe.mpdStatus + "/SEG?";
+  if (!probe.initOk) return "MPD✓" + probe.mpdStatus + "/SEG✗" + (probe.initStatus || "ERR");
+  return "NET✓" + probe.mpdStatus + "/" + probe.initStatus;
+}
+
 function qualityLabel(stream) {
   var raw = clean(stream && (stream.resolutions || stream.resolution));
   if (!raw) return "Auto";
@@ -390,8 +498,8 @@ function playInfo(subjectId, mediaType, season, episode) {
         ? data.streams
         : (Array.isArray(data.streamList) ? data.streamList : []);
 
-      var out = [];
       var seen = {};
+      var tasks = [];
 
       rows.forEach(function(stream) {
         var signCookie = clean(stream && (stream.signCookie || data.signCookie));
@@ -405,31 +513,43 @@ function playInfo(subjectId, mediaType, season, episode) {
         if (seen[key]) return;
         seen[key] = 1;
 
-        var codec = clean(stream.codecName || stream.codec || stream.format);
-        var qLabel = qualityLabel(stream);
-        var label = "MovieBox · Signed DASH · " + qLabel +
-          (codec ? " · " + codec.toUpperCase() : "");
-
         var headers = {
           "Cookie": cookie,
           "Referer": PLAYER_REFERER,
           "User-Agent": PLAYER_UA
         };
 
-        out.push({
-          // Nuvio displays "name" as the primary row label.
-          name: label,
-          title: label,
-          url: manifest,
-          quality: qualityValue(stream),
-          provider: "stellar-moviebox",
-          headers: headers,
-          subtitles: []
-        });
+        tasks.push(
+          probeDash(manifest, headers).then(function(probe) {
+            var codec = clean(stream.codecName || stream.codec || stream.format);
+            var qLabel = qualityLabel(stream);
+            var label = "MovieBox · " + networkLabel(probe) + " · " + cookieMode(signCookie) +
+              " · " + qLabel + (codec ? " · " + codec.toUpperCase() : "");
+
+            console.log(
+              "[Stellar/MovieBox] preflight mpd=" + probe.mpdStatus +
+              " init=" + probe.initStatus + " initUrl=" + clean(probe.initUrl)
+            );
+
+            return {
+              // Nuvio displays "name" as the primary row label.
+              name: label,
+              title: label,
+              url: manifest,
+              quality: qualityValue(stream),
+              provider: "stellar-moviebox",
+              type: "dash",
+              headers: headers,
+              subtitles: []
+            };
+          })
+        );
       });
 
-      console.log("[Stellar/MovieBox] signed streams=" + out.length);
-      return out;
+      return Promise.all(tasks).then(function(out) {
+        console.log("[Stellar/MovieBox] signed streams=" + out.length);
+        return out;
+      });
     });
 }
 
@@ -462,5 +582,8 @@ module.exports = {
   resolveManifest: resolveManifest,
   buildSignedHeaders: buildSignedHeaders,
   chooseSubject: chooseSubject,
-  bootstrap: bootstrap
+  bootstrap: bootstrap,
+  firstDashInitUrl: firstDashInitUrl,
+  probeDash: probeDash,
+  networkLabel: networkLabel
 };

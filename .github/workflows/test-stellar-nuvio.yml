@@ -86,7 +86,12 @@ jobs:
           const fs=require('fs');
           const m=JSON.parse(fs.readFileSync('stellar-nuvio/manifest.json','utf8'));
           if(m.name!=='Stellar Local') throw new Error('unexpected manifest name');
-          if(!Array.isArray(m.scrapers)||m.scrapers.length!==8) throw new Error('expected 8 scrapers');
+          if(!Array.isArray(m.scrapers)||m.scrapers.length===0) throw new Error('manifest has no scrapers');
+          const providerFiles=fs.readdirSync('stellar-nuvio/providers').filter(x=>x.endsWith('.js')).sort();
+          const manifestFiles=m.scrapers.map(s=>s.filename.replace(/^providers\//,'')).sort();
+          if(JSON.stringify(providerFiles)!==JSON.stringify(manifestFiles)) {
+            throw new Error('manifest/provider file mismatch: providers='+providerFiles.join(',')+' manifest='+manifestFiles.join(','));
+          }
           const ids=new Set();
           for(const s of m.scrapers){
             if(ids.has(s.id)) throw new Error('duplicate id '+s.id);

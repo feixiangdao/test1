@@ -800,7 +800,8 @@ function getStreams(tmdbId, mediaType = "movie", season = null, episode = null) 
       const wantedTitle = normalizeTitle(mediaInfo.title);
       const selectedMedia = searchResults.find((result) => {
         const raw = String(result.title || "");
-        const candidateTitle = normalizeTitle(raw);
+        const comparableRaw = raw.replace(/^\s*\[[^\]]+\]\s*/, "");
+        const candidateTitle = normalizeTitle(comparableRaw);
         const titleOk = candidateTitle === wantedTitle || candidateTitle.startsWith(wantedTitle + " ");
         if (!titleOk) return false;
         if (mediaType === "movie") {
@@ -838,8 +839,26 @@ function getStreams(tmdbId, mediaType = "movie", season = null, episode = null) 
         }
       });
       if (mediaType === "tv" && episode !== null) {
-        filteredLinks = finalLinks.filter((link) => link.episode === episode);
+        filteredLinks = filteredLinks.filter((link) => link.episode === episode);
       }
+      filteredLinks = (yield Promise.all(filteredLinks.map((link) => {
+        const h = __spreadProps(__spreadValues({}, link.headers || {}), { "User-Agent": HEADERS["User-Agent"] });
+        return fetch(link.url, {
+          method: "HEAD",
+          headers: h,
+          redirect: "manual",
+          signal: AbortSignal.timeout(8000)
+        }).then((response) => {
+          const ct = (response.headers.get("content-type") || "").toLowerCase();
+          const okStatus = response.ok || response.status === 206;
+          const okType = ct.includes("video/") ||
+            ct.includes("application/octet-stream") ||
+            ct.includes("application/x-matroska") ||
+            ct.includes("application/vnd.apple.mpegurl") ||
+            ct.includes("application/x-mpegurl");
+          return okStatus && okType ? link : null;
+        }).catch(() => null);
+      }))).filter(Boolean);
       const streams = filteredLinks.map((link) => {
         let mediaTitle = link.fileName && link.fileName !== "Unknown" ? link.fileName : mediaInfo.title;
         if (mediaType === "tv" && season && episode) {

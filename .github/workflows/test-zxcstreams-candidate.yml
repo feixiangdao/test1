@@ -1,0 +1,45 @@
+name: Test ZXCStreams Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'stellar-nuvio/providers/zxcstreams.js'
+      - '.github/workflows/test-zxcstreams-candidate.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install crypto-js --no-save
+      - name: Direct media regression
+        run: |
+          NODE_PATH="$PWD/node_modules" node - <<'NODE'
+          const p=require('./stellar-nuvio/providers/zxcstreams.js');
+          async function one(type,id,s,e,label){
+            const rows=await p.getStreams(id,type,s,e);
+            console.log('RESULT',label,rows.length,rows.map(x=>({name:x.name,quality:x.quality,host:new URL(x.url).host})));
+            let good=0;
+            for(const x of rows.slice(0,12)){
+              try{
+                const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-2047'},redirect:'manual'});
+                const b=Buffer.from(await r.arrayBuffer());
+                const prefix=b.subarray(0,100).toString('utf8').replace(/\s+/g,' ');
+                const ok=(r.ok||r.status===206)&&(/#EXTM3U/.test(prefix)||/<MPD/.test(prefix)||/video\//.test(r.headers.get('content-type')||''));
+                if(ok)good++;
+                console.log('MEDIA',label,x.name,r.status,r.headers.get('content-type'),new URL(x.url).host,'OK='+ok,prefix);
+              }catch(err){console.log('MEDIA ERR',label,x.name,err.message)}
+            }
+            console.log('GOOD',label,good);
+            if(!rows.length||!good)process.exitCode=1;
+          }
+          (async()=>{
+            await one('movie','550',null,null,'Fight Club');
+            await one('tv','1399',1,1,'GOT S1E1');
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

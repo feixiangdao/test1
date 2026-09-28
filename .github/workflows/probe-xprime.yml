@@ -1,0 +1,44 @@
+name: Probe Xprime
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-xprime.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Clone current Nuvio providers
+        run: |
+          git clone --depth 1 https://github.com/yoruix/nuvio-providers.git /tmp/nuvio-providers
+          cd /tmp/nuvio-providers
+          npm install --ignore-scripts
+      - name: Probe Xprime direct streams
+        working-directory: /tmp/nuvio-providers
+        run: |
+          node - <<'NODE'
+          const p=require('./providers/xprime.js');
+          async function one(type,id,s,e){
+            const rows=await p.getStreams(id,type,s,e);
+            console.log('XPRIME ROWS',type,rows.length,rows.slice(0,30).map(x=>({
+              name:x.name,quality:x.quality,
+              host:(()=>{try{return new URL(x.url).host}catch(_){return''}})(),
+              title:x.title
+            })));
+            for(const x of rows.slice(0,12)){
+              try{
+                const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(15000)});
+                const b=Buffer.from(await r.arrayBuffer());
+                console.log('XPRIME MEDIA',type,x.name,x.quality,r.status,r.headers.get('content-type'),new URL(x.url).host,'bytes',b.length,'prefix',b.subarray(0,120).toString('utf8').replace(/\s+/g,' '));
+              }catch(err){console.log('XPRIME MEDIA',type,x.name,'ERR',err.message)}
+            }
+          }
+          (async()=>{await one('movie','550');await one('tv','1399',1,1)})().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

@@ -1,0 +1,31 @@
+name: Quick Test DVDPlay S3E2
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/quick-test-dvdplay-s3e2.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install cheerio-without-node-native@0.20.2 --no-save
+      - name: Probe S3E2
+        run: |
+          node - <<'NODE'
+          const p=require('./stellar-nuvio/providers/dvdplay.js');
+          (async()=>{
+            const rows=await p.getStreams('93405','tv',3,2);
+            console.log('ROWS',rows.length,rows.map(x=>({name:x.name,quality:x.quality,title:x.title,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+            for(const x of rows){
+              const r=await fetch(x.url,{method:'HEAD',headers:{...(x.headers||{}),'User-Agent':'Mozilla/5.0'},redirect:'manual',signal:AbortSignal.timeout(10000)});
+              console.log('HEAD',x.quality,r.status,r.headers.get('content-type'),r.headers.get('content-length'),new URL(x.url).host);
+            }
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

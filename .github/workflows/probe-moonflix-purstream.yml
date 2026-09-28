@@ -1,0 +1,19 @@
+name: Quick Moonflix Purstream Probe
+on:
+  push:
+    paths:
+      - 'research/probe-moonflix-purstream.js'
+      - '.github/workflows/probe-moonflix-purstream.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe Moonflix and Purstream
+        run: node research/probe-moonflix-purstream.js

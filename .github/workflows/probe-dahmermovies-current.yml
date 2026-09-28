@@ -1,0 +1,19 @@
+name: Probe DahmerMovies Current
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'stellar-nuvio/diagnose-dahmermovies.js'
+      - '.github/workflows/probe-dahmermovies-current.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node stellar-nuvio/diagnose-dahmermovies.js

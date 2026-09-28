@@ -17,7 +17,7 @@ jobs:
           node-version: '22'
       - name: Clone current Nuvio providers
         run: |
-          git clone --depth 1 https://github.com/yoruix/nuvio-providers.git /tmp/nuvio-providers
+          git clone --depth 1 --branch main https://github.com/yoruix/nuvio-providers.git /tmp/nuvio-providers
           cd /tmp/nuvio-providers
           npm install --ignore-scripts
       - name: Probe Xprime direct streams

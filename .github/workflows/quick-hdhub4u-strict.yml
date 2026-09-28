@@ -31,6 +31,8 @@ jobs:
             await one('movie','550',null,null,'Fight Club');
             await one('movie','27205',null,null,'Inception');
             await one('tv','1399',1,1,'GOT S1E1');
+            await one('tv','1399',8,1,'GOT S8E1');
             await one('tv','93405',1,1,'Squid Game S1E1');
+            await one('tv','93405',3,1,'Squid Game S3E1');
           })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
           NODE

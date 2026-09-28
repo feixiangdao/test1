@@ -1,0 +1,42 @@
+name: Test Stellar 4KHDHub
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'stellar-nuvio/providers/4khdhub.js'
+      - '.github/workflows/test-stellar-4khdhub.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install runtime dependency
+        run: npm install cheerio-without-node-native@0.20.2 --no-save
+      - name: Probe provider
+        run: |
+          node - <<'NODE'
+          const p=require('./stellar-nuvio/providers/4khdhub.js');
+          async function one(label,id,type,s,e){
+            const rows=await p.getStreams(id,type,s,e);
+            console.log('ROWS',label,rows.length,rows.map(x=>({name:x.name,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})(),title:x.title})));
+            for(const x of rows.slice(0,8)){
+              try{
+                const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(15000)});
+                const b=Buffer.from(await r.arrayBuffer());
+                console.log('MEDIA',label,x.quality,r.status,r.headers.get('content-type'),new URL(x.url).host,'bytes',b.length);
+              }catch(err){console.log('MEDIAERR',label,err.message)}
+            }
+          }
+          (async()=>{
+            await one('Fight Club','550','movie');
+            await one('Inception','27205','movie');
+            await one('GOT S1E1','1399','tv',1,1);
+            await one('Squid Game S1E1','93405','tv',1,1);
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

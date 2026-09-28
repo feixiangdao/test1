@@ -1,6 +1,6 @@
 {
   "name": "Stellar Local",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
   "scrapers": [
     {
@@ -117,6 +117,26 @@
         "tv"
       ],
       "filename": "providers/castletv.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
+    },
+    {
+      "id": "stellar-netmirror",
+      "name": "Stellar · NetMirror",
+      "description": "NetMirror 当前 mobile playlist 本地解析。自动在 Netflix / Prime Video / Hotstar/Disney+ 镜像中查找，返回 Auto/1080p/720p/480p HLS，并保留多语言音轨与字幕。",
+      "version": "1.0.0",
+      "author": "Stellar Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/netmirror.js",
       "enabled": true,
       "formats": [
         "m3u8"

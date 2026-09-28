@@ -66,3 +66,14 @@ MovieBox 已改为当前 v4.0.02 移动端协议：
 它直接调用 `vidrock.ru/api/movie/{TMDB}/`，再在 Nuvio 本机使用 WebCrypto AES-GCM 解密最终媒体 URL。真实联网测试《Fight Club》返回 3 条媒体流，三条均 HTTP 200，其中包含 HLS master 和 1080p 线路。
 
 当前 VidRock 的 TV endpoint 实测返回 404，因此 manifest 明确只声明 `movie`，不会在剧集里制造空播放源。
+
+
+### NetMirror
+
+NetMirror 已使用当前 mobile playlist 流程接入 Stellar Local：
+
+- 自动尝试 Netflix → Prime Video → Hotstar/Disney+；
+- 电影和剧集均支持；
+- 返回 Auto / 1080p / 720p / 480p HLS（以上游实际提供为准）；
+- HLS 内可包含多语言音轨；
+- 上游 captions 同步作为字幕返回。

@@ -59,19 +59,19 @@ jobs:
       - name: Probe next Stellar sources v2
         working-directory: stellar-nuvio
         run: node probe-next-sources-2.js
-      - name: NetMirror corrected live probe
+      - name: NetMirror helper tests
         working-directory: stellar-nuvio
-        run: node probe-netmirror-corrected.js
-      - name: NetMirror mobile playlist live probe
+        run: node test-netmirror.js
+      - name: NetMirror live probe
         working-directory: stellar-nuvio
-        run: node probe-netmirror-playlist.js
+        run: node live-netmirror.js
       - name: Validate manifest
         run: |
           node - <<'NODE'
           const fs=require('fs');
           const m=JSON.parse(fs.readFileSync('stellar-nuvio/manifest.json','utf8'));
           if(m.name!=='Stellar Local') throw new Error('unexpected manifest name');
-          if(!Array.isArray(m.scrapers)||m.scrapers.length!==6) throw new Error('expected 6 scrapers');
+          if(!Array.isArray(m.scrapers)||m.scrapers.length!==7) throw new Error('expected 7 scrapers');
           const ids=new Set();
           for(const s of m.scrapers){
             if(ids.has(s.id)) throw new Error('duplicate id '+s.id);

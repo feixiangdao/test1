@@ -1,0 +1,111 @@
+name: Probe OneTouch ZXC Native
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-onetouch-zxc-native.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Probe OneTouchTV without TMDB
+        continue-on-error: true
+        run: |
+          node - <<'NODE'
+          const crypto=require('crypto');
+          const BASE='https://api3.devcorp.me';
+          const KEY=Buffer.from('im72charPasswordofdInitVectorStm','utf8');
+          const IV=Buffer.from('im72charPassword','utf8');
+          const H={'User-Agent':'Mozilla/5.0','Referer':'https://onetouchtv.xyz/'};
+          function dec(s){
+            s=s.replace(/-_\./g,'/').replace(/@/g,'+').replace(/\s+/g,'');
+            const p=s.length%4;if(p)s+='='.repeat(4-p);
+            const d=crypto.createDecipheriv('aes-256-cbc',KEY,IV);
+            return JSON.parse(Buffer.concat([d.update(Buffer.from(s,'base64')),d.final()]).toString('utf8')).result;
+          }
+          async function get(path){
+            const r=await fetch(BASE+path,{headers:H,signal:AbortSignal.timeout(15000)});
+            const t=await r.text();
+            console.log('HTTP',r.status,path,'ct',r.headers.get('content-type'),'len',t.length);
+            if(!r.ok)return null;
+            try{return dec(t)}catch(e){console.log('DEC ERR',path,e.message,'prefix',t.slice(0,120));return null}
+          }
+          async function media(url,label){
+            try{
+              const r=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0','Referer':BASE+'/',Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(15000)});
+              const b=Buffer.from(await r.arrayBuffer());
+              console.log('MEDIA',label,r.status,r.headers.get('content-type'),new URL(url).host,'bytes',b.length,'prefix',b.subarray(0,100).toString('utf8').replace(/\s+/g,' '));
+            }catch(e){console.log('MEDIA',label,'ERR',e.message)}
+          }
+          async function one(title,kind){
+            const rows=await get('/vod/search?keyword='+encodeURIComponent(title));
+            console.log('SEARCH',title,Array.isArray(rows)?rows.slice(0,10).map(x=>({id:x.id,title:x.title,year:x.year,type:x.type})):rows);
+            if(!Array.isArray(rows))return;
+            const cand=rows.find(x=>String(x.title||'').toLowerCase()===title.toLowerCase() && (kind==='movie'?x.type==='movie':x.type!=='movie')) || rows[0];
+            if(!cand)return;
+            const d=await get('/vod/'+cand.id+'/detail');
+            console.log('DETAIL',title,d&&{title:d.title,eps:d.episodes&&d.episodes.slice(0,5)});
+            if(!d||!d.episodes||!d.episodes.length)return;
+            const ep=kind==='movie'?d.episodes[0]:(d.episodes.find(x=>parseInt(x.episode,10)===1)||d.episodes[0]);
+            if(!ep||!ep.playId)return;
+            const s=await get('/vod/'+cand.id+'/episode/'+ep.playId);
+            console.log('STREAMDATA',title,s&&{sources:s.sources,trackCount:(s.track||[]).length});
+            for(const x of (s&&s.sources||[]).slice(0,8)) if(x.url) await media(x.url,title+' '+(x.quality||x.name||''));
+          }
+          (async()=>{await one('Fight Club','movie');await one('Game of Thrones','tv')})().catch(e=>{console.error('FATAL',e.stack||e);process.exitCode=1});
+          NODE
+
+      - name: Probe ZXCStreams without TMDB
+        continue-on-error: true
+        run: |
+          node - <<'NODE'
+          const crypto=require('crypto');
+          const PORTALS=['https://zxcstream.xyz','https://zxcprime.xyz'];
+          const SUBS=['r1','r2','r3','r4','r5','r6','v4','cdn','api','stream'];
+          const SALT='3435443433';
+          const SERVERS=['icarus','berkas','orion','athena'];
+          const F={id:'rgrwsdsdfgwrwrwwr',fToken:'xfgdfgdsffgrwgrwyjhkjt',ts:'rdghhdghhfssft',token:'ZDDVHJFGHYRHG',title:'TUKTHFSSFGDGHJS',year:'53653TRFG647GF',season:'adkljfhdahfladhfjahfjlahfhfljkadfdf',episode:'546745ygy46ytfgty',imdbId:'564745ygtuy5yi75yuy'};
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/141.0 Safari/537.36';
+          const H={'User-Agent':UA,'Accept':'application/json, text/plain, */*'};
+          const sha=x=>crypto.createHash('sha512').update(x).digest('hex');
+          async function token(base,id,type,s,e){
+            const rt=Date.now(),xt=sha(rt+':'+SALT+':'+id).slice(0,64),ref=base+'/player/'+type+'/'+id+(s!=null?'/'+s+'/'+e:'');
+            const r=await fetch(base+'/backend/token',{method:'POST',headers:{...H,Origin:base,'Content-Type':'application/json',Referer:ref},body:JSON.stringify({[F.id]:id,[F.fToken]:xt,[F.ts]:rt}),signal:AbortSignal.timeout(8000)});
+            const t=await r.text(); console.log('TOKEN',base,r.status,t.slice(0,180));
+            if(!r.ok)return null; let d; try{d=JSON.parse(t)}catch(_){return null}
+            return d[F.token]?{token:d[F.token],ts:d[F.ts],xt,ref}:null;
+          }
+          async function discover(){
+            for(const p of PORTALS){try{const r=await fetch(p,{headers:{'User-Agent':UA},redirect:'follow',signal:AbortSignal.timeout(10000)});const b=new URL(r.url).origin;console.log('PORTAL',p,'=>',b,r.status);if(b!==new URL(p).origin){const x=await token(b,'550','movie');if(x)return b}}catch(e){console.log('PORTAL ERR',p,e.message)}}
+            for(const sub of SUBS){const b='https://'+sub+'.zxcstream.xyz';try{const x=await token(b,'550','movie');if(x)return b}catch(e){console.log('SUB ERR',b,e.message)}}
+            return null;
+          }
+          async function media(url,h,label){try{const r=await fetch(url,{headers:{...h,Range:'bytes=0-4095'},redirect:'manual',signal:AbortSignal.timeout(15000)});const b=Buffer.from(await r.arrayBuffer());console.log('MEDIA',label,r.status,r.headers.get('content-type'),new URL(url).host,'bytes',b.length,'prefix',b.subarray(0,100).toString('utf8').replace(/\s+/g,' '))}catch(e){console.log('MEDIA',label,'ERR',e.message)}}
+          async function one(base,meta,type,s,e){
+            const tk=await token(base,meta.tmdbId,type,s,e); if(!tk)return;
+            const q={[F.id]:meta.tmdbId,b:type,[F.ts]:String(tk.ts),[F.token]:tk.token,[F.fToken]:tk.xt,[F.title]:meta.title,[F.year]:meta.year,date:meta.releaseDate,[F.imdbId]:meta.imdbId};
+            if(s!=null){q[F.season]=String(s);q[F.episode]=String(e)}
+            for(const srv of SERVERS){
+              try{
+                const u=base+'/backend_/servers/'+srv+'?'+new URLSearchParams(q).toString();
+                const r=await fetch(u,{headers:{...H,Origin:base,Referer:tk.ref},signal:AbortSignal.timeout(12000)});
+                const t=await r.text(); console.log('SERVER',type,srv,r.status,t.slice(0,600));
+                if(!r.ok)continue; let d; try{d=JSON.parse(t)}catch(_){continue}
+                for(const l of (d.links||[]).slice(0,6)) if(l.link) await media(l.link,{Referer:tk.ref,Origin:base,'User-Agent':UA},type+' '+srv+' '+(l.resolution||l.source||''));
+              }catch(err){console.log('SERVER ERR',srv,err.message)}
+            }
+          }
+          (async()=>{
+            const base=await discover();console.log('BASE',base);if(!base)return;
+            await one(base,{tmdbId:'550',title:'Fight Club',year:'1999',releaseDate:'1999-10-15',imdbId:'tt0137523'},'movie');
+            await one(base,{tmdbId:'1399',title:'Game of Thrones',year:'2011',releaseDate:'2011-04-17',imdbId:'tt0944947'},'tv',1,1);
+          })().catch(e=>{console.error('FATAL',e.stack||e);process.exitCode=1});
+          NODE

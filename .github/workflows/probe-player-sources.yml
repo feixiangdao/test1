@@ -1,0 +1,19 @@
+name: Probe Mapple FibWatch Movix VidLove XPass
+on:
+  push:
+    paths:
+      - 'research/probe-player-sources.js'
+      - '.github/workflows/probe-player-sources.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save crypto-js cheerio-without-node-native
+      - run: node research/probe-player-sources.js

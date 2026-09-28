@@ -3,6 +3,9 @@ on:
   push:
     paths:
       - 'stellar-nuvio/probe-netmirror-playlist.js'
+      - 'stellar-nuvio/providers/netmirror.js'
+      - 'stellar-nuvio/test-netmirror.js'
+      - 'stellar-nuvio/live-netmirror.js'
       - '.github/workflows/probe-netmirror-quick.yml'
   workflow_dispatch:
 
@@ -14,6 +17,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Probe current NetMirror playlist
+      - name: NetMirror helper
         working-directory: stellar-nuvio
-        run: node probe-netmirror-playlist.js
+        run: node test-netmirror.js
+      - name: NetMirror live provider
+        working-directory: stellar-nuvio
+        run: node live-netmirror.js

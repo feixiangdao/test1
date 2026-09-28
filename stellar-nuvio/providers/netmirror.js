@@ -63,6 +63,7 @@ function getCookie() {
 
   return fetch(MAIN + "/verify.php",{
     method:"POST",
+    redirect:"manual",
     followRedirects:false,
     headers:{
       "User-Agent":UA,

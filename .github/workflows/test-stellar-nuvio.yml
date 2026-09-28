@@ -65,6 +65,9 @@ jobs:
       - name: Cineby live local-style probe
         working-directory: stellar-nuvio
         run: node live-cineby.js
+      - name: Mapple live probe
+        working-directory: stellar-nuvio
+        run: node live-mapple.js
       - name: Movix helper tests
         working-directory: stellar-nuvio
         run: node test-movix.js

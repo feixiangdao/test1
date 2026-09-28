@@ -1,0 +1,35 @@
+name: Diagnose DVDPlay Search
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/diagnose-dvdplay-search.yml'
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect search HTML
+        run: |
+          node - <<'NODE'
+          async function one(q){
+            const u='https://dvdplay.cv/search.php?q='+encodeURIComponent(q).replace(/%20/g,'+');
+            const r=await fetch(u,{headers:{'User-Agent':'Mozilla/5.0','Accept':'text/html'}});
+            const t=await r.text();
+            console.log('QUERY',q,'HTTP',r.status,'LEN',t.length);
+            const re=/<a\s+href="([^"]+)"[^>]*>\s*<p\s+class="home"[^>]*>([\s\S]*?)<\/p>/gi;
+            let m,n=0;
+            while((m=re.exec(t))&&n<20){
+              console.log('RESULT',n++,m[1],String(m[2]).replace(/<[^>]+>/g,' ').replace(/&[^;]+;/g,' ').replace(/\s+/g,' ').trim());
+            }
+            const hrefs=[...t.matchAll(/href="([^"]*page-[^"]+)"/gi)].slice(0,20).map(x=>x[1]);
+            console.log('PAGE HREFS',hrefs);
+          }
+          (async()=>{for(const q of ['Fight Club','Inception','Titanic','The Dark Knight','Squid Game'])await one(q)})().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

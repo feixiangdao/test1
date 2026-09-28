@@ -1,4 +1,5 @@
 name: Probe HDHub4U Strict
+# rerun after candidate syntax fix
 
 on:
   workflow_dispatch:

@@ -1,0 +1,37 @@
+name: Inspect HiveX Search Call
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/inspect-hivex-search-call.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect call context
+        run: |
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36';
+          (async()=>{
+            const h=await fetch('https://hivex.stream/',{headers:{'User-Agent':UA},signal:AbortSignal.timeout(12000)}).then(r=>r.text());
+            const srcs=[...new Set([...h.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)].map(m=>new URL(m[1],'https://hivex.stream/').toString()))];
+            for(const u of srcs){
+              const t=await fetch(u,{headers:{'User-Agent':UA,Referer:'https://hivex.stream/'},signal:AbortSignal.timeout(12000)}).then(r=>r.text()).catch(()=>null);
+              if(!t)continue;
+              for(const key of ['/api/movies/search?query=','/api/movies/','fetch(']){
+                let pos=0,count=0;
+                while((pos=t.indexOf(key,pos))>=0&&count<12){
+                  console.log('CTX',u,key,t.slice(Math.max(0,pos-1200),Math.min(t.length,pos+2400)));
+                  pos+=key.length;count++;
+                }
+              }
+            }
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

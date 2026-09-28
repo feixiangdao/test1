@@ -196,6 +196,10 @@ function tmdbInfo(tmdbId, mediaType) {
 }
 
 function normTitle(v) {
+  return clean(v).toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function looseTitle(v) {
   return clean(v)
     .toLowerCase()
     .replace(/\[[^\]]*\]/g, "")
@@ -235,12 +239,19 @@ function chooseSubject(payload, meta) {
 
   var want = normTitle(meta.title);
   var original = normTitle(meta.originalTitle);
+  var looseWant = looseTitle(meta.title);
+  var looseOriginal = looseTitle(meta.originalTitle);
   var year = String(meta.year || "");
   var wantedType = meta.mediaType === "tv" ? 2 : 1;
 
   function titleMatches(it) {
     var n = normTitle(it && (it.title || it.name));
     return n && (n === want || (original && n === original));
+  }
+
+  function looseMatches(it) {
+    var n = looseTitle(it && (it.title || it.name));
+    return n && (n === looseWant || (looseOriginal && n === looseOriginal));
   }
   function typeMatches(it) {
     var st = Number(it && it.subjectType);
@@ -257,13 +268,18 @@ function chooseSubject(payload, meta) {
   });
   if (exact) return exact;
 
-  var looseYear = items.find(function(it) {
+  var markedYear = items.find(function(it) {
+    return typeMatches(it) && looseMatches(it) && (!year || subjectYear(it) === year);
+  });
+  if (markedYear) return markedYear;
+
+  var containsYear = items.find(function(it) {
     if (!typeMatches(it)) return false;
     var n = normTitle(it && (it.title || it.name));
     var loose = n && want && (n.indexOf(want) >= 0 || want.indexOf(n) >= 0);
     return loose && (!year || subjectYear(it) === year);
   });
-  if (looseYear) return looseYear;
+  if (containsYear) return containsYear;
 
   return items.find(typeMatches) || items[0];
 }

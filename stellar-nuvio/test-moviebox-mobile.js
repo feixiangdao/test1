@@ -26,7 +26,7 @@ assert(h.Authorization==='Bearer tok');
 
 const picked=m.chooseSubject(
   {items:[
-    {subjectId:'1',subjectType:1,title:'Fight Club [Hindi]',releaseDate:'2023-12-15'},
+    {subjectId:'1',subjectType:1,title:'Fight Club [Hindi]',releaseDate:'1999-10-15'},
     {subjectId:'2',subjectType:1,title:'Fight Club',releaseDate:'1999-10-15'}
   ]},
   {title:'Fight Club',originalTitle:'Fight Club',year:'1999',mediaType:'movie'}

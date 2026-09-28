@@ -20,6 +20,7 @@ jobs:
           git clone --depth 1 --branch main https://github.com/yoruix/nuvio-providers.git /tmp/nuvio-providers
           cd /tmp/nuvio-providers
           npm install --ignore-scripts
+          npm install --no-save axios cheerio
 
       - name: Probe MyFlixer final HLS
         continue-on-error: true

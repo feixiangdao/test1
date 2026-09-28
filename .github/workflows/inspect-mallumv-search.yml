@@ -1,0 +1,40 @@
+name: Inspect MalluMV Search
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/inspect-mallumv-search.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect search pages
+        run: |
+          node - <<'NODE'
+          const BASE='https://mallumv.gay';
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36';
+          (async()=>{
+            for(const q of ['Fight Club','Inception','Squid Game']){
+              try{
+                const u=BASE+'/search.php?q='+encodeURIComponent(q).replace(/%20/g,'+');
+                const r=await fetch(u,{headers:{'User-Agent':UA},redirect:'follow',signal:AbortSignal.timeout(12000)});
+                const t=await r.text();
+                console.log('\nSEARCH',q,r.status,r.url,'len',t.length,'noResults',/No results/i.test(t));
+                const cards=[];
+                for(const m of t.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]{0,900}?)<\/a>/gi)){
+                  const text=m[2].replace(/<[^>]+>/g,' ').replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/\s+/g,' ').trim();
+                  if(text && /Fight Club|Inception|Squid Game/i.test(text)) cards.push({href:m[1],text});
+                }
+                console.log('MATCHES',JSON.stringify(cards.slice(0,30),null,2));
+                console.log('PREFIX',t.slice(0,600).replace(/\s+/g,' '));
+              }catch(e){console.log('ERR',q,e.message)}
+            }
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+          NODE

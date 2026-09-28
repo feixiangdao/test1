@@ -53,6 +53,12 @@ jobs:
       - name: Probe next Stellar sources
         working-directory: stellar-nuvio
         run: node probe-next-sources.js
+      - name: Diagnose OneTouchTV
+        working-directory: stellar-nuvio
+        run: node diagnose-onetouchtv.js
+      - name: Probe next Stellar sources v2
+        working-directory: stellar-nuvio
+        run: node probe-next-sources-2.js
       - name: Validate manifest
         run: |
           node - <<'NODE'

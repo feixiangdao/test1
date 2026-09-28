@@ -1,4 +1,3 @@
-// focused-probe-trigger
 const crypto=require('crypto');
 const BASE='https://api3.devcorp.me';
 const KEY=Buffer.from('im72charPasswordofdInitVectorStm','utf8');
@@ -12,51 +11,37 @@ function dec(s){
  return JSON.parse(Buffer.concat([d.update(Buffer.from(s,'base64')),d.final()]).toString('utf8')).result;
 }
 async function enc(path){
- const r=await fetch(BASE+path,{headers:H});
+ const r=await fetch(BASE+path,{headers:H,signal:AbortSignal.timeout(15000)});
  const t=await r.text();
  console.log('HTTP',r.status,path,'len',t.length);
- if(!r.ok)throw new Error('HTTP '+r.status+' '+t.slice(0,200));
+ if(!r.ok)throw new Error('HTTP '+r.status+' '+t.slice(0,160));
  return dec(t);
 }
-function norm(v){return String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
+function norm(v){return String(v||'').toLowerCase().replace(/\s*\((?:19|20)\d{2}\)\s*$/,'').replace(/[^a-z0-9]+/g,'')}
+async function inspect(query,wanted){
+ console.log('\n===',query,'===');
+ const rows=await enc('/vod/search?keyword='+encodeURIComponent(query));
+ console.log('SEARCH',JSON.stringify((rows||[]).slice(0,12),null,2));
+ const hit=(rows||[]).find(x=>norm(x.title)===norm(wanted));
+ console.log('CHOSEN',hit&&{id:hit.id,title:hit.title,year:hit.year,type:hit.type});
+ if(!hit)return;
+ const d=await enc('/vod/'+encodeURIComponent(hit.id)+'/detail');
+ console.log('EPISODES',JSON.stringify(d&&d.episodes,null,2));
+ const ep=(d&&Array.isArray(d.episodes)?d.episodes:[]).find(x=>Number(x&&x.episode)===1);
+ console.log('EP1',ep);
+ if(!ep||ep.playId==null)return;
+ const data=await enc('/vod/'+encodeURIComponent(hit.id)+'/episode/'+encodeURIComponent(ep.playId));
+ console.log('SOURCES',JSON.stringify(data&&data.sources,null,2));
+ for(const src of (data&&data.sources||[]).slice(0,4)){
+  if(!src||!src.url)continue;
+  try{
+   const r=await fetch(src.url,{headers:{'User-Agent':'Mozilla/5.0','Referer':BASE+'/',Range:'bytes=0-2047'},redirect:'manual',signal:AbortSignal.timeout(15000)});
+   const b=Buffer.from(await r.arrayBuffer());
+   console.log('MEDIA',src.name,src.quality,src.type,r.status,r.headers.get('content-type'),new URL(src.url).host,b.subarray(0,140).toString('utf8').replace(/\s+/g,' '));
+  }catch(e){console.log('MEDIA ERR',e.message)}
+ }
+}
 (async()=>{
- console.log('=== OneTouchTV ===');
- try{
-   const search=await enc('/vod/search?keyword='+encodeURIComponent('Fight Club'));
-   console.log('search count',Array.isArray(search)?search.length:null,JSON.stringify(search).slice(0,3500));
-   const candidates=(Array.isArray(search)?search:[]).filter(x=>norm(x.title)==='fightclub');
-   const hit=candidates.find(x=>String(x.year||'').includes('1999'))||candidates[0];
-   console.log('chosen',hit&&{id:hit.id,title:hit.title,year:hit.year,type:hit.type});
-   if(!hit)return;
-   const det=await enc('/vod/'+encodeURIComponent(hit.id)+'/detail');
-   console.log('detail',JSON.stringify(det).slice(0,4000));
-   const ep=det&&Array.isArray(det.episodes)?det.episodes[0]:null;
-   console.log('episode',ep);
-   if(!ep)return;
-   const sd=await enc('/vod/'+encodeURIComponent(hit.id)+'/episode/'+encodeURIComponent(ep.playId));
-   console.log('streamData',JSON.stringify(sd).slice(0,5000));
-   const srcs=(sd&&sd.sources)||[];
-   for(const s of srcs.slice(0,8)){
-     if(!s||!s.url)continue;
-     try{
-       const r=await fetch(s.url,{headers:{'User-Agent':'Mozilla/5.0','Referer':BASE+'/',Range:'bytes=0-2047'},redirect:'manual'});
-       const ct=r.headers.get('content-type');
-       const body=await r.text();
-       console.log('media',s.name,s.quality,s.type,new URL(s.url).host,r.status,ct,'prefix',body.slice(0,150).replace(/\s+/g,' '));
-     }catch(e){console.log('media error',s.name,e.message)}
-   }
-
-   const tvs=await enc('/vod/search?keyword='+encodeURIComponent('Game of Thrones'));
-   const tvhit=(Array.isArray(tvs)?tvs:[]).find(x=>norm(x.title)==='gameofthrones'&&String(x.type||'').toLowerCase()!=='movie')||(Array.isArray(tvs)?tvs[0]:null);
-   console.log('tv chosen',tvhit&&{id:tvhit.id,title:tvhit.title,year:tvhit.year,type:tvhit.type});
-   if(tvhit){
-     const td=await enc('/vod/'+encodeURIComponent(tvhit.id)+'/detail');
-     console.log('tv detail episodes',td&&td.episodes&&td.episodes.slice(0,5));
-     const tep=td&&Array.isArray(td.episodes)?td.episodes.find(x=>parseInt(x.episode,10)===1):null;
-     if(tep){
-       const ts=await enc('/vod/'+encodeURIComponent(tvhit.id)+'/episode/'+encodeURIComponent(tep.playId));
-       console.log('tv streamData',JSON.stringify(ts).slice(0,3500));
-     }
-   }
- }catch(e){console.log('OneTouchTV error',e.stack||e.message)}
-})();
+ await inspect('Squid Game Season 2','Squid Game Season 2');
+ await inspect('Squid Game Season 3','Squid Game Season 3');
+})().catch(e=>{console.error(e.stack||e);process.exitCode=1});

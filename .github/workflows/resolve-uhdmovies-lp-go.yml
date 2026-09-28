@@ -42,7 +42,7 @@ jobs:
             const p2=await post(f2.action,f2.fields,f1.action||start);
             const t2=p2.b.toString('utf8');
             const scm=t2.match(/sc\("([^"]+)","([^"]+)",(\d+)\)/);
-            const gom=t2.match(/href["']?\s*,?\s*["']https:\\/\\/en\.thenaukriadda\.in\\/\?lp_go=([^"'\\)]+)/i)||t2.match(/\?lp_go=([A-Za-z0-9_-]+)/);
+            const gom=t2.match(/\\?lp_go=([A-Za-z0-9_-]+)/);
             console.log('SC',scm&&{name:scm[1],valueLen:scm[2].length,minutes:scm[3]});
             console.log('GO',gom&&gom[1]);
             if(!scm||!gom)return null;

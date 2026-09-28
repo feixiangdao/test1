@@ -54,6 +54,10 @@ jobs:
               const t=await r.text();
               console.log('HTML',step,t.slice(0,2500).replace(/\n/g,'\\n'));
               const $=cheerio.load(t);
+              const scripts=$('script').get().map(el=>$(el).html()||'').filter(x=>/_lp_|lp-|hop|token|countdown|location|replace\(|go=|setTimeout|setInterval/i.test(x));
+              const anchors=$('a[href]').get().map(el=>({text:$(el).text().trim().slice(0,80),href:$(el).attr('href')})).filter(x=>/lp|go=|continue|download|next|redirect/i.test((x.text||'')+' '+(x.href||'')));
+              const metas=$('meta[http-equiv="refresh"]').get().map(el=>$(el).attr('content')||'');
+              console.log('SIGNALS',step,JSON.stringify({scripts:scripts.slice(0,12),anchors:anchors.slice(0,30),metas},null,2));
               const forms=$('form').get().map(el=>{
                 const $f=$(el), data={};
                 $f.find('input[name]').each((_,inp)=>{data[$(inp).attr('name')]=$(inp).attr('value')||''});
@@ -74,8 +78,9 @@ jobs:
               const meta=$('meta[http-equiv="refresh"]').attr('content')||'';
               const mm=meta.match(/url\s*=\s*(.+)$/i);
               if(mm){referer=url;url=absolutize(mm[1].replace(/^['"]|['"]$/g,''),url);method='GET';body=null;continue}
-              const js=t.match(/(?:location(?:\.href)?\s*=|replace\()\s*['"]([^'"]+)['"]/i);
-              if(js){referer=url;url=absolutize(js[1],url);method='GET';body=null;continue}
+              const js=t.match(/(?:window\.)?location(?:\.href)?\s*=\s*['"]([^'"]+)['"]|location\.replace\(\s*['"]([^'"]+)['"]\s*\)/i);
+              const jsTarget=js&&(js[1]||js[2]);
+              if(jsTarget && !/[{}]/.test(jsTarget)){referer=url;url=absolutize(jsTarget,url);method='GET';body=null;continue}
               console.log('STOP-NO-NEXT',url);return null;
             }
             return null;

@@ -62,6 +62,9 @@ jobs:
       - name: NetMirror corrected live probe
         working-directory: stellar-nuvio
         run: node probe-netmirror-corrected.js
+      - name: NetMirror mobile playlist live probe
+        working-directory: stellar-nuvio
+        run: node probe-netmirror-playlist.js
       - name: Validate manifest
         run: |
           node - <<'NODE'

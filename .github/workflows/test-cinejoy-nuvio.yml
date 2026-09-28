@@ -22,7 +22,9 @@ jobs:
             echo "Checking $f"
             node --check "$f"
           done
-      - name: Test Jellyfin Direct\n        run: node cinejoy-nuvio/test-jellyfin-direct.js\n      - name: Validate manifest
+      - name: Test Jellyfin Direct
+        run: node cinejoy-nuvio/test-jellyfin-direct.js
+      - name: Validate manifest
         run: |
           node - <<'NODE'
           const fs = require('fs');

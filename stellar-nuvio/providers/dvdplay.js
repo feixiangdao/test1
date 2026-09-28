@@ -978,10 +978,19 @@ function getStreams(tmdbId, mediaType = 'movie', seasonNum = null, episodeNum = 
                             !url.includes('winexch.com');
                     });
 
-                    // 6. Remove duplicates based on URL
-                    const uniqueStreams = Array.from(new Map(allStreams.map(stream => [stream.url, stream])).values());
+                    // 6. Remove duplicates based on URL.
+                    let uniqueStreams = Array.from(new Map(allStreams.map(stream => [stream.url, stream])).values());
 
-                    // 7. Validate URLs in parallel (optional, can be disabled for speed)
+                    // For TV, filter to the requested episode BEFORE network validation.
+                    // Season pages can expose dozens of files across every episode.
+                    if ((mediaType === 'tv' || mediaType === 'series') && episodeNum != null) {
+                        uniqueStreams = uniqueStreams.filter(stream =>
+                            streamMatchesEpisode(stream.title || stream.name || '', seasonNum, episodeNum)
+                        );
+                        console.log('[DVDPlay] Pre-validation episode candidates: ' + uniqueStreams.length);
+                    }
+
+                    // 7. Validate only current-episode URLs.
                     console.log(`[DVDPlay] Validating ${uniqueStreams.length} stream URLs...`);
                     const validationPromises = uniqueStreams.map(stream => {
                         try {

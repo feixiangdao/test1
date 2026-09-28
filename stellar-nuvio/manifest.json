@@ -1,6 +1,6 @@
 {
   "name": "Stellar Local",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
   "scrapers": [
     {
@@ -247,6 +247,26 @@
         "multi"
       ],
       "limited": false
+    },
+    {
+      "id": "stellar-onetouchtv",
+      "name": "Stellar · OneTouchTV",
+      "description": "OneTouchTV 严格标题/年份匹配的本地 HLS 补充源。返回前验证最终 #EXTM3U；拒绝近似错配。片库覆盖与部分季数据不完整，因此标记 limited。",
+      "version": "1.0.0",
+      "author": "Stellar Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/onetouchtv.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
     }
   ]
 }

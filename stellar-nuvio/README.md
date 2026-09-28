@@ -17,6 +17,15 @@
 - Stellar · VidZee
 - Stellar · VixSrc
 - Stellar · MovieBox
+- Stellar · VAPlayer
+- Stellar · VidRock
+- Stellar · CastleTV
+- Stellar · NetMirror
+- Stellar · Cineby
+- Stellar · Movix
+- Stellar · Mapple
+- Stellar · Vidlink
+- Stellar · ZXCStreams
 
 MP4Hydra 当前上游处于维护状态，没有加入。
 
@@ -77,3 +86,25 @@ NetMirror 已使用当前 mobile playlist 流程接入 Stellar Local：
 - 返回 Auto / 1080p / 720p / 480p HLS（以上游实际提供为准）；
 - HLS 内可包含多语言音轨；
 - 上游 captions 同步作为字幕返回。
+
+
+### ZXCStreams v1.13
+
+新增 **Stellar · ZXCStreams**，适配 2026-09 当前新版播放器 API，而不是已经失效的旧 `/backend/token` 流程。
+
+当前正式启用的服务器：
+
+- Daedalus：HLS；
+- Berkas：多镜像 HLS；
+- Alatreon：HLS；
+- Valstrax：DASH；
+- Atlas：DASH。
+
+Resshin 虽然 API 能返回 MP4，但最终 `api1.zxcstream.xyz` 当前实测 HTTP 502，因此正式 Provider 主动排除。
+
+真实联网回归：
+
+- Fight Club：返回 8 条流，抽样验证 8/8 最终媒体可读；
+- Game of Thrones S01E01：返回 8 条流，抽样验证 8/8 最终媒体可读；
+- HLS 返回有效 `#EXTM3U`，DASH 返回有效 `<MPD>`；
+- 不使用 iframe、网页播放器或外部跳转。

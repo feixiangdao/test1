@@ -798,11 +798,28 @@ function getStreams(tmdbId, mediaType = "movie", season = null, episode = null) 
       if (searchResults.length === 0)
         return [];
       const bestMatch = findBestTitleMatch(mediaInfo, searchResults, mediaType, season);
-      if (!bestMatch) {\n        console.log(`[HDHub4u/Strict] Rejecting search results: no sufficiently accurate title/season match`);\n        return [];\n      }\n      const selectedMedia = bestMatch;
+      if (!bestMatch) {
+        console.log(`[HDHub4u/Strict] Rejecting search results: no sufficiently accurate title/season match`);
+        return [];
+      }
+      const selectedMedia = bestMatch;
       console.log(`[HDHub4u] Selected: "${selectedMedia.title}" (${selectedMedia.url})`);
       const result = yield getDownloadLinks(selectedMedia.url);
       const finalLinks = result.finalLinks;
-      let filteredLinks = finalLinks.filter((link) => {\n        try {\n          const h = new URL(link.url).hostname.toLowerCase();\n          return h.includes('pixeldrain.net') || h.includes('pixeldrain.dev') || h.includes('cloudflarestorage.com') || h.endsWith('.r2.dev') || h.includes('video-downloads.googleusercontent.com') || h === 'cdn.lenin.buzz' || h.endsWith('.workers.dev');\n        } catch (_) { return false; }\n      });
+      let filteredLinks = finalLinks.filter((link) => {
+        try {
+          const h = new URL(link.url).hostname.toLowerCase();
+          return h.includes("pixeldrain.net") ||
+            h.includes("pixeldrain.dev") ||
+            h.includes("cloudflarestorage.com") ||
+            h.endsWith(".r2.dev") ||
+            h.includes("video-downloads.googleusercontent.com") ||
+            h === "cdn.lenin.buzz" ||
+            h.endsWith(".workers.dev");
+        } catch (_) {
+          return false;
+        }
+      });
       if (mediaType === "tv" && episode !== null) {
         filteredLinks = finalLinks.filter((link) => link.episode === episode);
       }

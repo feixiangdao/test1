@@ -24,13 +24,15 @@ jobs:
           done
       - name: Test Jellyfin Direct
         run: node cinejoy-nuvio/test-jellyfin-direct.js
+      - name: Test VidZee Direct
+        run: node cinejoy-nuvio/test-vidzee.js
       - name: Validate manifest
         run: |
           node - <<'NODE'
           const fs = require('fs');
           const m = require('./cinejoy-nuvio/manifest.json');
-          if (!Array.isArray(m.scrapers) || m.scrapers.length !== 12) {
-            throw new Error(`Expected 12 scrapers, got ${m.scrapers && m.scrapers.length}`);
+          if (!Array.isArray(m.scrapers) || m.scrapers.length !== 13) {
+            throw new Error(`Expected 13 scrapers, got ${m.scrapers && m.scrapers.length}`);
           }
           const ids = new Set();
           for (const s of m.scrapers) {

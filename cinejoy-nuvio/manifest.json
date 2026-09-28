@@ -1,7 +1,7 @@
 {
   "name": "Cinejoy Local",
-  "version": "1.2.0",
-  "description": "Cinejoy providers adapted for Nuvio local execution. Direct media URLs only, plus optional user-authorized Jellyfin Direct.",
+  "version": "1.3.0",
+  "description": "Cinejoy providers adapted for Nuvio local execution, plus selected direct-media sources and optional user-authorized Jellyfin Direct. Direct media URLs only.",
   "scrapers": [
     {
       "id": "cinejoy-vidlink",
@@ -267,6 +267,28 @@
         "multi"
       ],
       "limited": false
+    },
+    {
+      "id": "vidzee-direct",
+      "name": "VidZee Direct",
+      "description": "VidZee 当前直链接口（e=0）本地解析；直接返回 HLS 媒体 URL，并携带 CDN 所需 Referer。",
+      "version": "1.0.0",
+      "author": "Cinejoy Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidzee.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "logo": "https://vidzee.wtf/favicon.ico",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
     }
   ]
 }

@@ -16,7 +16,7 @@ https://raw.githubusercontent.com/feixiangdao/test1/main/cinejoy-nuvio/manifest.
 
 ## 当前 provider
 
-CineJoy 上游当前 11 条线路已全部建立对应项；另外增加一个可选的用户自有媒体库直连源：
+CineJoy 上游当前 11 条线路已全部建立对应项；另外增加 VidZee 原生直链源和一个可选的用户自有媒体库直连源：
 
 - Cinejoy · Aether 1 (CinemaOS) — 实验性，默认关闭
 - Cinejoy · Nebula Stream X (VidKing)
@@ -28,13 +28,15 @@ CineJoy 上游当前 11 条线路已全部建立对应项；另外增加一个�
 - Cinejoy · Pulsar Relay (VidSrc Me / VSEmbed)
 - Cinejoy · Titan Mesh (VidUp)
 - Cinejoy · Zenith Direct (RiveStream)
-- Cinejoy · Astral Core 9 (VidCore)\n- Cinejoy · Jellyfin Direct — 用户自有 Jellyfin 媒体库，默认关闭；无 iframe，直接交给 Nuvio 原生播放器
+- Cinejoy · Astral Core 9 (VidCore)\n- VidZee Direct — 使用当前 VidZee 明文流接口（e=0），直接返回 HLS/媒体 URL
+- Cinejoy · Jellyfin Direct — 用户自有 Jellyfin 媒体库，默认关闭；无 iframe，直接交给 Nuvio 原生播放器
 
 ## 兼容性原则
 
 - provider 只向 Nuvio 返回真实 `http(s)` 媒体地址；不把 iframe/embed 网页地址冒充成视频流。
 - Nuvio 会向 provider 传入 TMDB ID、`movie/tv`、season 和 episode。
 - 需要 Referer / Origin 的线路会随 stream 返回播放 headers。
+- VidZee Direct 使用 `core.vidzee.wtf/streams/...&e=0` 的明文返回模式，并在播放请求中带 `Referer: https://player.vidzee.wtf/`。
 - VidFast / VidEasy / VidNest 的辅助解密请求只处理小型元数据；最终媒体流仍由设备直接访问。
 - CinemaOS 当前公开集成属于 embed-only，而 Nuvio `PluginRuntimeResult` 需要 `url` 直链，因此该项默认关闭；只有页面直接暴露真实媒体地址时才会返回结果。
 

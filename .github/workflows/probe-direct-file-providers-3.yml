@@ -24,6 +24,8 @@ jobs:
             curl -fsSL "https://raw.githubusercontent.com/yoruix/nuvio-providers/main/providers/$f.js" -o "/tmp/nuvio-providers/providers/$f.js"
           done
       - name: Probe
+        env:
+          NODE_PATH: ${{ github.workspace }}/node_modules
         run: |
           node - <<'NODE'
           async function media(name,label,x){

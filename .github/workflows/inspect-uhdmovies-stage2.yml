@@ -58,6 +58,8 @@ jobs:
               const a=[...new Set((p2.t.match(re)||[]))];
               console.log('MATCH',re.toString(),JSON.stringify(a.slice(0,80),null,2));
             }
+            const gi=p2.t.toLowerCase().indexOf('go to download');
+            console.log('DOWNLOADCTX',gi>=0?p2.t.slice(Math.max(0,gi-1200),gi+800).replace(/\s+/g,' '):'missing');
             const suspicious=p2.t.split(/\n/).filter(x=>/_lp_|redirect|location|fetch\(|ajax|download|driveseed|video-seed|workers\.dev|r2\.dev|pixeldrain|hubcloud|gofile/i.test(x));
             console.log('LINES',suspicious.slice(0,220).join('\n'));
           })().catch(e=>{console.error(e.stack||e);process.exitCode=1});

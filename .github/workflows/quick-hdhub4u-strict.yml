@@ -1,4 +1,5 @@
 name: Quick HDHub4U Strict
+# range fallback validation
 
 on:
   workflow_dispatch:

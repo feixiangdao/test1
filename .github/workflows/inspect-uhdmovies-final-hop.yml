@@ -1,0 +1,40 @@
+name: Inspect UHDMovies Final Hop
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/inspect-uhdmovies-final-hop.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install cheerio-without-node-native@0.20.2 crypto-js@4.2.0 --no-save
+      - name: Fetch provider
+        run: |
+          mkdir -p ./_probe/providers
+          curl -fsSL https://raw.githubusercontent.com/yoruix/nuvio-providers/main/providers/uhdmovies.js -o ./_probe/providers/uhdmovies.js
+      - name: Inspect final hop
+        run: |
+          node - <<'NODE'
+          const p=require('./_probe/providers/uhdmovies.js');
+          (async()=>{
+            const rows=await p.getStreams('550','movie');
+            console.log('ROWS',rows.length);
+            for(const [i,x] of rows.slice(0,5).entries()){
+              console.log('ROW',i,JSON.stringify(x));
+              try{
+                const r=await fetch(x.url,{headers:{...(x.headers||{}),'User-Agent':'Mozilla/5.0'},redirect:'manual',signal:AbortSignal.timeout(12000)});
+                const t=await r.text();
+                console.log('RESP',i,'status',r.status,'ct',r.headers.get('content-type'),'loc',r.headers.get('location'),'url',r.url);
+                console.log('BODY',i,t.slice(0,3000).replace(/\n/g,'\\n'));
+              }catch(e){console.log('ERR',i,e.stack||e.message)}
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

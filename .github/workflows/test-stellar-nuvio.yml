@@ -41,24 +41,9 @@ jobs:
       - name: VAPlayer live probe
         working-directory: stellar-nuvio
         run: node live-vaplayer.js
-      - name: Diagnose PrimeSrc and VAPlayer
-        working-directory: stellar-nuvio
-        run: node diagnose-new-sources.js
-      - name: Diagnose CineVibe
-        working-directory: stellar-nuvio
-        run: node diagnose-cinevibe.js
       - name: Diagnose VidRock
         working-directory: stellar-nuvio
         run: node diagnose-vidrock.js
-      - name: Probe next Stellar sources
-        working-directory: stellar-nuvio
-        run: node probe-next-sources.js
-      - name: Diagnose OneTouchTV
-        working-directory: stellar-nuvio
-        run: node diagnose-onetouchtv.js
-      - name: Probe next Stellar sources v2
-        working-directory: stellar-nuvio
-        run: node probe-next-sources-2.js
       - name: Cineby helper tests
         working-directory: stellar-nuvio
         run: node test-cineby.js

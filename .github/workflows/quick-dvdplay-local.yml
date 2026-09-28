@@ -1,0 +1,21 @@
+name: Quick DVDPlay Local
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/quick-dvdplay-local.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save cheerio-without-node-native
+      - name: Probe Stellar DVDPlay local provider
+        working-directory: stellar-nuvio
+        run: node live-dvdplay.js

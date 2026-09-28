@@ -1,0 +1,59 @@
+name: Probe Direct File Providers 3
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-direct-file-providers-3.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install cheerio-without-node-native@0.20.2 crypto-js@4.2.0 --no-save
+      - name: Fetch providers
+        run: |
+          mkdir -p /tmp/nuvio-providers/providers
+          for f in dvdplay uhdmovies moviesmod moviesdrive; do
+            curl -fsSL "https://raw.githubusercontent.com/yoruix/nuvio-providers/main/providers/$f.js" -o "/tmp/nuvio-providers/providers/$f.js"
+          done
+      - name: Probe
+        run: |
+          node - <<'NODE'
+          async function media(name,label,x){
+            if(!x||!x.url)return;
+            try{
+              const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-4095','User-Agent':'Mozilla/5.0'},redirect:'manual',signal:AbortSignal.timeout(15000)});
+              const b=Buffer.from(await r.arrayBuffer());
+              const p=b.subarray(0,100).toString('utf8').replace(/\s+/g,' ');
+              console.log('MEDIA',name,label,x.quality||'',r.status,r.headers.get('content-type'),new URL(x.url).host,'bytes',b.length,'prefix',p);
+            }catch(e){console.log('MEDIAERR',name,label,e.message)}
+          }
+          async function test(name){
+            let p;try{p=require('/tmp/nuvio-providers/providers/'+name+'.js')}catch(e){console.log('LOADERR',name,e.message);return}
+            const fn=p.getStreams||p.default?.getStreams;
+            if(!fn){console.log('NOFN',name);return}
+            const qs=[
+              ['550','movie',null,null,'Fight Club'],
+              ['27205','movie',null,null,'Inception'],
+              ['1399','tv',1,1,'GOT S1E1'],
+              ['93405','tv',1,1,'Squid Game S1E1']
+            ];
+            for(const q of qs){
+              try{
+                const rows=await fn(q[0],q[1],q[2],q[3]);
+                console.log('ROWS',name,q[4],(rows||[]).length,(rows||[]).slice(0,12).map(x=>({name:x.name,title:x.title,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+                for(const x of (rows||[]).slice(0,5))await media(name,q[4],x);
+              }catch(e){console.log('ERR',name,q[4],e.stack||e.message)}
+            }
+          }
+          (async()=>{
+            for(const n of ['dvdplay','uhdmovies','moviesmod','moviesdrive'])await test(n);
+          })().catch(e=>{console.error('FATAL',e.stack||e);process.exitCode=1});
+          NODE

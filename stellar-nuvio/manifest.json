@@ -1,6 +1,6 @@
 {
   "name": "Stellar Local",
-  "version": "1.19.0",
+  "version": "1.19.1",
   "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
   "scrapers": [
     {
@@ -129,7 +129,7 @@
     {
       "id": "stellar-netmirror",
       "name": "Stellar · NetMirror",
-      "description": "NetMirror 当前 mobile playlist 本地解析。自动在 Netflix / Prime Video / Hotstar/Disney+ 镜像中查找，返回 Auto/1080p/720p/480p HLS，并保留多语言音轨与字幕。",
+      "description": "NetMirror mobile playlist 本地解析。Netflix / Prime Video / Hotstar/Disney+ 候选会在设备本机继续验证 master.m3u8 与首个 variant.m3u8，避免显示 master 可开但真正播放 403 的假可用源；网络/地区依赖较强。",
       "version": "1.0.0",
       "author": "Stellar Local",
       "supportedTypes": [
@@ -144,7 +144,7 @@
       "contentLanguage": [
         "multi"
       ],
-      "limited": false
+      "limited": true
     },
     {
       "id": "stellar-cineby",
@@ -189,7 +189,7 @@
     {
       "id": "stellar-mapple",
       "name": "Stellar · Mapple",
-      "description": "Mapple 本地签名 HLS。支持电影/剧集、多镜像、Auto/1080p/2160p 等清晰度；最终 HLS 已真实验证。",
+      "description": "Mapple 本地签名 HLS。当前上游会对 GitHub 数据中心出口返回 403，因此无法用 CI 代表手机网络；本地版已同步 18 个 hoster，并由 Nuvio 设备直接请求。",
       "version": "1.0.0",
       "author": "Stellar Local",
       "supportedTypes": [
@@ -204,7 +204,7 @@
       "contentLanguage": [
         "multi"
       ],
-      "limited": false
+      "limited": true
     },
     {
       "id": "stellar-vidlink",

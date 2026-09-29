@@ -66,6 +66,9 @@ jobs:
         continue-on-error: true
         working-directory: stellar-nuvio
         run: node live-netmirror.js
+      - name: PurStream live probe
+        working-directory: stellar-nuvio
+        run: node live-purstream.js
       - name: Validate manifest
         run: |
           node - <<'NODE'

@@ -60,14 +60,14 @@ function flattenSearch(value,path,out){
 function rowTypeOK(row,type){
   var p=clean(row&&row.__path).toLowerCase();
   var t=clean(row&&(row.type||row.media_type||row.mediaType)).toLowerCase();
-  if(type==="movie"){
-    if(/series|tv|show|anime/.test(p))return false;
-    if(t&&t!=="movie"&&t!=="film")return false;
-  }else{
-    if(/movie|films?/.test(p))return false;
-    if(t&&t==="movie")return false;
+  // PurStream currently places TV rows inside data.items.movies.items.
+  // Trust an explicit item type first; use collection path only when type is absent.
+  if(t){
+    if(type==="movie")return t==="movie"||t==="film";
+    return t==="tv"||t==="series"||t==="show";
   }
-  return true;
+  if(type==="movie")return !/series|tv|show|anime/.test(p);
+  return !/movie|films?/.test(p);
 }
 function pick(rows,meta){
   var wanted=[meta.title,meta.originalTitle].filter(Boolean).map(norm);

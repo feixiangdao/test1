@@ -291,6 +291,7 @@ function getPlaybackSession(tmdbId, mediaType, tvSlug, mediaReferer, cookieJar) 
       body: ""
     });
     cookieJar.update(tokenRes);
+    console.log("[Stellar/Mapple] token status=" + tokenRes.status + " cookie=" + (cookieJar.getCookieString() ? "yes" : "no"));
     if (!tokenRes.ok)
       return null;
     const tokenData = yield tokenRes.json();
@@ -313,9 +314,12 @@ function getPlaybackSession(tmdbId, mediaType, tvSlug, mediaReferer, cookieJar) 
       body: JSON.stringify(initPayload)
     });
     cookieJar.update(playbackRes);
-    if (!playbackRes.ok)
+    if (!playbackRes.ok) {
+      console.log("[Stellar/Mapple] init status=" + playbackRes.status);
       return null;
+    }
     const initData = yield playbackRes.json();
+    console.log("[Stellar/Mapple] init success=" + !!initData.success + " pow=" + !!initData.requiresPow + " token=" + !!initData.token);
     let playbackToken = null;
     if (initData.success && initData.token) {
       playbackToken = initData.token;
@@ -339,6 +343,9 @@ function getPlaybackSession(tmdbId, mediaType, tvSlug, mediaReferer, cookieJar) 
       if (powRes.ok) {
         const powData = yield powRes.json();
         playbackToken = powData == null ? void 0 : powData.token;
+        console.log("[Stellar/Mapple] pow status=" + powRes.status + " token=" + !!playbackToken);
+      } else {
+        console.log("[Stellar/Mapple] pow status=" + powRes.status);
       }
     }
     if (!playbackToken)
@@ -368,11 +375,15 @@ function extractHosterStream(hoster, tmdbId, mediaType, tvSlug, mediaReferer, se
           requestToken: session.requestToken
         })
       });
-      if (!encRes.ok)
+      if (!encRes.ok) {
+        console.log("[Stellar/Mapple] " + hoster.name + " encrypt status=" + encRes.status);
         return [];
+      }
       const encData = yield encRes.json();
-      if (!(encData == null ? void 0 : encData.url))
+      if (!(encData == null ? void 0 : encData.url)) {
+        console.log("[Stellar/Mapple] " + hoster.name + " encrypt path=no");
         return [];
+      }
       const streamEndpoint = `${BASE_URL}${encData.url}&requestToken=${encodeURIComponent(session.requestToken)}&token=${encodeURIComponent(session.playbackToken)}`;
       const streamRes = yield fetch(streamEndpoint, {
         headers: __spreadProps(__spreadValues({}, API_HEADERS), {
@@ -380,9 +391,12 @@ function extractHosterStream(hoster, tmdbId, mediaType, tvSlug, mediaReferer, se
           "Cookie": cookieJar.getCookieString()
         })
       });
-      if (!streamRes.ok)
+      if (!streamRes.ok) {
+        console.log("[Stellar/Mapple] " + hoster.name + " stream status=" + streamRes.status);
         return [];
+      }
       const streamData = yield streamRes.json();
+      console.log("[Stellar/Mapple] " + hoster.name + " stream success=" + !!(streamData && streamData.success) + " url=" + !!(streamData && streamData.data && streamData.data.stream_url));
       const streamUrl = (_a = streamData == null ? void 0 : streamData.data) == null ? void 0 : _a.stream_url;
       if (!(streamData == null ? void 0 : streamData.success) || !streamUrl || streamUrl.includes("playback-unavailable")) {
         return [];

@@ -14,16 +14,7 @@ async function media(label,row){
 async function one(label,id,type,s,e){
   const rows=await p.getStreams(id,type,s,e);
   console.log('[PurStream live]',label,'rows='+rows.length);
-  if(!rows.length){
-    try{
-      const metaUrl='https://api.themoviedb.org/3/'+(type==='tv'?'tv':'movie')+'/'+id+'?api_key=68e094699525b18a70bab2f86b1fa706&language=en-US';
-      const md=await (await fetch(metaUrl)).json();
-      const title=type==='tv'?md.name:md.title;
-      const sr=await fetch('https://api.purstream.ad/api/v1/search-bar/search/'+encodeURIComponent(title),{headers:{Accept:'application/json,text/plain,*/*',Origin:'https://purstream.ad',Referer:'https://purstream.ad/','User-Agent':'Mozilla/5.0'}});
-      console.log('[PurStream debug]',label,'searchStatus='+sr.status,'body='+(await sr.text()).slice(0,12000));
-    }catch(e){console.log('[PurStream debug]',label,e.message)}
-    throw new Error(label+' no streams');
-  }
+  if(!rows.length)throw new Error(label+' no streams');
   for(const x of rows.slice(0,3))await media(label,x);
 }
 (async()=>{

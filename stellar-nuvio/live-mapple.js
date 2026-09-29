@@ -1,15 +1,4 @@
 const m=require('./providers/mapple.js');
-const _nativeFetch=global.fetch;
-global.fetch=async function(input,opts){
-  const r=await _nativeFetch(input,opts);
-  try{
-    const u=new URL(String(input));
-    if(u.hostname==='mapple.fun'){
-      console.log('MAP_STAGE',opts&&opts.method||'GET',u.pathname,r.status,r.headers.get('content-type')||'');
-    }
-  }catch(_){}
-  return r;
-};
 
 async function probe(type,id,s,e){
   const rows=await m.getStreams(id,type,s,e);

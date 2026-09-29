@@ -27,8 +27,12 @@
 - Stellar · Vidlink
 - Stellar · ZXCStreams
 - Stellar · OneTouchTV
+- Stellar · 4KHDHub
+- Stellar · UHDMovies
+- Stellar · DVDPlay（仅 TV，limited）
+- Stellar · PurStream
 
-MP4Hydra 当前上游处于维护状态，没有加入。
+未注册研究候选目前包括 HDHub4U。MP4Hydra 当前上游处于维护状态，没有加入。
 
 ## 安装地址
 
@@ -134,8 +138,37 @@ Resshin 虽然 API 能返回 MP4，但最终 `api1.zxcstream.xyz` 当前实测 H
 因此该源标记为 `limited: true`：宁可缺源，也不返回错片。
 
 
-### DVDPlay research note
+### 4KHDHub
 
-DVDPlay 的直文件链路本身可读（Pixeldrain / Cloudflare R2 可返回 HTTP 206），但当前站点搜索接口对多个不存在于片库的英文片名会退回最新内容，而上游 Provider 又把查询标题误当成搜索结果标题，存在严重错片风险。剧集还需要按 Season / Episode 精确选择。
+4KHDHub 作为高画质直文件补充源启用，并标记为 `limited: true`。
 
-因此 **v1.15.1 已撤下 DVDPlay 正式 Provider**。在严格标题/年份/季/集匹配完成前，不把它暴露给 Nuvio。
+当前实现会在返回给 Nuvio 前做 Range 媒体预检，只保留真正可读的 MKV/直文件，自动丢弃 HubCloud 302、403、404 等中间页或失效链接。电影覆盖明显好于剧集，因此不作为主源。
+
+### UHDMovies
+
+UHDMovies 已适配当前 LinkPilot / DriveSeed 链路，并标记为 `limited: true`。
+
+已验证 Fight Club 和 Game of Thrones S01E01 均可解析到实际 Google 视频 MKV；电影可出现 1080p/2160p，剧集也能返回 1080p/2160p。失效的 VideoSeed token 会自动丢弃，不把 HTML 中间页交给播放器。
+
+### DVDPlay
+
+DVDPlay 已重新启用，但仅声明 `tv`，并保持 `limited: true`。
+
+当前版本已经修复旧实现“搜索不到目标时误选最新内容”的错片问题，并且在网络预检前先按 Season / Episode 精确过滤。已验证 Squid Game S03E01 / S03E02 能返回 Pixeldrain 1080p/720p MKV。
+
+旧季与部分片库覆盖仍不完整，因此不开放 movie 类型。
+
+### PurStream
+
+PurStream 是当前较干净的 HLS 补充源：严格按 TMDB 标题/年份匹配，直接返回 master.m3u8，不经过网页播放器。
+
+当前 CI 实测 Interstellar、Fight Club、Breaking Bad S01E01、Game of Thrones S01E01 均返回 1 条 720p HLS，HTTP 206 且包含有效 `#EXTM3U`。
+
+### CI / 健康检查
+
+主 CI 现在将两类检查分开：
+
+- 语法、manifest、一致性和本地 helper tests：必须通过；
+- 第三方实时源探针：继续执行并记录结果，但临时上游故障不会再把整个主分支打红。
+
+同时实时探针日志只保留状态码、Host、Content-Type 等必要信息，不再打印完整签名媒体 URL。

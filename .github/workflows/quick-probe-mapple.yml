@@ -1,0 +1,39 @@
+name: Quick Probe Mapple
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/quick-probe-mapple.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save crypto-js
+      - name: Probe Mapple
+        working-directory: stellar-nuvio
+        run: |
+          node - <<'NODE'
+          globalThis.TMDB_API_KEY='68e094699525b18a70bab2f86b1fa706';
+          const p=require('./providers/mapple.js');
+          (async()=>{
+            const rows=await Promise.race([
+              p.getStreams('550','movie'),
+              new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),30000))
+            ]);
+            console.log('ROWS',rows.length,rows.slice(0,20).map(x=>({name:x.name,quality:x.quality,host:new URL(x.url).host})));
+            for(const x of rows.slice(0,4)){
+              try{
+                const r=await fetch(x.url,{headers:x.headers||{},redirect:'manual',signal:AbortSignal.timeout(7000)});
+                const t=await r.text();
+                console.log('MEDIA',x.name,r.status,r.headers.get('content-type'),new URL(x.url).host,'extm3u',t.includes('#EXTM3U'),'len',t.length);
+              }catch(e){console.log('MEDIAERR',x.name,e.message)}
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

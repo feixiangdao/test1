@@ -1,0 +1,84 @@
+name: Diagnose Mapple Stream API
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/diagnose-mapple-stream-api.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Diagnose Mapple stream API
+        run: |
+          node - <<'NODE'
+          const crypto=require('crypto');
+          const BASE='https://mapple.fun';
+          const UA='Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/135 Mobile Safari/537.36';
+          let jar={};
+          function update(res){
+            let arr=[]; try{arr=res.headers.getSetCookie?res.headers.getSetCookie():[]}catch(_){}
+            for(const raw of arr){
+              const pair=raw.split(';')[0],p=pair.indexOf('=');
+              if(p>0)jar[pair.slice(0,p).trim()]=pair.slice(p+1).trim();
+            }
+          }
+          function cookie(){return Object.entries(jar).map(([k,v])=>k+'='+v).join('; ')}
+          async function call(label,url,opt={}){
+            const h={...(opt.headers||{}),'User-Agent':UA};
+            if(cookie())h.Cookie=cookie();
+            const r=await fetch(url,{...opt,headers:h,redirect:'manual',signal:AbortSignal.timeout(7000)});
+            update(r);
+            const t=await r.text();
+            console.log(label,r.status,r.headers.get('content-type'),'len',t.length,'json',t.slice(0,280).replace(/\s+/g,' '));
+            let j=null; try{j=JSON.parse(t)}catch(_){}
+            return {r,t,j};
+          }
+          function solve(challenge,difficulty){
+            for(let n=0;n<5000000;n++){
+              const b=crypto.createHash('sha256').update(challenge+String(n)).digest();
+              let z=0;
+              for(const x of b){
+                if(x===0){z+=8;continue}
+                for(let bit=7;bit>=0;bit--){if(x&(1<<bit))break;z++}
+                break;
+              }
+              if(z>=difficulty)return String(n);
+            }
+            throw new Error('pow not found');
+          }
+          (async()=>{
+            const ref=BASE+'/movie/550';
+            await call('HOME',BASE+'/',{headers:{Accept:'text/html,*/*'}});
+            const tok=await call('TOKEN',BASE+'/api/request-token',{method:'POST',headers:{Accept:'*/*',Origin:BASE,Referer:ref,'Content-Type':'application/json'},body:''});
+            const requestToken=tok.j&&tok.j.token;
+            if(!requestToken)return;
+            const payload={mediaId:550,mediaType:'movie',tv_slug:'',requestToken};
+            const init=await call('INIT1',BASE+'/api/playback-init',{method:'POST',headers:{Accept:'*/*',Origin:BASE,Referer:ref,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+            if(!init.j)return;
+            let playbackToken=init.j.token||'';
+            if(init.j.requiresPow&&init.j.pow){
+              const n=solve(init.j.pow.challenge,init.j.pow.difficulty);
+              console.log('POW_SOLVED','difficulty',init.j.pow.difficulty,'nonceDigits',n.length);
+              const init2=await call('INIT2',BASE+'/api/playback-init',{method:'POST',headers:{Accept:'*/*',Origin:BASE,Referer:ref,'Content-Type':'application/json'},body:JSON.stringify({...payload,pow:{challengeId:init.j.pow.challengeId,nonce:n}})});
+              playbackToken=init2.j&&init2.j.token||'';
+              console.log('PLAYBACK_TOKEN',!!playbackToken);
+            }
+            if(!playbackToken)return;
+            for(const hst of [{name:'Zeus',key:'mapple'},{name:'Poseidon',key:'s25'},{name:'Athena',key:'s2'}]){
+              const enc=await call('ENC_'+hst.name,BASE+'/api/encrypt',{method:'POST',headers:{Accept:'*/*',Origin:BASE,Referer:ref,'Content-Type':'application/json'},body:JSON.stringify({data:{mediaId:550,mediaType:'movie',tv_slug:'',source:hst.key},endpoint:'stream-encrypted',requestToken})});
+              const path=enc.j&&enc.j.url;
+              console.log('ENC_PATH_'+hst.name,!!path);
+              if(!path)continue;
+              const sep=path.includes('?')?'&':'?';
+              const endpoint=BASE+path+sep+'requestToken='+encodeURIComponent(requestToken)+'&token='+encodeURIComponent(playbackToken);
+              const st=await call('STREAM_'+hst.name,endpoint,{headers:{Accept:'*/*',Origin:BASE,Referer:ref}});
+              console.log('STREAM_OK_'+hst.name,!!(st.j&&st.j.success),'HAS_URL',!!(st.j&&st.j.data&&st.j.data.stream_url));
+            }
+          })().catch(e=>{console.error('ERR',e.message);process.exitCode=1});
+          NODE

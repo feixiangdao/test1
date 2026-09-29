@@ -1,4 +1,4 @@
-name: Probe Next Direct Candidates
+name: Probe Next Direct Candidate
 
 on:
   workflow_dispatch:
@@ -9,57 +9,47 @@ on:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install dependencies
-        run: npm install cheerio-without-node-native@0.20.2 crypto-js@4.2.0 request@2.88.2 --no-save
-      - name: Fetch providers
+      - name: Fetch DesiFlix
         run: |
-          mkdir -p ./_probe/phisher
-          for f in istreamflare multimovies cinefreak netcinez movies4u; do
-            curl -fsSL "https://raw.githubusercontent.com/phisher98/phisher-nuvio-providers/main/providers/$f.js" -o "./_probe/phisher/$f.js"
-          done
-      - name: Probe
+          mkdir -p ./_probe
+          curl -fsSL https://raw.githubusercontent.com/NuvioPlugin/All-in-One-Nuvio/main/providers/desiflix.js -o ./_probe/desiflix.js
+      - name: Probe DesiFlix
         run: |
           node - <<'NODE'
-          async function media(name,label,x){
-            if(!x||!x.url)return;
+          const p=require('./_probe/desiflix.js');
+          async function one(label,id,type,s,e){
             try{
-              const r=await fetch(x.url,{
-                headers:{...(x.headers||{}),Range:'bytes=0-4095','User-Agent':(x.headers&&x.headers['User-Agent'])||'Mozilla/5.0'},
-                redirect:'manual',signal:AbortSignal.timeout(12000)
-              });
-              const ct=r.headers.get('content-type')||'';
-              let bytes=0,prefix='';
-              if(r.status===206 || /mpegurl|json|text|octet|video/i.test(ct)){
-                const b=Buffer.from(await r.arrayBuffer());bytes=b.length;prefix=b.subarray(0,120).toString('utf8').replace(/\s+/g,' ');
-              }
-              console.log('MEDIA',name,label,x.quality||'',r.status,ct,new URL(x.url).host,'bytes',bytes,'loc',r.headers.get('location'),'prefix',prefix);
-            }catch(e){console.log('MEDIAERR',name,label,e.message)}
-          }
-          async function test(name){
-            try{
-              const p=require('./_probe/phisher/'+name+'.js');
-              const fn=p.getStreams||p.default?.getStreams;
-              if(!fn){console.log('NOFN',name);return}
-              for(const q of [
-                ['550','movie',null,null,'Fight Club'],
-                ['1399','tv',1,1,'GOT S1E1']
-              ]){
+              const rows=await Promise.race([
+                p.getStreams(id,type,s,e),
+                new Promise((_,rej)=>setTimeout(()=>rej(new Error('provider timeout')),25000))
+              ]);
+              console.log('ROWS',label,(rows||[]).length,(rows||[]).slice(0,8).map(x=>({
+                name:x.name,quality:x.quality,
+                host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()
+              })));
+              for(const x of (rows||[]).slice(0,3)){
                 try{
-                  const rows=await Promise.race([
-                    fn(q[0],q[1],q[2],q[3]),
-                    new Promise((_,rej)=>setTimeout(()=>rej(new Error('provider timeout')),50000))
-                  ]);
-                  console.log('ROWS',name,q[4],(rows||[]).length,(rows||[]).slice(0,10).map(x=>({name:x.name,title:x.title,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
-                  for(const x of (rows||[]).slice(0,5))await media(name,q[4],x);
-                }catch(e){console.log('ERR',name,q[4],e.stack||e.message)}
+                  const h={...(x.headers||{}),Range:'bytes=0-2047'};
+                  const r=await fetch(x.url,{headers:h,redirect:'manual',signal:AbortSignal.timeout(7000)});
+                  const ct=r.headers.get('content-type')||'';
+                  let prefix='',bytes=0;
+                  if(r.status===200||r.status===206){
+                    const b=Buffer.from(await r.arrayBuffer());bytes=b.length;
+                    prefix=b.subarray(0,80).toString('utf8').replace(/\s+/g,' ');
+                  }
+                  console.log('MEDIA',label,r.status,ct,new URL(x.url).host,'bytes',bytes,'prefix',prefix);
+                }catch(err){console.log('MEDIAERR',label,err.message)}
               }
-            }catch(e){console.log('LOADERR',name,e.stack||e.message)}
+            }catch(e){console.log('ERR',label,e.message)}
           }
-          (async()=>{for(const n of ['istreamflare','multimovies','cinefreak','netcinez','movies4u'])await test(n)})().catch(e=>{console.error('FATAL',e.stack||e);process.exitCode=1});
+          (async()=>{
+            await one('Fight Club','550','movie');
+            await one('GOT S1E1','1399','tv',1,1);
+          })().catch(e=>{console.error(e);process.exitCode=1});
           NODE

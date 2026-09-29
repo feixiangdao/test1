@@ -68,17 +68,16 @@ Keep unregistered. Strict title/year/season matching and Range validation were t
 ## Next candidates to reassess
 
 ### CineFreak
-- Declares direct MKV/MP4 for movie and TV.
-- Uses TMDB metadata plus WordPress search and title scoring.
-- Core provider last materially updated 2026-06-19.
-- Do not promote without current direct-media evidence and wrong-title regression tests.
+Current reassessment: do not promote.
+- Fight Club, Inception, Game of Thrones S01E01 and Squid Game S01E01 all returned 0.
+- TMDB lookup succeeded, but CineFreak search returned no results for all four titles.
+- Keep deferred until the upstream catalog/search path changes.
 
 ### CTGMovies
-- Declares M3U8/MP4/MKV for movie and TV.
-- Current code uses ctgmovies.com plus an API base at cockpit.103.109.92.178.nip.io.
-- Has title normalization/year metadata and optional auth fields.
-- Core provider last materially updated 2026-07-04.
-- Do not promote without confirming the current API and strict movie/TV matching.
+Current reassessment: do not promote.
+- Fight Club, Inception, Game of Thrones S01E01 and Squid Game S01E01 all returned 0.
+- Current API calls to /movies, /tv and /anime fail in the test environment.
+- The configured API base remains cockpit.103.109.92.178.nip.io; do not register until a reachable backend is confirmed.
 
 ## CI policy
 

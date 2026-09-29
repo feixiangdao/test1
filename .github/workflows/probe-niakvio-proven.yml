@@ -1,0 +1,85 @@
+name: Probe NiakVIO Proven Providers
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-niakvio-proven.yml'
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [purstream, playimdb, streamzo, hindmoviez, kehflix, coflix]
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve current provider path
+        env:
+          PROVIDER: ${{ matrix.provider }}
+        run: |
+          node - <<'NODE' > /tmp/provider_path
+          const p=process.env.PROVIDER;
+          const paths={
+            purstream:'providers/purstream--nuvio--37df0e3f282528a4.js',
+            playimdb:'providers/playimdb--nuvio--07c35af88dbac223.js',
+            streamzo:'providers/streamzo--nuvio--3d4fb0aaf982e7a2.js',
+            hindmoviez:'providers/hindmoviez--nuvio--aab858140e2e0313.js',
+            kehflix:'providers/kehflix--nuvio--f78f6d1d5adf8cfc.js',
+            coflix:'providers/coflix--nuvio--b5e3038ca546dbe1.js'
+          };
+          process.stdout.write(paths[p]||'');
+          NODE
+          mkdir -p ./_probe
+          curl -fsSL "https://raw.githubusercontent.com/niakw/NiakVIO/main/$(cat /tmp/provider_path)" -o ./_probe/provider.js
+      - name: Probe streams
+        env:
+          PROVIDER: ${{ matrix.provider }}
+        run: |
+          node - <<'NODE'
+          globalThis.SCRAPER_SETTINGS={};
+          globalThis.SCRAPER_ID=process.env.PROVIDER;
+          globalThis.TMDB_API_KEY='68e094699525b18a70bab2f86b1fa706';
+          global.SCRAPER_SETTINGS=globalThis.SCRAPER_SETTINGS;
+          global.SCRAPER_ID=globalThis.SCRAPER_ID;
+          global.TMDB_API_KEY=globalThis.TMDB_API_KEY;
+          const name=process.env.PROVIDER;
+          function fnOf(p){return p?.getStreams||p?.default?.getStreams||globalThis.getStreams||global.getStreams}
+          async function media(label,x){
+            if(!x||!x.url)return;
+            try{
+              const h={...(x.headers||{}),...(x.behaviorHints?.proxyHeaders?.request||{}),Range:'bytes=0-4095'};
+              if(!h['User-Agent'])h['User-Agent']='Mozilla/5.0';
+              const r=await fetch(x.url,{headers:h,redirect:'manual',signal:AbortSignal.timeout(12000)});
+              const ct=r.headers.get('content-type')||'';
+              let b=Buffer.alloc(0);
+              if(r.status===206||/mpegurl|dash|xml|octet|video|text/i.test(ct))b=Buffer.from(await r.arrayBuffer());
+              console.log('MEDIA',name,label,x.quality||'',r.status,ct,new URL(x.url).host,'bytes',b.length,'loc',r.headers.get('location'),'prefix',b.subarray(0,100).toString('utf8').replace(/\s+/g,' '));
+            }catch(e){console.log('MEDIAERR',name,label,e.message)}
+          }
+          (async()=>{
+            let p;try{p=require('./_probe/provider.js')}catch(e){console.log('LOADERR',name,e.stack||e);return}
+            const fn=fnOf(p); if(!fn){console.log('NOFN',name);return}
+            const qs=[
+              ['157336','movie',null,null,'Interstellar'],
+              ['1396','tv',1,1,'Breaking Bad S1E1'],
+              ['550','movie',null,null,'Fight Club'],
+              ['1399','tv',1,1,'GOT S1E1']
+            ];
+            for(const q of qs){
+              try{
+                const rows=await Promise.race([
+                  fn(q[0],q[1],q[2],q[3]),
+                  new Promise((_,rej)=>setTimeout(()=>rej(new Error('provider timeout')),45000))
+                ]);
+                console.log('ROWS',name,q[4],Array.isArray(rows)?rows.length:-1,(rows||[]).slice(0,12).map(x=>({name:x.name,title:x.title,quality:x.quality,type:x.type,url:x.url,headers:x.headers})));
+                for(const x of (rows||[]).slice(0,4)) await media(q[4],x);
+              }catch(e){console.log('ERR',name,q[4],e.stack||e.message)}
+            }
+          })().catch(e=>{console.error('FATAL',e.stack||e);process.exitCode=1});
+          NODE

@@ -66,7 +66,7 @@ var __async = (__this, __arguments, generator) => {
 var BASE_URL = "https://mapple.fun";
 var SUBTITLE_BASE = "https://sub.wyzie.io";
 var TMDB_BASE_URL = "https://api.themoviedb.org/3";
-var TMDB_API_KEY = "439c478a771f35c05022f9feabcca01c";
+var TMDB_API_KEY = (typeof globalThis !== "undefined" && globalThis.TMDB_API_KEY) ? globalThis.TMDB_API_KEY : "439c478a771f35c05022f9feabcca01c";
 var DEFAULT_USER_AGENT = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Mobile Safari/537.36";
 var API_HEADERS = {
   "User-Agent": DEFAULT_USER_AGENT,
@@ -81,7 +81,23 @@ var PLAYBACK_HEADERS = {
 };
 var HOSTERS = [
   { name: "Zeus", key: "mapple" },
-  { name: "Athena", key: "s2" }
+  { name: "Poseidon", key: "s25" },
+  { name: "Athena", key: "s2" },
+  { name: "Hera", key: "s4" },
+  { name: "Persephone", key: "s12" },
+  { name: "Apollo", key: "s19" },
+  { name: "Artemis", key: "s13" },
+  { name: "Hermes", key: "s26" },
+  { name: "Ares", key: "s24" },
+  { name: "Aphrodite", key: "s6" },
+  { name: "Hephaestus", key: "s15" },
+  { name: "Demeter", key: "s7" },
+  { name: "Dionysus", key: "s8" },
+  { name: "Hestia", key: "s3" },
+  { name: "Hades", key: "s16" },
+  { name: "Nike", key: "s5" },
+  { name: "Atlas", key: "s1" },
+  { name: "Prometheus", key: "s10" }
 ]
 
 // src/mapple/pow.js

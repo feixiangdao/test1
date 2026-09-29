@@ -68,7 +68,7 @@ var import_cheerio_without_node_native2 = __toESM(require("cheerio-without-node-
 // src/uhdmovies/constants.js
 var DOMAINS_URL = "https://raw.githubusercontent.com/phisher98/TVVVV/refs/heads/main/domains.json";
 var FALLBACK_DOMAIN = "https://uhdmovies.pink";
-var TMDB_API_KEY = "1865f43a0549ca50d341dd9ab8b29f49";
+var TMDB_API_KEY = (typeof globalThis !== "undefined" && globalThis.TMDB_API_KEY) ? globalThis.TMDB_API_KEY : "1865f43a0549ca50d341dd9ab8b29f49";
 var TMDB_BASE_URL = "https://api.themoviedb.org/3";
 var HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -233,6 +233,7 @@ function resolveLinkPilot(url) {
         method: "POST",
         headers: __spreadProps(__spreadValues({}, HEADERS), {
           "Referer": url,
+          "Cookie": "lp_ck_test=1",
           "Content-Type": "application/x-www-form-urlencoded"
         }),
         body: encodeForm(f1.fields)

@@ -427,11 +427,18 @@ function getStreams(tmdbId, mediaType, seasonNum = null, episodeNum = null) {
     const session = yield getPlaybackSession(tmdbId, type, tvSlug, mediaReferer, cookieJar);
     if (!session)
       return [];
-    const hosterPromises = HOSTERS.map(
-      (hoster) => extractHosterStream(hoster, tmdbId, type, tvSlug, mediaReferer, session, cookieJar, mediaTitle, subtitles)
-    );
-    const hosterResults = yield Promise.all(hosterPromises);
-    const allStreams = hosterResults.flat();
+    const allStreams = [];
+    var successfulHosters = 0;
+    for (const hoster of HOSTERS) {
+      const rows = yield extractHosterStream(hoster, tmdbId, type, tvSlug, mediaReferer, session, cookieJar, mediaTitle, subtitles);
+      if (rows && rows.length) {
+        allStreams.push(...rows);
+        successfulHosters++;
+        // Mapple currently behaves better with sequential requests on one playback session.
+        // Two working mirrors are enough; avoid hammering all 18 hosters and reduce latency.
+        if (successfulHosters >= 2) break;
+      }
+    }
     const seen = /* @__PURE__ */ new Set();
     const uniqueStreams = [];
     allStreams.forEach((stream) => {

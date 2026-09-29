@@ -23,6 +23,9 @@ jobs:
             echo "Checking $f"
             node --check "$f"
           done
+      - name: PurStream live probe
+        working-directory: stellar-nuvio
+        run: node live-purstream.js
       - name: MovieBox helper tests
         working-directory: stellar-nuvio
         run: node test-moviebox-mobile.js
@@ -66,9 +69,6 @@ jobs:
         continue-on-error: true
         working-directory: stellar-nuvio
         run: node live-netmirror.js
-      - name: PurStream live probe
-        working-directory: stellar-nuvio
-        run: node live-purstream.js
       - name: Validate manifest
         run: |
           node - <<'NODE'

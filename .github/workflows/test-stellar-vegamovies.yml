@@ -1,0 +1,49 @@
+name: Test Stellar VegaMovies
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/test-stellar-vegamovies.yml'
+      - 'stellar-nuvio/providers/vegamovies.js'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install cheerio-without-node-native@0.20.2 --no-save
+      - name: Test official provider
+        env:
+          NODE_PATH: ${{ github.workspace }}/node_modules
+        run: |
+          node - <<'NODE'
+          globalThis.TMDB_API_KEY='68e094699525b18a70bab2f86b1fa706';
+          global.TMDB_API_KEY=globalThis.TMDB_API_KEY;
+          const p=require('./stellar-nuvio/providers/vegamovies.js');
+          async function one(label,id,type,s,e,required){
+            const rows=await Promise.race([
+              p.getStreams(id,type,s,e),
+              new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+' timeout')),45000))
+            ]);
+            console.log('RESULT',label,'rows='+(rows||[]).length,(rows||[]).map(x=>({
+              quality:x.quality||'',
+              name:x.name||'',
+              host:(()=>{try{return new URL(x.url).host}catch(_){return''}})(),
+              provider:x.provider||''
+            })));
+            if(required && (!rows||!rows.length))throw new Error(label+' expected at least one verified stream');
+            if((rows||[]).some(x=>x.provider!=='stellar-vegamovies'))throw new Error(label+' provider tag mismatch');
+          }
+          (async()=>{
+            await one('Fight Club','550','movie',undefined,undefined,true);
+            await one('Inception','27205','movie',undefined,undefined,true);
+            await one('GOT S1E1','1399','tv',1,1,true);
+            await one('Squid Game S1E1','93405','tv',1,1,true);
+            await one('Squid Game S3E1','93405','tv',3,1,false);
+          })().catch(e=>{console.error(e.stack||e);process.exit(1)});
+          NODE

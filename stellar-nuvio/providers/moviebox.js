@@ -8,7 +8,7 @@ var BASE = "https://apig.inmoviebox.com";
 var API_HOST = "apig.inmoviebox.com";
 var BOOTSTRAP_HOST = "api.inmoviebox.com";
 var TMDB_BASE = "https://api.themoviedb.org/3";
-var TMDB_KEY = "68e094699525b18a70bab2f86b1fa706";
+var TMDB_KEY = (typeof globalThis !== "undefined" && globalThis.TMDB_API_KEY) ? globalThis.TMDB_API_KEY : "68e094699525b18a70bab2f86b1fa706";
 
 var GATEWAY_SECRET = CryptoJS.enc.Base64.parse("76iRl07s0xSN9jqmEWAt79EBJZulIQIsV64FZr2O");
 var API_UA = "MovieBox/4.0.02 (Android 14; Pixel 6)";

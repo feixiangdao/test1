@@ -10,65 +10,23 @@ on:
 jobs:
   syntax:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+
       - name: Install crypto-js for MovieBox tests
         run: npm install --no-save crypto-js
+
       - name: Syntax check providers
         run: |
           for f in stellar-nuvio/providers/*.js; do
             echo "Checking $f"
             node --check "$f"
           done
-      - name: PurStream live probe
-        working-directory: stellar-nuvio
-        run: node live-purstream.js
-      - name: MovieBox helper tests
-        working-directory: stellar-nuvio
-        run: node test-moviebox-mobile.js
-      - name: MovieBox signed live probe
-        working-directory: stellar-nuvio
-        run: node live-moviebox-mobile.js
-      - name: CastleTV helper tests
-        working-directory: stellar-nuvio
-        run: node test-castletv.js
-      - name: CastleTV live probe
-        working-directory: stellar-nuvio
-        run: node live-castletv.js
-      - name: VAPlayer helper tests
-        working-directory: stellar-nuvio
-        run: node test-vaplayer.js
-      - name: VAPlayer live probe
-        working-directory: stellar-nuvio
-        run: node live-vaplayer.js
-      - name: Diagnose VidRock
-        working-directory: stellar-nuvio
-        run: node diagnose-vidrock.js
-      - name: Cineby helper tests
-        working-directory: stellar-nuvio
-        run: node test-cineby.js
-      - name: Cineby live local-style probe
-        working-directory: stellar-nuvio
-        run: node live-cineby.js
-      - name: Mapple live probe
-        working-directory: stellar-nuvio
-        run: node live-mapple.js
-      - name: Movix helper tests
-        working-directory: stellar-nuvio
-        run: node test-movix.js
-      - name: Movix live probe
-        working-directory: stellar-nuvio
-        run: node live-movix.js
-      - name: NetMirror helper tests
-        working-directory: stellar-nuvio
-        run: node test-netmirror.js
-      - name: NetMirror live probe (informational)
-        continue-on-error: true
-        working-directory: stellar-nuvio
-        run: node live-netmirror.js
+
       - name: Validate manifest
         run: |
           node - <<'NODE'
@@ -76,17 +34,95 @@ jobs:
           const m=JSON.parse(fs.readFileSync('stellar-nuvio/manifest.json','utf8'));
           if(m.name!=='Stellar Local') throw new Error('unexpected manifest name');
           if(!Array.isArray(m.scrapers)||m.scrapers.length===0) throw new Error('manifest has no scrapers');
-          const providerFiles=fs.readdirSync('stellar-nuvio/providers').filter(x=>x.endsWith('.js')).sort();
-          const manifestFiles=m.scrapers.map(s=>s.filename.replace(/^providers\//,'')).sort();
-          if(JSON.stringify(providerFiles)!==JSON.stringify(manifestFiles)) {
-            throw new Error('manifest/provider file mismatch: providers='+providerFiles.join(',')+' manifest='+manifestFiles.join(','));
-          }
+
           const ids=new Set();
+          const manifestFiles=new Set();
           for(const s of m.scrapers){
             if(ids.has(s.id)) throw new Error('duplicate id '+s.id);
             ids.add(s.id);
+            if(!s.filename || !/^providers\/.+\.js$/.test(s.filename)) throw new Error('invalid filename for '+s.id);
             const p='stellar-nuvio/'+s.filename;
             if(!fs.existsSync(p)) throw new Error('missing '+p);
+            manifestFiles.add(s.filename.replace(/^providers\//,''));
           }
-          console.log('Stellar Local manifest OK');
+
+          // Deliberately retained research candidate: present in providers/ for syntax checks,
+          // but not exposed to users until reliability is good enough.
+          const allowedUnregistered=new Set(['hdhub4u.js']);
+          const providerFiles=fs.readdirSync('stellar-nuvio/providers').filter(x=>x.endsWith('.js'));
+          const unexpected=providerFiles.filter(x=>!manifestFiles.has(x)&&!allowedUnregistered.has(x));
+          if(unexpected.length) throw new Error('unregistered provider files: '+unexpected.join(','));
+
+          console.log('Stellar Local manifest OK; active='+m.scrapers.length+' candidateExtras='+providerFiles.filter(x=>allowedUnregistered.has(x)).join(','));
           NODE
+
+      - name: MovieBox helper tests
+        working-directory: stellar-nuvio
+        run: node test-moviebox-mobile.js
+
+      - name: CastleTV helper tests
+        working-directory: stellar-nuvio
+        run: node test-castletv.js
+
+      - name: VAPlayer helper tests
+        working-directory: stellar-nuvio
+        run: node test-vaplayer.js
+
+      - name: Cineby helper tests
+        working-directory: stellar-nuvio
+        run: node test-cineby.js
+
+      - name: Movix helper tests
+        working-directory: stellar-nuvio
+        run: node test-movix.js
+
+      - name: NetMirror helper tests
+        working-directory: stellar-nuvio
+        run: node test-netmirror.js
+
+      # Everything below depends on third-party sites/CDNs. A temporary upstream
+      # outage should be visible in the log, but must not make syntax/manifest CI red.
+      - name: PurStream live probe
+        continue-on-error: true
+        working-directory: stellar-nuvio
+        run: node live-purstream.js
+
+      - name: MovieBox signed live probe
+        continue-on-error: true
+        working-directory: stellar-nuvio
+        run: node live-moviebox-mobile.js
+
+      - name: CastleTV live probe
+        continue-on-error: true
+        working-directory: stellar-nuvio
+        run: node live-castletv.js
+
+      - name: VAPlayer live probe
+        continue-on-error: true
+        working-directory: stellar-nuvio
+        run: node live-vaplayer.js
+
+      - name: Diagnose VidRock
+        continue-on-error: true
+        working-directory: stellar-nuvio
+        run: node diagnose-vidrock.js
+
+      - name: Cineby live local-style probe
+        continue-on-error: true
+        working-directory: stellar-nuvio
+        run: node live-cineby.js
+
+      - name: Mapple live probe
+        continue-on-error: true
+        working-directory: stellar-nuvio
+        run: node live-mapple.js
+
+      - name: Movix live probe
+        continue-on-error: true
+        working-directory: stellar-nuvio
+        run: node live-movix.js
+
+      - name: NetMirror live probe
+        continue-on-error: true
+        working-directory: stellar-nuvio
+        run: node live-netmirror.js

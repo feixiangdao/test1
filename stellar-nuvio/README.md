@@ -84,14 +84,21 @@ MovieBox 已改为当前 v4.0.02 移动端协议：
 
 ### NetMirror
 
-NetMirror 已使用当前 mobile playlist 流程接入 Stellar Local：
+NetMirror 已使用当前 mobile playlist 流程接入 Stellar Local，并标记为 `limited: true`：
 
 - 自动尝试 Netflix → Prime Video → Hotstar/Disney+；
 - 电影和剧集均支持；
-- 返回 Auto / 1080p / 720p / 480p HLS（以上游实际提供为准）；
-- HLS 内可包含多语言音轨；
-- 上游 captions 同步作为字幕返回。
+- 候选返回后在 Nuvio 设备本机验证 master.m3u8，并继续验证首个 variant.m3u8；
+- 只有真正可播放的 HLS 才显示，避免“master 能开但 variant 403”导致 buffering；
+- GitHub 数据中心实测 variant 在不同 UA / Referer 组合下均为 403，因此 CI 的 0 条不代表手机网络一定不可用；
+- HLS 内仍保留多语言音轨与上游字幕信息。
 
+
+### Mapple
+
+Mapple 保留为设备网络依赖型补充源，并标记为 `limited: true`。
+
+当前 GitHub Runner 访问 `mapple.fun/` 与 `/api/request-token` 都直接返回 HTTP 403，说明失败发生在会话/token 之前，并非 hoster 解析逻辑本身。Local Provider 已同步当前 18 个 hoster；是否可用以 Android 设备本机网络结果为准。
 
 ### ZXCStreams v1.13
 

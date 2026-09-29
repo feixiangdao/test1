@@ -66,6 +66,11 @@ Keep unregistered. Strict title/year/season matching and Range validation were t
 | Nakios | defer pending API migration | Current maintained source explicitly says the default api.nakios.store sources backend is dead/404 and exposes NUVIO_NAKIOS_API_URL for a future replacement API. Do not register until a new working API is published. |
 | Peachify | defer | Backend aggregation overlaps existing sources and has shown provider churn. |
 | HindMoviez | research only | Candidate exists but is not promoted. |
+| VidSrc.me | reject for now | Current embed pages parsed 0 servers for Fight Club and GOT S1E1. |
+| Xpass | reject for now | Current embed pages no longer expose the expected backups variable; Fight Club and GOT S1E1 both returned 0. |
+| VidLove | reject for now | Fight Club and GOT S1E1 both returned 0 in current quick screen. |
+| Einthusan | verified candidate, unregistered | Regional South Asian movie source. 3 Idiots returned Hindi 1080p/480p and Dangal returned Hindi/Tamil/Telugu variants; sampled 1080p links were HTTP 200 video/mp4. Keep unregistered pending further allowed integration work. |
+| GramCinema | defer | Provider requires a user-supplied `cinemaTvToken` setting; without it getStreams returns 0. Not suitable as a zero-config source. |
 | ZinkMovies | reject for now | Current quick screen returned 0 for Fight Club and GOT S1E1. |
 | MoviesHunt | reject for now | Search returned candidates, but strict matcher rejected Fight Club and GOT S1E1; both returned 0. |
 | Movies4U | reject for now | Current quick screen returned 0 for Fight Club and GOT S1E1. |

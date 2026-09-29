@@ -1,0 +1,62 @@
+name: Diagnose Mapple Session
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/diagnose-mapple-session.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Diagnose session
+        run: |
+          node - <<'NODE'
+          const BASE='https://mapple.fun';
+          const UA='Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/135 Mobile Safari/537.36';
+          let cookie='';
+          function update(res){
+            try{
+              const arr=res.headers.getSetCookie?res.headers.getSetCookie():[];
+              for(const raw of arr){
+                const pair=raw.split(';')[0];
+                if(pair&&pair.includes('=')) cookie+=(cookie?'; ':'')+pair;
+              }
+            }catch(_){}
+          }
+          async function req(label,url,opt={}){
+            const h={...(opt.headers||{}),'User-Agent':UA};
+            if(cookie)h.Cookie=cookie;
+            const r=await fetch(url,{...opt,headers:h,redirect:'manual',signal:AbortSignal.timeout(8000)});
+            update(r);
+            const t=await r.text();
+            console.log(label,r.status,r.headers.get('content-type'),'len',t.length,'loc',r.headers.get('location'),'cookie',!!cookie,'body',t.slice(0,500).replace(/\s+/g,' '));
+            return {r,t};
+          }
+          (async()=>{
+            await req('HOME',BASE+'/',{headers:{Accept:'text/html,*/*'}});
+            const mediaRef=BASE+'/movie/550';
+            const tok=await req('TOKEN',BASE+'/api/request-token',{
+              method:'POST',
+              headers:{Accept:'*/*',Origin:BASE,Referer:mediaRef,'Content-Type':'application/json'},
+              body:''
+            });
+            let token=''; try{token=JSON.parse(tok.t).token||''}catch(_){}
+            console.log('TOKEN_PRESENT',!!token);
+            if(!token)return;
+            const init=await req('INIT',BASE+'/api/playback-init',{
+              method:'POST',
+              headers:{Accept:'*/*',Origin:BASE,Referer:mediaRef,'Content-Type':'application/json'},
+              body:JSON.stringify({mediaId:550,mediaType:'movie',tv_slug:'',requestToken:token})
+            });
+            try{
+              const j=JSON.parse(init.t);
+              console.log('INIT_KEYS',Object.keys(j),'success',j.success,'requiresPow',j.requiresPow,'powDifficulty',j.pow&&j.pow.difficulty);
+            }catch(_){}
+          })().catch(e=>{console.error('ERR',e.message);process.exitCode=1});
+          NODE

@@ -1,0 +1,47 @@
+name: Probe NoTorrent Current
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-notorrent-current.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe addon API
+        run: |
+          node - <<'NODE'
+          const BASE='https://addon-osvh.onrender.com';
+          async function one(label,path){
+            try{
+              const r=await fetch(BASE+path,{headers:{'User-Agent':'Mozilla/5.0'},signal:AbortSignal.timeout(25000)});
+              const t=await r.text();
+              console.log('API',label,r.status,r.headers.get('content-type'),'len',t.length,'prefix',t.slice(0,500));
+              if(!r.ok)return;
+              let d;try{d=JSON.parse(t)}catch(e){console.log('JSONERR',e.message);return}
+              const rows=Array.isArray(d.streams)?d.streams:[];
+              console.log('ROWS',label,rows.length,rows.slice(0,20).map(x=>({name:x.name,title:x.title,url:x.url,externalUrl:x.externalUrl,behaviorHints:x.behaviorHints})));
+              for(const x of rows.filter(x=>x&&x.url).slice(0,8)){
+                try{
+                  const h={...(x.behaviorHints?.headers||{}),...(x.behaviorHints?.proxyHeaders?.request||{}),Range:'bytes=0-4095','User-Agent':'Mozilla/5.0'};
+                  const rr=await fetch(x.url,{headers:h,redirect:'manual',signal:AbortSignal.timeout(12000)});
+                  const ct=rr.headers.get('content-type')||'';
+                  let b=Buffer.alloc(0);
+                  if(rr.status===206||/mpegurl|text|json|octet|video/i.test(ct))b=Buffer.from(await rr.arrayBuffer());
+                  console.log('MEDIA',label,rr.status,ct,new URL(x.url).host,'bytes',b.length,'loc',rr.headers.get('location'),'prefix',b.subarray(0,100).toString('utf8').replace(/\s+/g,' '));
+                }catch(e){console.log('MEDIAERR',label,e.message)}
+              }
+            }catch(e){console.log('ERR',label,e.stack||e.message)}
+          }
+          (async()=>{
+            await one('Fight Club','/stream/movie/tt0137523.json');
+            await one('GOT S1E1','/stream/series/tt0944947:1:1.json');
+          })().catch(e=>{console.error('FATAL',e);process.exitCode=1});
+          NODE

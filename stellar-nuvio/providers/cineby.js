@@ -127,6 +127,25 @@ function qRank(q){
   if(s.indexOf("2160")>=0||s.indexOf("4k")>=0)return 2160;
   var m=s.match(/(\d{3,4})/);return m?parseInt(m[1],10):0;
 }
+function fetchTimed(url,opts,ms){
+  opts=opts||{};
+  var timer=null,signal=null;
+  try{
+    if(typeof AbortSignal!=="undefined"&&typeof AbortSignal.timeout==="function"){
+      signal=AbortSignal.timeout(ms);
+      var copy={};Object.keys(opts).forEach(function(k){copy[k]=opts[k];});
+      copy.signal=signal;opts=copy;
+    }
+  }catch(_){}
+  var timeout=new Promise(function(_,reject){
+    timer=setTimeout(function(){reject(new Error("timeout "+ms+"ms"));},ms);
+  });
+  return Promise.race([fetch(url,opts),timeout]).then(function(r){
+    if(timer)clearTimeout(timer);return r;
+  },function(e){
+    if(timer)clearTimeout(timer);throw e;
+  });
+}
 function tmdbMeta(tmdbId,mediaType){
   var type=mediaType==="tv"?"tv":"movie";
   var url=TMDB+"/"+type+"/"+encodeURIComponent(String(tmdbId))+"?api_key="+encodeURIComponent(TMDB_KEY)+"&append_to_response=external_ids";
@@ -167,13 +186,13 @@ function query(meta,provider,seed){
   };
   var qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+"="+encodeURIComponent(String(params[k]));}).join("&");
   var url=API+"/"+provider.endpoint+"?"+qs;
-  return fetch(url,{headers:{
+  return fetchTimed(url,{headers:{
     "User-Agent":UA,
     "Origin":"https://www.vidking.net",
     "Referer":"https://www.vidking.net/",
     "Cache-Control":"no-cache, no-store, must-revalidate",
     "Pragma":"no-cache"
-  }}).then(function(r){
+  }},7000).then(function(r){
     if(!r.ok)throw new Error(provider.name+" HTTP "+r.status);
     return r.text();
   }).then(function(body){
@@ -199,7 +218,7 @@ function mapSubs(list){
   });
 }
 function hlsProbe(url,headers){
-  return fetch(url,{headers:headers}).then(function(r){
+  return fetchTimed(url,{headers:headers},5000).then(function(r){
     if(!r.ok)return false;
     var ct=clean(r.headers&&r.headers.get&&r.headers.get("content-type")).toLowerCase();
     return r.text().then(function(t){

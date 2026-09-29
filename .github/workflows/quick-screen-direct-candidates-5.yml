@@ -1,0 +1,67 @@
+name: Quick Screen Direct Candidates 5
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/quick-screen-direct-candidates-5.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch candidates
+        run: |
+          mkdir -p ./_probe
+          for f in gramcinema einthusan vidlove xpass vidsrc; do
+            curl -fsSL "https://raw.githubusercontent.com/NuvioPlugin/All-in-One-Nuvio/main/providers/$f.js" -o "./_probe/$f.js"
+          done
+      - name: Quick screen
+        run: |
+          node - <<'NODE'
+          const names=['gramcinema','einthusan','vidlove','xpass','vidsrc'];
+          function withTimeout(p,ms,label){let t;const q=new Promise((_,rej)=>{t=setTimeout(()=>rej(new Error(label+' timeout')),ms)});return Promise.race([p,q]).finally(()=>clearTimeout(t));}
+          function hdr(row){const h={};const p=row?.behaviorHints?.proxyHeaders?.request||{};Object.assign(h,p,row?.headers||{});if(!h['User-Agent']&&!h['user-agent'])h['User-Agent']='Mozilla/5.0 (Linux; Android 14) Chrome/141 Mobile Safari/537.36';return h}
+          async function media(row){
+            const out={host:'',status:0,ct:'',valid:false};
+            try{out.host=new URL(row.url).host}catch(_){return out}
+            const h=hdr(row);
+            try{
+              const r=await fetch(row.url,{method:'HEAD',headers:h,redirect:'manual',signal:AbortSignal.timeout(5000)});
+              out.status=r.status;out.ct=r.headers.get('content-type')||'';
+              if((r.status===200||r.status===206)&&!/html|zip/i.test(out.ct)&&(/video|octet|matroska|mpegurl|dash\+xml/i.test(out.ct)||/\.(mkv|mp4|m3u8|mpd)(?:[?#]|$)/i.test(row.url))){out.valid=true;return out}
+            }catch(_){}
+            try{
+              h.Range='bytes=0-2047';
+              const r=await fetch(row.url,{headers:h,redirect:'manual',signal:AbortSignal.timeout(5000)});
+              out.status=r.status;out.ct=r.headers.get('content-type')||'';
+              if(r.status!==200&&r.status!==206)return out;
+              if(/html|zip/i.test(out.ct))return out;
+              let b=Buffer.alloc(0);if(r.body){const rd=r.body.getReader();const x=await rd.read();if(x.value)b=Buffer.from(x.value);try{await rd.cancel()}catch(_){}}
+              const t=b.subarray(0,256).toString('utf8');
+              out.valid=t.includes('#EXTM3U')||t.includes('<MPD')||(b.length>=4&&b[0]===0x1a&&b[1]===0x45&&b[2]===0xdf&&b[3]===0xa3)||(b.length>=12&&b.subarray(4,8).toString('ascii')==='ftyp')||/video|octet|matroska/i.test(out.ct);
+            }catch(_){}
+            return out;
+          }
+          async function one(name,label,id,type,s,e){
+            try{
+              globalThis.SCRAPER_SETTINGS={};globalThis.SCRAPER_ID=name;globalThis.TMDB_API_KEY='68e094699525b18a70bab2f86b1fa706';global.SCRAPER_SETTINGS=globalThis.SCRAPER_SETTINGS;global.SCRAPER_ID=name;global.TMDB_API_KEY=globalThis.TMDB_API_KEY;
+              const p=require('./_probe/'+name+'.js');const fn=p.getStreams||p.default?.getStreams||globalThis.getStreams||global.getStreams;
+              const rows=await withTimeout(fn(id,type,s,e),15000,name+' '+label);
+              const short=(rows||[]).slice(0,5);
+              console.log('ROWS',name,label,(rows||[]).length,short.map(x=>({name:x.name,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+              if(short[0])console.log('MEDIA',name,label,JSON.stringify(await media(short[0])));
+            }catch(err){console.log('ERR',name,label,err.message)}
+          }
+          (async()=>{
+            for(const n of names){
+              await one(n,'Fight Club','550','movie');
+              await one(n,'GOT S1E1','1399','tv',1,1);
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

@@ -1,0 +1,39 @@
+name: Probe Einthusan Regional
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-einthusan-regional.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          mkdir -p ./_probe
+          curl -fsSL https://raw.githubusercontent.com/NuvioPlugin/All-in-One-Nuvio/main/providers/einthusan.js -o ./_probe/einthusan.js
+      - name: Probe Indian titles
+        run: |
+          node - <<'NODE'
+          globalThis.SCRAPER_SETTINGS={};globalThis.TMDB_API_KEY='68e094699525b18a70bab2f86b1fa706';
+          const p=require('./_probe/einthusan.js');
+          function withTimeout(p,ms,label){let t;const q=new Promise((_,rej)=>{t=setTimeout(()=>rej(new Error(label+' timeout')),ms)});return Promise.race([p,q]).finally(()=>clearTimeout(t));}
+          async function one(label,id){
+            try{
+              const rows=await withTimeout(p.getStreams(id,'movie'),20000,label);
+              console.log('ROWS',label,(rows||[]).length,(rows||[]).slice(0,8).map(x=>({name:x.name,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+              if(rows&&rows[0]){
+                const h={...(rows[0].behaviorHints?.proxyHeaders?.request||{}),...(rows[0].headers||{}),'User-Agent':'Mozilla/5.0 (Linux; Android 14) Chrome/141 Mobile Safari/537.36'};
+                const r=await fetch(rows[0].url,{method:'HEAD',headers:h,redirect:'manual',signal:AbortSignal.timeout(6000)});
+                console.log('MEDIA',label,r.status,r.headers.get('content-type')||'',new URL(rows[0].url).host);
+              }
+            }catch(e){console.log('ERR',label,e.message)}
+          }
+          (async()=>{await one('3 Idiots','20453');await one('Dangal','360814')})().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

@@ -1,0 +1,45 @@
+name: Quick Stellar UHDMovies Resolve
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/quick-stellar-uhdmovies-resolve.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install cheerio-without-node-native@0.20.2 crypto-js@4.2.0 --no-save
+      - name: Resolve only
+        run: |
+          node - <<'NODE'
+          const p=require('./stellar-nuvio/providers/uhdmovies.js');
+          async function one(label,id,type,s,e){
+            const rows=await Promise.race([
+              p.getStreams(id,type,s,e),
+              new Promise((_,rej)=>setTimeout(()=>rej(new Error('resolve timeout')),45000))
+            ]);
+            console.log('ROWS',label,(rows||[]).length,(rows||[]).map(x=>({
+              name:x.name,quality:x.quality,
+              host:(()=>{try{return new URL(x.url).host}catch(_){return''}})(),
+              path:(()=>{try{return new URL(x.url).pathname.slice(0,80)}catch(_){return''}})(),
+              title:x.title
+            })));
+            for(const x of (rows||[]).slice(0,5)){
+              try{
+                const r=await fetch(x.url,{method:'HEAD',headers:{...(x.headers||{}),'User-Agent':'Mozilla/5.0'},redirect:'manual',signal:AbortSignal.timeout(8000)});
+                console.log('HEAD',label,x.quality||'',r.status,r.headers.get('content-type'),r.headers.get('content-length'),new URL(x.url).host);
+              }catch(err){console.log('HEADERR',label,err.message)}
+            }
+          }
+          (async()=>{
+            await one('Fight Club','550','movie');
+            await one('GOT S1E1','1399','tv',1,1);
+          })().catch(e=>{console.error('FATAL',e.stack||e);process.exitCode=1});
+          NODE

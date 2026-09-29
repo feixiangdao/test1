@@ -1,0 +1,56 @@
+name: Probe NetMirror Variant Headers
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-netmirror-variant.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe variant header matrix
+        working-directory: stellar-nuvio
+        run: |
+          node - <<'NODE'
+          const p=require('./providers/netmirror.js');
+          async function req(label,url,headers){
+            try{
+              const r=await fetch(url,{headers,redirect:'manual',signal:AbortSignal.timeout(6000)});
+              const text=await r.text();
+              console.log(label,r.status,r.headers.get('content-type'),new URL(url).host,'extm3u',text.includes('#EXTM3U'),'len',text.length);
+              return {status:r.status,text};
+            }catch(e){
+              console.log(label,'ERR',e.message); return null;
+            }
+          }
+          (async()=>{
+            const rows=await p.getStreams('550','movie');
+            console.log('ROWS',rows.length,rows.map(x=>({name:x.name,quality:x.quality,host:new URL(x.url).host})));
+            const row=rows.find(x=>x.quality==='1080p')||rows[0];
+            if(!row)throw new Error('no row');
+            const master=await req('MASTER',row.url,row.headers||{});
+            if(!master||!master.text.includes('#EXTM3U'))return;
+            const lines=master.text.split(/\r?\n/).filter(Boolean);
+            let variant='';
+            for(let i=0;i<lines.length;i++){
+              if(lines[i].startsWith('#EXT-X-STREAM-INF')&&lines[i+1]&&!lines[i+1].startsWith('#')){
+                variant=new URL(lines[i+1],row.url).href; break;
+              }
+            }
+            if(!variant){console.log('NO_VARIANT');return}
+            const ua=(row.headers||{})['User-Agent']||'Mozilla/5.0';
+            const masterOrigin=new URL(row.url).origin;
+            await req('CURRENT',variant,row.headers||{});
+            await req('UA_ONLY',variant,{'User-Agent':ua});
+            await req('NO_HEADERS',variant,{});
+            await req('MASTER_REF',variant,{'User-Agent':ua,'Referer':row.url});
+            await req('MASTER_ORIGIN',variant,{'User-Agent':ua,'Referer':masterOrigin+'/'});
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

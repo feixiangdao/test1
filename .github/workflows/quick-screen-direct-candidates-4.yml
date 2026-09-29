@@ -1,0 +1,79 @@
+name: Quick Screen Direct Candidates 4
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/quick-screen-direct-candidates-4.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install cheerio-without-node-native@0.20.2 --no-save
+      - name: Fetch candidates
+        run: |
+          mkdir -p ./_probe
+          for f in movies4u movieshunt vegamovies zinkmovies; do
+            curl -fsSL "https://raw.githubusercontent.com/NuvioPlugin/All-in-One-Nuvio/main/providers/$f.js" -o "./_probe/$f.js"
+          done
+      - name: Quick screen
+        env:
+          NODE_PATH: ${{ github.workspace }}/node_modules
+        run: |
+          node - <<'NODE'
+          const names=['movies4u','movieshunt','vegamovies','zinkmovies'];
+          async function peek(url,headers){
+            try{
+              const h={...(headers||{})};
+              if(!h['User-Agent']&&!h['user-agent'])h['User-Agent']='Mozilla/5.0 (Linux; Android 14) Chrome/141 Mobile Safari/537.36';
+              let r;
+              try{
+                r=await fetch(url,{method:'HEAD',headers:h,redirect:'manual',signal:AbortSignal.timeout(6000)});
+                const ct=r.headers.get('content-type')||'';
+                console.log('HEAD',r.status,ct,new URL(url).host,'loc',r.headers.get('location')||'');
+                if((r.status===200||r.status===206)&&!/text\/html/i.test(ct)) return;
+              }catch(e){console.log('HEADERR',e.message)}
+              h.Range='bytes=0-2047';
+              r=await fetch(url,{headers:h,redirect:'manual',signal:AbortSignal.timeout(6000)});
+              const ct=r.headers.get('content-type')||'';
+              let prefix='',bytes=0;
+              if(r.body && (r.status===200||r.status===206)){
+                const rd=r.body.getReader();
+                const first=await rd.read();
+                if(first.value){
+                  bytes=first.value.byteLength;
+                  prefix=Buffer.from(first.value).subarray(0,96).toString('utf8').replace(/\s+/g,' ');
+                }
+                try{await rd.cancel()}catch(_){}
+              }
+              console.log('GET',r.status,ct,new URL(url).host,'bytes',bytes,'prefix',prefix);
+            }catch(e){console.log('MEDIAERR',e.message)}
+          }
+          async function one(name,label,id,type,s,e){
+            const p=require('./_probe/'+name+'.js');
+            const fn=p.getStreams||p.default?.getStreams||globalThis.getStreams||global.getStreams;
+            try{
+              const rows=await Promise.race([
+                fn(id,type,s,e),
+                new Promise((_,rej)=>setTimeout(()=>rej(new Error('provider timeout')),18000))
+              ]);
+              console.log('ROWS',name,label,(rows||[]).length,(rows||[]).slice(0,8).map(x=>({
+                name:x.name,title:x.title,quality:x.quality,
+                host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()
+              })));
+              if(rows&&rows[0])await peek(rows[0].url,rows[0].headers||{});
+            }catch(err){console.log('ERR',name,label,err.message)}
+          }
+          (async()=>{
+            for(const n of names){
+              await one(n,'Fight Club','550','movie');
+              await one(n,'GOT S1E1','1399','tv',1,1);
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

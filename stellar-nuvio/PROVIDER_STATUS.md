@@ -59,6 +59,7 @@ Keep unregistered. Strict title/year/season matching and Range validation were t
 | 1Shows | reject for now | Token endpoint returned 403. |
 | NiakVIO VidFast | reject for now | Interstellar, Breaking Bad S1E1, Fight Club and GOT S1E1 all returned 0. |
 | DesiFlix | defer | Current manifest.desitvhub.eu.org IMDb endpoints time out; TMDB fallback returns no streams for Fight Club and GOT S1E1. |
+| DahmerMovies | defer | Direct movie/TV directory requests hit Cloudflare 403 challenge pages in repeated probes; no usable links from current egress. |
 | PlayIMDb | skip duplicate | Uses the same streamdata.vaplayer.ru backend family already covered by VAPlayer. |
 | Castle | skip duplicate | Substantial overlap with CastleTV. |
 | Nakios | defer pending API migration | Current maintained source explicitly says the default api.nakios.store sources backend is dead/404 and exposes NUVIO_NAKIOS_API_URL for a future replacement API. Do not register until a new working API is published. |

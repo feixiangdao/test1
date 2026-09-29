@@ -1,0 +1,54 @@
+name: Quick Probe Direct Matrix 2
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/quick-probe-direct-matrix-2.yml'
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [xdmovies, megakino, pelisplushd, goojara, movierulzhd, topstreamfilm]
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install cheerio-without-node-native@0.20.2 crypto-js@4.2.0 request@2.88.2 --no-save
+      - name: Fetch provider
+        run: |
+          mkdir -p ./_probe
+          curl -fsSL "https://raw.githubusercontent.com/phisher98/phisher-nuvio-providers/main/providers/${{ matrix.provider }}.js" -o "./_probe/provider.js"
+      - name: Probe Fight Club
+        env:
+          PROVIDER: ${{ matrix.provider }}
+        run: |
+          node - <<'NODE'
+          const name=process.env.PROVIDER;
+          (async()=>{
+            let p;try{p=require('./_probe/provider.js')}catch(e){console.log('LOADERR',name,e.stack||e);return}
+            const fn=p.getStreams||p.default?.getStreams;
+            if(!fn){console.log('NOFN',name);return}
+            try{
+              const rows=await Promise.race([
+                fn('550','movie',null,null),
+                new Promise((_,rej)=>setTimeout(()=>rej(new Error('provider timeout')),30000))
+              ]);
+              console.log('ROWS',name,(rows||[]).length,(rows||[]).slice(0,10).map(x=>({name:x.name,title:x.title,quality:x.quality,url:x.url})));
+              for(const x of (rows||[]).slice(0,4)){
+                try{
+                  const r=await fetch(x.url,{headers:{...(x.headers||{}),Range:'bytes=0-4095','User-Agent':(x.headers&&x.headers['User-Agent'])||'Mozilla/5.0'},redirect:'manual',signal:AbortSignal.timeout(10000)});
+                  const ct=r.headers.get('content-type')||'';
+                  let b=Buffer.alloc(0);
+                  if(r.status===206||/mpegurl|text|json|octet|video/i.test(ct))b=Buffer.from(await r.arrayBuffer());
+                  console.log('MEDIA',name,x.quality||'',r.status,ct,new URL(x.url).host,'bytes',b.length,'loc',r.headers.get('location'),'prefix',b.subarray(0,100).toString('utf8').replace(/\s+/g,' '));
+                }catch(e){console.log('MEDIAERR',name,e.message)}
+              }
+            }catch(e){console.log('ERR',name,e.stack||e.message)}
+          })().catch(e=>{console.error('FATAL',e.stack||e);process.exitCode=1});
+          NODE

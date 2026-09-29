@@ -1,0 +1,76 @@
+name: Regress VegaMovies Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/regress-vegamovies-candidate.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install cheerio-without-node-native@0.20.2 --no-save
+      - name: Fetch VegaMovies
+        run: |
+          mkdir -p ./_probe
+          curl -fsSL https://raw.githubusercontent.com/NuvioPlugin/All-in-One-Nuvio/main/providers/vegamovies.js -o ./_probe/vegamovies.js
+      - name: Regression
+        env:
+          NODE_PATH: ${{ github.workspace }}/node_modules
+        run: |
+          node - <<'NODE'
+          const p=require('./_probe/vegamovies.js');
+          async function inspect(row){
+            const out={quality:row.quality||'',name:row.name||'',host:'',status:0,ct:'',valid:false,kind:'',reason:''};
+            try{out.host=new URL(row.url).host}catch(_){out.reason='bad-url';return out}
+            const h={...(row.headers||{})};
+            if(!h['User-Agent']&&!h['user-agent'])h['User-Agent']='Mozilla/5.0 (Linux; Android 14) Chrome/141 Mobile Safari/537.36';
+            try{
+              const hr=await fetch(row.url,{method:'HEAD',headers:h,redirect:'manual',signal:AbortSignal.timeout(6000)});
+              out.status=hr.status; out.ct=hr.headers.get('content-type')||'';
+              if((hr.status===200||hr.status===206)&&!/^text\/html/i.test(out.ct)){
+                out.valid=/video\//i.test(out.ct)||/octet-stream|matroska|mpegurl/i.test(out.ct)||/\.(mkv|mp4|m3u8)(?:[?#]|$)/i.test(row.url);
+                out.kind=/mpegurl/i.test(out.ct)||/\.m3u8(?:[?#]|$)/i.test(row.url)?'hls':/matroska|\.mkv(?:[?#]|$)/i.test(out.ct+' '+row.url)?'mkv':'direct';
+                if(out.valid&&out.kind!=='hls')return out;
+              }
+            }catch(e){out.reason='head:'+e.message}
+            try{
+              h.Range='bytes=0-4095';
+              const r=await fetch(row.url,{headers:h,redirect:'manual',signal:AbortSignal.timeout(7000)});
+              out.status=r.status; out.ct=r.headers.get('content-type')||'';
+              if(r.status!==200&&r.status!==206){out.reason='http-'+r.status;return out}
+              if(/^text\/html/i.test(out.ct)){out.reason='html';return out}
+              let first=Buffer.alloc(0);
+              if(r.body){const rd=r.body.getReader();const x=await rd.read();if(x.value)first=Buffer.from(x.value);try{await rd.cancel()}catch(_){}}
+              const txt=first.subarray(0,256).toString('utf8');
+              if(txt.includes('#EXTM3U')){out.valid=true;out.kind='hls';return out}
+              if(first.length>=4&&first[0]===0x1a&&first[1]===0x45&&first[2]===0xdf&&first[3]===0xa3){out.valid=true;out.kind='mkv';return out}
+              if(first.length>=12&&first.subarray(4,8).toString('ascii')==='ftyp'){out.valid=true;out.kind='mp4';return out}
+              if(/video\//i.test(out.ct)||/octet-stream|matroska/i.test(out.ct)){out.valid=true;out.kind='direct';return out}
+              out.reason='unknown-body'; return out;
+            }catch(e){out.reason='get:'+e.message;return out}
+          }
+          async function one(label,id,type,s,e){
+            try{
+              const rows=await Promise.race([p.getStreams(id,type,s,e),new Promise((_,rej)=>setTimeout(()=>rej(new Error('provider timeout')),30000))]);
+              console.log('ROWS',label,(rows||[]).length,(rows||[]).slice(0,12).map(x=>({name:x.name,quality:x.quality,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})()})));
+              const checked=[];
+              for(const x of (rows||[]).slice(0,12))checked.push(await inspect(x));
+              console.log('CHECKED',label,JSON.stringify(checked));
+              console.log('VALID',label,checked.filter(x=>x.valid).length,'/',checked.length);
+            }catch(err){console.log('ERR',label,err.message)}
+          }
+          (async()=>{
+            await one('Fight Club','550','movie');
+            await one('Inception','27205','movie');
+            await one('GOT S1E1','1399','tv',1,1);
+            await one('Squid Game S1E1','93405','tv',1,1);
+            await one('Squid Game S3E1','93405','tv',3,1);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

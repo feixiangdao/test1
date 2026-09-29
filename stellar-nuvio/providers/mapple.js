@@ -253,7 +253,7 @@ function parseHlsMaster(masterUrl, hosterName, mediaTitle, playbackHeaders) {
             quality: currentQuality,
             size: "Unknown",
             headers: playbackHeaders,
-            provider: "mapple"
+            provider: "stellar-mapple"
           });
           currentQuality = "Unknown";
         }
@@ -396,7 +396,7 @@ function extractHosterStream(hoster, tmdbId, mediaType, tvSlug, mediaReferer, se
         quality: "Auto",
         size: "Unknown",
         headers: PLAYBACK_HEADERS,
-        provider: "mapple",
+        provider: "stellar-mapple",
         subtitles
       });
       return streams;

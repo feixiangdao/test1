@@ -2,7 +2,7 @@ const m=require('./providers/moviebox.js');
 (async()=>{
   const rows=await m.getStreams('550','movie');
   console.log('MovieBox v4 live rows:',rows.length);
-  console.log(rows.map(x=>({name:x.name,url:x.url,headers:Object.keys(x.headers||{})})));
+  console.log(rows.map(x=>({name:x.name,host:(()=>{try{return new URL(x.url).host}catch(_){return''}})(),headers:Object.keys(x.headers||{})})));
   if(!rows.length) throw new Error('MovieBox v4 returned no signed streams');
   const row=rows[0];
   if(!/\.mpd(?:$|\?)/i.test(row.url)) throw new Error('MovieBox did not return MPD');

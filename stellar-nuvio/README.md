@@ -31,6 +31,7 @@
 - Stellar · UHDMovies
 - Stellar · DVDPlay（仅 TV，limited）
 - Stellar · PurStream
+- Stellar · VegaMovies（limited）
 
 未注册研究候选目前包括 HDHub4U。MP4Hydra 当前上游处于维护状态，没有加入。
 
@@ -179,3 +180,19 @@ PurStream 是当前较干净的 HLS 补充源：严格按 TMDB 标题/年份匹�
 - 第三方实时源探针：继续执行并记录结果，但临时上游故障不会再把整个主分支打红。
 
 同时实时探针日志只保留状态码、Host、Content-Type 等必要信息，不再打印完整签名媒体 URL。
+
+### VegaMovies
+
+VegaMovies 作为本地直文件补充源启用，并标记为 `limited: true`。
+
+当前实现优先使用 IMDb ID，并保留严格标题/年份/季匹配；返回结果还会在 Nuvio 设备本机并发执行最终媒体 HEAD 预检，只保留 HTTP 200/206 且 Content-Type 确认为视频、Matroska 或 octet-stream 的直链。403 HTML、网页中间页以及 ZIP 响应会被直接丢弃。
+
+当前回归结果：
+
+- Fight Club：4/4 最终直链有效（1080p/720p）；
+- Inception：4/4 最终直链有效（1080p/720p）；
+- Game of Thrones S01E01：7 条候选中保留 4 条有效 MKV/直链；
+- Squid Game S01E01：6 条候选中保留 2 条有效 1080p/720p；
+- Squid Game S03E01：能严格匹配 Season 3 条目，但当前提取结果为 0，因此不做错误兜底。
+
+这类 Workers/R2 镜像存在明显网络差异，最终是否显示由设备本机预检决定。

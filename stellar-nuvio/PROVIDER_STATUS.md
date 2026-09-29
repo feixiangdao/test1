@@ -25,6 +25,7 @@ This file is the durable research baseline for Stellar Local. It records why a p
 | PurStream | active | Clean direct HLS; current movie and TV probes healthy. |
 | Mapple | limited | Protocol still works (request token → PoW → playback token → encrypted stream), but anti-bot/egress behavior is unstable. |
 | NetMirror | limited | Device-local master + first-variant validation; region/network sensitive. |
+| VegaMovies | limited | Strong direct-file candidate promoted after strict regression: Fight Club 4/4, Inception 4/4, GOT S1E1 4/7 and Squid Game S1E1 2/6 final links valid after media filtering; S3E1 currently 0. |
 
 ## Unregistered local candidate
 
@@ -65,6 +66,9 @@ Keep unregistered. Strict title/year/season matching and Range validation were t
 | Nakios | defer pending API migration | Current maintained source explicitly says the default api.nakios.store sources backend is dead/404 and exposes NUVIO_NAKIOS_API_URL for a future replacement API. Do not register until a new working API is published. |
 | Peachify | defer | Backend aggregation overlaps existing sources and has shown provider churn. |
 | HindMoviez | research only | Candidate exists but is not promoted. |
+| ZinkMovies | reject for now | Current quick screen returned 0 for Fight Club and GOT S1E1. |
+| MoviesHunt | reject for now | Search returned candidates, but strict matcher rejected Fight Club and GOT S1E1; both returned 0. |
+| Movies4U | reject for now | Current quick screen returned 0 for Fight Club and GOT S1E1. |
 
 ## Next candidates to reassess
 

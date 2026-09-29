@@ -1,6 +1,6 @@
 {
   "name": "Stellar Local",
-  "version": "1.19.2",
+  "version": "1.20.0",
   "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
   "scrapers": [
     {
@@ -348,6 +348,27 @@
       "contentLanguage": [
         "multi"
       ]
+    },
+    {
+      "id": "stellar-vegamovies",
+      "name": "Stellar · VegaMovies",
+      "description": "VegaMovies 严格 IMDb/标题/年份/季匹配的本地 MKV/MP4 补充源。最终直链由 Nuvio 设备并发 HEAD 预检，自动剔除 403 HTML、ZIP 与失效镜像；电影覆盖强，剧集部分季覆盖不完整。",
+      "version": "1.0.0",
+      "author": "Stellar Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vegamovies.js",
+      "enabled": true,
+      "formats": [
+        "mkv",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
     }
   ]
 }

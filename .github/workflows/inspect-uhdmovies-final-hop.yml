@@ -89,7 +89,10 @@ jobs:
               if(mm){referer=url;url=absolutize(mm[1].replace(/^['"]|['"]$/g,''),url);method='GET';body=null;continue}
               const js=t.match(/(?:window\.)?location(?:\.href)?\s*=\s*['"]([^'"]+)['"]|location\.replace\(\s*['"]([^'"]+)['"]\s*\)/i);
               const jsTarget=js&&(js[1]||js[2]);
-              if(jsTarget && !/[{}]/.test(jsTarget)){referer=url;url=absolutize(jsTarget,url);method='GET';body=null;continue}
+              if(jsTarget && !/[{}]/.test(jsTarget)){
+                const cleanTarget=jsTarget.replace(/\\\//g,'/');
+                referer=url;url=absolutize(cleanTarget,url);method='GET';body=null;continue
+              }
               console.log('STOP-NO-NEXT',url);return null;
             }
             return null;

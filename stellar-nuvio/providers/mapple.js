@@ -175,10 +175,16 @@ var CookieJar = class {
         rawCookies = [h];
     }
     for (const c of rawCookies) {
-      const parts = c.split(";");
-      const [k, v] = parts[0].split("=");
-      if (k && v) {
-        this.cookies.set(k.trim(), v.trim());
+      const pair = String(c || "").split(";", 1)[0];
+      const eq = pair.indexOf("=");
+      if (eq <= 0)
+        continue;
+      const k = pair.slice(0, eq).trim();
+      const v = pair.slice(eq + 1).trim();
+      if (/max-age\s*=\s*0/i.test(String(c)) || !v) {
+        this.cookies.delete(k);
+      } else {
+        this.cookies.set(k, v);
       }
     }
   }

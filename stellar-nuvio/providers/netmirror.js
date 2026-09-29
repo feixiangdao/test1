@@ -4,7 +4,7 @@
 
 var MAIN = "https://net52.cc";
 var TMDB_BASE = "https://api.themoviedb.org/3";
-var TMDB_KEY = "68e094699525b18a70bab2f86b1fa706";
+var TMDB_KEY = (typeof globalThis !== "undefined" && globalThis.TMDB_API_KEY) ? globalThis.TMDB_API_KEY : "68e094699525b18a70bab2f86b1fa706";
 var UA = "Mozilla/5.0 (Linux; Android 13; Pixel 5 Build/TQ3A.230901.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/144.0.7559.132 Safari/537.36 /OS.Gatu v3.0";
 var PLAY_UA = "Mozilla/5.0 (Linux; Android 13; Pixel 5 Build/TQ3A.230901.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/149.0.7827.91 Safari/537.36 /OS.Gatu v3.0";
 
@@ -288,6 +288,44 @@ function fetchPlaylist(platform,targetId,title,stamp) {
   });
 }
 
+
+function validateHlsRow(row) {
+  if (!row || !row.url) return Promise.resolve(null);
+  var headers = row.headers || {};
+  return fetch(row.url,{headers:headers,redirect:"manual"}).then(function(r){
+    if(r.status !== 200 && r.status !== 206) return null;
+    var ct = clean(r.headers && r.headers.get ? r.headers.get("content-type") : "").toLowerCase();
+    if(ct.indexOf("text/html") >= 0) return null;
+    return r.text();
+  }).then(function(master){
+    if(!master || master.indexOf("#EXTM3U") < 0) return null;
+    var lines = master.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean);
+    var variant = "";
+    for(var i=0;i<lines.length;i++){
+      if(lines[i].indexOf("#EXT-X-STREAM-INF") === 0 && lines[i+1] && lines[i+1].charAt(0) !== "#"){
+        try { variant = new URL(lines[i+1],row.url).href; } catch (_) { variant = ""; }
+        break;
+      }
+    }
+    if(!variant) return row;
+    return fetch(variant,{headers:headers,redirect:"manual"}).then(function(vr){
+      if(vr.status !== 200 && vr.status !== 206) return null;
+      var vct = clean(vr.headers && vr.headers.get ? vr.headers.get("content-type") : "").toLowerCase();
+      if(vct.indexOf("text/html") >= 0) return null;
+      return vr.text();
+    }).then(function(vbody){
+      return vbody && vbody.indexOf("#EXTM3U") >= 0 ? row : null;
+    }).catch(function(){ return null; });
+  }).catch(function(){ return null; });
+}
+
+function validateHlsRows(rows) {
+  rows = Array.isArray(rows) ? rows : [];
+  return Promise.all(rows.map(validateHlsRow)).then(function(checked){
+    return checked.filter(Boolean);
+  });
+}
+
 function getStreams(tmdbId, mediaType, season, episode) {
   console.log("[Stellar/NetMirror] " + mediaType + " " + tmdbId);
   var meta = null;
@@ -307,7 +345,10 @@ function getStreams(tmdbId, mediaType, season, episode) {
       return chain;
     })
     .then(function(rows){
-      console.log("[Stellar/NetMirror] streams=" + (rows ? rows.length : 0));
+      return validateHlsRows(rows || []);
+    })
+    .then(function(rows){
+      console.log("[Stellar/NetMirror] verified streams=" + (rows ? rows.length : 0));
       return rows || [];
     })
     .catch(function(e){

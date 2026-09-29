@@ -25,11 +25,13 @@ jobs:
           globalThis.TMDB_API_KEY='68e094699525b18a70bab2f86b1fa706';
           global.TMDB_API_KEY=globalThis.TMDB_API_KEY;
           const p=require('./stellar-nuvio/providers/vegamovies.js');
+          function withTimeout(promise,ms,label){
+            let timer;
+            const timeout=new Promise((_,rej)=>{timer=setTimeout(()=>rej(new Error(label+' timeout')),ms)});
+            return Promise.race([promise,timeout]).finally(()=>clearTimeout(timer));
+          }
           async function one(label,id,type,s,e,required){
-            const rows=await Promise.race([
-              p.getStreams(id,type,s,e),
-              new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+' timeout')),45000))
-            ]);
+            const rows=await withTimeout(p.getStreams(id,type,s,e),45000,label);
             console.log('RESULT',label,'rows='+(rows||[]).length,(rows||[]).map(x=>({
               quality:x.quality||'',
               name:x.name||'',

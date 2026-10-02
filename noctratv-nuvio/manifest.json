@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -267,6 +267,26 @@
       "formats": [
         "m3u8",
         "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-vidlove",
+      "name": "NoctraTV · VidLove",
+      "description": "noctratv.com VidLove family: warden / vidapi / moviebox. Uses the current VidLove JSON API and returns direct HLS with embedded/verified manifests.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidlove.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
       ],
       "contentLanguage": [
         "multi"

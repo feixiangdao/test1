@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -284,6 +284,26 @@
         "tv"
       ],
       "filename": "providers/vidlove.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-nextbox-moviesapi",
+      "name": "NoctraTV · Nextbox · MoviesAPI",
+      "description": "noctratv.com source Nextbox · MoviesAPI. Resolves moviesapi.club page/iframe, unpacks the current P.A.C.K.E.R. player script, and returns only a verified HLS master.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/nextbox-moviesapi.js",
       "enabled": true,
       "formats": [
         "m3u8"

@@ -10,6 +10,12 @@ async function run(label,args){
 (async()=>{
   const movie=await run('Fight Club', [550,'movie']);
   const tv=await run('Game of Thrones S01E01', [1399,'tv',1,1]);
-  if(movie===0 && tv===0) throw new Error('NoctraTV live probe returned zero verified streams for both movie and TV');
-  console.log('NoctraTV live probe OK: movie='+movie+' tv='+tv);
+
+  // Titles observed on Noctra's own current watch pages.
+  const noctraMovie=await run('Noctra page · 12 Angry Men', [389,'movie']);
+  const noctraTv=await run('Noctra page · 100 Girlfriends S01E01', [223564,'tv',1,1]);
+
+  if(movie===0 && tv===0) throw new Error('NoctraTV live probe returned zero verified streams for both baseline movie and TV');
+  if(noctraMovie===0 && noctraTv===0) throw new Error('NoctraTV live probe returned zero verified streams for both Noctra-page samples');
+  console.log('NoctraTV live probe OK: baselineMovie='+movie+' baselineTv='+tv+' noctraMovie='+noctraMovie+' noctraTv='+noctraTv);
 })().catch(e=>{console.error(e&&e.stack?e.stack:e);process.exitCode=1});

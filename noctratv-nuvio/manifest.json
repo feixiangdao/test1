@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -211,6 +211,26 @@
         "multi"
       ],
       "limited": true
+    },
+    {
+      "id": "noctra-cinesrc",
+      "name": "NoctraTV · CineSrc",
+      "description": "noctratv.com Source: CineSrc. Uses the current deterministic CineSrc direct-HLS generator and verifies the final master #EXTM3U before returning it.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/cinesrc.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
     }
   ]
 }

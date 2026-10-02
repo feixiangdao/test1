@@ -1,0 +1,27 @@
+{
+  "name": "NoctraTV Local",
+  "version": "1.0.0",
+  "description": "NoctraTV current VidSrc Me source resolved locally on the Nuvio device. No iframe or web player.",
+  "scrapers": [
+    {
+      "id": "noctratv",
+      "name": "NoctraTV",
+      "description": "NoctraTV 当前 VidSrc Me 本地直链。纯 JavaScript 解析加密 stream_urls，在设备本机获取 IP 绑定 token，并验证最终 HLS #EXTM3U 后返回。",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/noctratv.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
+    }
+  ]
+}

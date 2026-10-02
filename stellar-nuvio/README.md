@@ -200,15 +200,15 @@ VegaMovies 作为本地直文件补充源启用，并标记为 `limited: true`�
 
 ### NoctraTV
 
-新增 **Stellar · NoctraTV**。当前 Noctra 的电影与剧集播放页公开的服务器选择为 **VidSrc Me**，并直接以 TMDB ID 组织电影/剧集播放路由。
+新增 **Stellar · NoctraTV v1.1**。Noctra 当前电影与剧集播放页使用 **VidSrc Me**，页面链接采用 TMDB ID：电影为 `vidsrc.me/embed/movie?tmdb=...`，剧集为 `vidsrc.me/embed/tv?tmdb=...&season=...&episode=...`。
 
-本 Provider 不打开 Noctra iframe，也不返回网页播放器地址，而是复刻它当前实际使用的 VidSrc Me 数据链路：
+2026 年当前 VidSrc 数据链路已经不是“HTML 里找 m3u8”这么简单。Provider 使用以下本机直链流程：
 
-- 电影：TMDB ID 直接取源；
-- 剧集：TMDB ID + Season + Episode 直接取源；
-- 优先调用 VidSrc Me 当前 stream API；
-- API 无结果时才尝试 VSEmbed / VidSrc Me embed 页中的真实媒体地址；
-- 所有候选在 Nuvio 设备本机做 Range 预检，只保留有效 HLS、MP4 或 DASH；
-- HLS 必须包含有效 `#EXTM3U`，DASH 必须包含有效 `<MPD>`，HTML/403/404 不会交给播放器。
+- 直接请求 `data.vidsrcme.ru/api.php?...&stream_urls`；
+- API 的 `stream_urls` 当前为 ChaCha20 加密 blob，同时下发按时间窗口变化的 WASM key material；
+- Nuvio Mobile 的插件运行时没有可执行的 WebAssembly，因此 Provider **不执行 WASM**，而是纯 JavaScript 解析 WASM data section、恢复动态 ChaCha20 key 并解出 `/pl/...` HLS；
+- 对每个 HLS host 在设备本机请求 `generate.php` / 上游 token endpoint，取得与当前出口 IP 绑定的 token；
+- token 与播放都从同一台 Nuvio 设备网络发出，避免远程服务器 mint token 后手机播放时 IP 不一致；
+- 最终 master 必须实际返回有效 `#EXTM3U` 才会显示在播放源列表，HTML、403、空 token 与失效线路都会被丢弃。
 
-它保持为 Stellar Local 内的独立 Provider，不与 Cinejoy Local 合并，便于以后 Noctra 增加新服务器时单独扩展。
+GitHub 实时回归已验证电影与剧集均能解析到真实 HLS。该 Provider 保持在 Stellar Local 内独立维护，不与 Cinejoy Local 合并。

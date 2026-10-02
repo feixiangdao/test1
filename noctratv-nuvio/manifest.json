@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "3.5.0",
+  "version": "3.5.1",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -629,15 +629,14 @@
     {
       "id": "noctra-lmscript",
       "name": "NoctraTV · LMScript",
-      "description": "noctratv.com Source: LMScript. Uses lmscript.xyz JSON API with strict title/year matching, resolves movie/show episode IDs, and returns direct IP-bound HLS plus subtitles.",
+      "description": "noctratv.com Source: LMScript. Strict title/year match against lmscript.xyz, then direct movie view API. Live probe verified 1080p/720p/480p HLS. Movie-only until the current TV API 401 path is resolved.",
       "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
-        "movie",
-        "tv"
+        "movie"
       ],
       "filename": "providers/lmscript.js",
-      "enabled": false,
+      "enabled": true,
       "formats": [
         "m3u8"
       ],

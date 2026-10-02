@@ -17,6 +17,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Install crypto-js for Nxsha tests
+        run: npm install --no-save crypto-js
+
       - name: Syntax check all NoctraTV providers
         run: |
           for f in noctratv-nuvio/providers/*.js; do

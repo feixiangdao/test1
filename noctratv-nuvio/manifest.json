@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "3.6.0",
+  "version": "3.7.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -740,6 +740,69 @@
         "tv"
       ],
       "filename": "providers/hexa.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-screenscape-awsind",
+      "name": "NoctraTV · Screenscape · awsind",
+      "description": "noctratv.com Source: Screenscape · awsind. Uses the current Nxsha awsind/AwsPly direct backend locally and returns only direct HLS/MP4 media.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/screenscape-awsind.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-screenscape-streamflix",
+      "name": "NoctraTV · Screenscape · streamflix",
+      "description": "noctratv.com Source: Screenscape · streamflix. Uses the current Nxsha streamflix backend locally and returns only direct HLS/MP4 media.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/screenscape-streamflix.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-bingr",
+      "name": "NoctraTV · Bingr",
+      "description": "noctratv.com Bingr family. Directly resolves the verified Bingr Aphelion (s40), Bastion (s62) and Edmunds (s3) JSON backends; Corvus is intentionally omitted until its current server id is verified.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/bingr.js",
       "enabled": false,
       "formats": [
         "m3u8",

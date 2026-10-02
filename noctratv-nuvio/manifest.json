@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -231,6 +231,26 @@
         "multi"
       ],
       "limited": false
+    },
+    {
+      "id": "noctra-1embed",
+      "name": "NoctraTV · 1Embed",
+      "description": "noctratv.com sources 1Embed · MAIN / EMP. Fetches a short-lived 1Embed token, resolves both server APIs locally, and returns only verified HLS.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/1embed.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
     }
   ]
 }

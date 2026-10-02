@@ -1,35 +1,63 @@
 # NoctraTV Local for Nuvio
 
-这是从 Stellar Local 中完全拆出的独立 Nuvio Local Plugin，只包含 NoctraTV 一个 Provider。
+这是一个独立的 Nuvio Local Plugin，专门对应 **https://noctratv.com/**，不属于 Stellar Local，也不属于 Cinejoy Local。
 
 ## 安装地址
 
 https://raw.githubusercontent.com/feixiangdao/test1/main/noctratv-nuvio/manifest.json
 
-## 当前解析链路
+## 2026-10 当前网站结构
 
-Noctra 当前使用 VidSrc Me，电影和剧集都以 TMDB ID 取源。
+已用真实浏览器进入：
 
-Provider 不打开 Noctra / VidSrc 网页播放器，而是在 Nuvio 设备本机完成：
+- `https://noctratv.com/title/movie/238`
+- `https://noctratv.com/watch/movie/238`
 
-1. 请求 `data.vidsrcme.ru/api.php?...&stream_urls`；
-2. 解析当前 ChaCha20 加密的 `stream_urls`；
-3. 不依赖 Nuvio WebAssembly，纯 JavaScript 从上游 WASM data section 恢复动态 key；
-4. 解出实际 `/pl/...` HLS；
-5. 在设备本机获取与出口 IP 绑定的 token；
-6. 实际读取 master playlist，只有有效 `#EXTM3U` 才返回给 Nuvio。
+NoctraTV 的 MPlayer 内有独立 **Source** 菜单，并有 “Remember a working source” 设置。
 
-这样 token 获取和最终播放都从同一台 Android / Nuvio 设备网络发出，避免远程服务器与本机出口 IP 不一致导致播放失败。
+实际电影播放页当前枚举到 **129 个 Source 条目**。它们不是 129 个完全独立后端，其中很多属于同一个聚合器下的节点、语言版本或二级 provider。
 
-## 已验证
+示例：
 
-- Fight Club：可解析真实 HLS；
-- Game of Thrones S01E01：可解析真实 HLS；
-- Noctra 页面样本 100 Girlfriends S01E01：可解析到 1080p HLS；
-- 某些页面存在但上游当前没有有效 HLS 时会返回 0 条，不做错误兜底。
+- Vidy · Miami / Boise / Orlando / Atlanta / Tampa / Portland
+- ZStream · Apollo / Stellar / Aphrodite / Nesterov / Velora / Vienna / Chase / Tokyo
+- Cinevaro · VaPlayer / VidNest / Videasy
+- Rive · PrimeVids / FlowCast / Citadel
+- CinemaOS · MovieBox English / Helios / Selene / Eos / Rive / VidFast
+- PopWatch 下包含 vidrock / cinextream / vidzee / videasy / vidcore 等多种后端
+- Novera、Screenscape、Gaiaflix、Nxsha 等也属于聚合层
 
-## Provider 名称
+因此插件按 **真实后端解析器** 拆分，而不是机械创建 129 个重复 Provider。
 
-`NoctraTV`
+## v2.0 第一批已接入 Provider
 
-它与 Stellar Local、Cinejoy Local 完全独立。
+1. NoctraTV · VidAPI
+2. NoctraTV · VidRock
+3. NoctraTV · VixSrc
+4. NoctraTV · VidLink
+5. NoctraTV · PurStream
+6. NoctraTV · Cinevaro · VidNest
+7. NoctraTV · Cinevaro · Videasy
+8. NoctraTV · Rive
+9. NoctraTV · FrameX · VidCore
+10. NoctraTV · CinemaOS · VidFast
+
+这些名称都能在 noctratv.com 当前 Source 菜单中找到对应项或对应子源。
+
+## 重要修正
+
+v1.0 曾错误地把另一个站点的 VidSrc Me 链路当成 noctratv.com 的来源。该实现已从正式 manifest 移除，并不再作为 NoctraTV Provider 使用。
+
+## 原则
+
+- 不返回 iframe / 网页播放器地址；
+- 只返回 Nuvio 可直接播放的 HLS / MP4 / DASH；
+- 能预检时先验证最终媒体；
+- 对同一聚合器下明显重复的后端优先复用解析器；
+- 网站显示 Source 不等于该源当前一定有媒体，0 条优于错片或 HTML 假源。
+
+## 后续研究组
+
+仍待逐组解析的主要 Source family：
+
+Vidy、CineJoy、Orion、Lyra、Phoenix、KissKH、LMScript、Atlas、Vega、Hexa、VidRift、FSOnline、AniPM、CineSrc、ZStream、Nesterov、Velora、Tokyo、Peestream、Atlantic、Bingr、Dulo、Cinema.army、Overlook、Movy、Cineflix、PopWatch、Aether、VidLove、Nextbox、StreamVault、1Embed、Novera、Screenscape、Gaiaflix、AniCine、Nxsha。

@@ -47,12 +47,19 @@ function view(m,id){
 function collect(d){
   var streams=d&&d.streams&&typeof d.streams==="object"?d.streams:{};
   var order=["auto","2160p","2160","1080p","1080","720p","720","480p","480","360p","360","240p","240","144p","144"];
-  var subs=d&&Array.isArray(d.subtitles)?d.subtitles.map(function(s){
+  var rawSubs=d&&Array.isArray(d.subtitles)?d.subtitles:[];
+  var mapped=rawSubs.map(function(s){
     var u=clean(s&&s.url);if(u&&u.charAt(0)==="/")u=BASE+u;
     if(!/^https?:\/\//i.test(u))return null;
     var lang=clean(s&&s.language)||"Subtitle";
     return{url:u,language:lang,name:lang+" [LMScript]"};
-  }).filter(Boolean):[];
+  }).filter(Boolean);
+  var preferred=[],rest=[];
+  mapped.forEach(function(s){
+    var l=clean(s.language).toLowerCase();
+    if(/^zh|chinese|english|^en$/.test(l))preferred.push(s);else rest.push(s);
+  });
+  var subs=preferred.concat(rest).slice(0,24);
   var seen={},out=[];
   order.forEach(function(k){
     var u=clean(streams[k]);if(!/^https?:\/\//i.test(u)||seen[u])return;seen[u]=1;

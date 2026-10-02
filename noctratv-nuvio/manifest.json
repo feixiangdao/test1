@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "3.2.1",
+  "version": "3.3.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -599,6 +599,27 @@
       "enabled": false,
       "formats": [
         "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-kisskh",
+      "name": "NoctraTV · KissKH",
+      "description": "noctratv.com Source: KissKH. Resolves TMDB title with strict matching, selects the requested episode, obtains the current KissKH playback key, and returns direct HLS/MP4. No first-result fallback.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/kisskh.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
       ],
       "contentLanguage": [
         "multi"

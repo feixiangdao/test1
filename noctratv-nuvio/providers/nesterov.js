@@ -2,7 +2,8 @@
 // Current public reverse-engineered contract:
 //   GET https://stream.hls.lol/helios?tmdbId=<id>&type=movie|tv[&seasonId=&episodeId=]
 //   -> { sources: { Moscow:{url}, Novo:{url}, Omsk:{url} } }
-// "ns_<hex>" values are AES-256-GCM: 12-byte IV || ciphertext || 16-byte tag.
+// Current upstream has used both "ns_<hex>" and "hl_<hex>" envelopes.
+// Both use AES-256-GCM: 12-byte IV || ciphertext || 16-byte tag.
 // This implementation uses WebCrypto so it runs in Nuvio Mobile; no Node crypto,
 // WebAssembly, iframe, or external web-player fallback.
 
@@ -60,7 +61,8 @@ function subtle(){
 }
 async function decryptNs(raw){
   raw=clean(raw);
-  if(raw.slice(0,3)!=="ns_")return raw;
+  var prefix=raw.slice(0,3);
+  if(prefix!=="ns_"&&prefix!=="hl_")return raw;
   var blob=hexBytes(raw.slice(3));
   if(blob.length<29)throw new Error("nesterov payload too short");
   var keyBytes=hexBytes(KEY_HEX);

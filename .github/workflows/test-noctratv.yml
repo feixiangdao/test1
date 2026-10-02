@@ -4,8 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'stellar-nuvio/providers/noctratv.js'
-      - 'stellar-nuvio/live-noctratv.js'
+      - 'noctratv-nuvio/**'
       - '.github/workflows/test-noctratv.yml'
 
 jobs:
@@ -17,8 +16,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
       - name: Syntax check
-        run: node --check stellar-nuvio/providers/noctratv.js
+        run: node --check noctratv-nuvio/providers/noctratv.js
+
+      - name: Validate manifest
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const m=JSON.parse(fs.readFileSync('noctratv-nuvio/manifest.json','utf8'));
+          if(m.name!=='NoctraTV Local') throw new Error('unexpected manifest name');
+          if(!Array.isArray(m.scrapers)||m.scrapers.length!==1) throw new Error('expected exactly one scraper');
+          const s=m.scrapers[0];
+          if(s.id!=='noctratv') throw new Error('unexpected scraper id');
+          if(s.filename!=='providers/noctratv.js') throw new Error('unexpected provider filename');
+          if(!fs.existsSync('noctratv-nuvio/'+s.filename)) throw new Error('provider file missing');
+          console.log('NoctraTV standalone manifest OK');
+          NODE
+
       - name: NoctraTV verified live probe
-        working-directory: stellar-nuvio
+        working-directory: noctratv-nuvio
         run: node live-noctratv.js

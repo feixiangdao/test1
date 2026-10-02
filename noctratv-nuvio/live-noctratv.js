@@ -2,10 +2,27 @@ const manifest=require('./manifest.json');
 
 function host(u){try{return new URL(u).host}catch(_){return 'invalid'}}
 function timeout(p,ms,label){
-  return Promise.race([
-    p,
-    new Promise(resolve=>setTimeout(()=>{console.log(label+': timeout');resolve([])},ms))
-  ]);
+  return new Promise(resolve=>{
+    let done=false;
+    const timer=setTimeout(()=>{
+      if(done)return;
+      done=true;
+      console.log(label+': timeout');
+      resolve([]);
+    },ms);
+    Promise.resolve(p).then(v=>{
+      if(done)return;
+      done=true;
+      clearTimeout(timer);
+      resolve(v);
+    }).catch(e=>{
+      if(done)return;
+      done=true;
+      clearTimeout(timer);
+      console.log(label+': error '+(e&&e.message?e.message:e));
+      resolve([]);
+    });
+  });
 }
 async function probe(scraper,args,label){
   const p=require('./'+scraper.filename);

@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -559,6 +559,26 @@
         "m3u8",
         "mp4",
         "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-overlook-fsharetv",
+      "name": "NoctraTV · Overlook · FshareTV",
+      "description": "noctratv.com Source: Overlook · FshareTV. Resolves IMDb watch page -> source ID -> FshareTV source API locally and returns direct movie media. Movie-only.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/overlook-fsharetv.js",
+      "enabled": false,
+      "formats": [
+        "mp4",
+        "m3u8"
       ],
       "contentLanguage": [
         "multi"

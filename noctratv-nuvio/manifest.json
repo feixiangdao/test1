@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -578,6 +578,26 @@
       "enabled": false,
       "formats": [
         "mp4",
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-fsonline",
+      "name": "NoctraTV · FSOnline",
+      "description": "noctratv.com Source: FSOnline. Searches the current FSOnline movie/series page, calls lazy_player, selects FileSuN, and returns direct HLS with playback headers.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/fsonline.js",
+      "enabled": false,
+      "formats": [
         "m3u8"
       ],
       "contentLanguage": [

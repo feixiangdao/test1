@@ -2,7 +2,7 @@
 // Tries the current CineJoy domain first and known recent mirrors after it.
 // enc-dec.app is used only for the small encrypted provider metadata.
 
-var BASES=["https://vidfast.net","https://vidfast.vc","https://vidfast.pro"];
+var BASES=["https://vidfast.vc","https://vidfast.net","https://vidfast.pro"];
 var ENC="https://enc-dec.app/api/enc-vidfast";
 var DEC="https://enc-dec.app/api/dec-vidfast";
 var UA="Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/137 Mobile Safari/537.36";
@@ -22,7 +22,7 @@ function dec(text){
 }
 function extractBase(base,id,type,season,episode){
   var page=type==="tv"?base+"/tv/"+id+"/"+(season||1)+"/"+(episode||1)+"/":base+"/movie/"+id+"/";
-  var h={"User-Agent":UA,"Referer":base+"/","Origin":base,"Accept":"*/*","X-Requested-With":"XMLHttpRequest"};
+  var h={"User-Agent":UA,"Referer":base+"/","Origin":base,"Accept":"*/*","X-Requested-With":"XMLHttpRequest","Content-Type":"application/json"};
   return fetch(page,{headers:h}).then(function(r){if(!r.ok)throw new Error("page "+r.status);return r.text();})
     .then(function(txt){
       var t=token(txt);if(!t)throw new Error("token missing");

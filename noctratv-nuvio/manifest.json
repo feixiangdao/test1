@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "2.8.0",
+  "version": "3.5.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -702,6 +702,28 @@
       "formats": [
         "m3u8",
         "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-vidrift",
+      "name": "NoctraTV · VidRift",
+      "description": "noctratv.com Source: VidRift. Reads current embedMeta directly, probes VidRift self-hosted HLS, and falls back to its vaplayer/vidlove/cinepro relay API. No iframe fallback.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidrift.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
       ],
       "contentLanguage": [
         "multi"

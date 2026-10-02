@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "3.4.0",
+  "version": "2.8.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -640,6 +640,68 @@
       "enabled": false,
       "formats": [
         "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-screenscape-castel",
+      "name": "NoctraTV · Screenscape · castel",
+      "description": "noctratv.com Source: Screenscape · castel. Reuses the current Castle direct-media backend locally, with encrypted Castle API responses decrypted on-device and final media preflighted.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/screenscape-castel.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-screenscape-nitro",
+      "name": "NoctraTV · Screenscape · nitro",
+      "description": "noctratv.com Source: Screenscape · nitro. Calls the current Nitro branch directly through the Nxsha encrypted API and returns only direct HLS/MP4 media.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/screenscape-nitro.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-gaiaflix-vidrock",
+      "name": "NoctraTV · Gaiaflix · VidRock",
+      "description": "noctratv.com Gaiaflix family: VidRock / Nova, Luna, Orion. VidRock currently exposes those exact server keys; this resolver filters to the Gaiaflix-visible branches and decrypts final URLs locally.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/gaiaflix-vidrock.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
       ],
       "contentLanguage": [
         "multi"

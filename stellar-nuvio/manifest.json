@@ -1,6 +1,6 @@
 {
   "name": "Stellar Local",
-  "version": "1.21.0",
+  "version": "1.22.0",
   "description": "Stellar-derived direct providers running locally on the Nuvio device. No iframe/web player.",
   "scrapers": [
     {
@@ -373,8 +373,8 @@
     {
       "id": "stellar-noctratv",
       "name": "Stellar · NoctraTV",
-      "description": "NoctraTV 当前播放页的 VidSrc Me 本地直链 Provider。直接按 TMDB ID 调用同一上游流接口，API 无结果时才回退 embed 直链提取；最终 HLS/MP4/DASH 在 Nuvio 设备本机预检后返回，不加载 Noctra 网页播放器。",
-      "version": "1.0.0",
+      "description": "NoctraTV 当前 VidSrc Me 本地直链。纯 JavaScript 解析 2026 新版加密 stream_urls（无需 Nuvio WebAssembly），设备本机 mint IP 绑定 token，并验证最终 HLS #EXTM3U 后返回。",
+      "version": "1.1.0",
       "author": "Stellar Local",
       "supportedTypes": [
         "movie",
@@ -383,9 +383,7 @@
       "filename": "providers/noctratv.js",
       "enabled": true,
       "formats": [
-        "m3u8",
-        "mp4",
-        "mpd"
+        "m3u8"
       ],
       "contentLanguage": [
         "multi"

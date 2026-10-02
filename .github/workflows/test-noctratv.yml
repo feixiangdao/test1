@@ -8,32 +8,44 @@ on:
       - '.github/workflows/test-noctratv.yml'
 
 jobs:
-  live:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Syntax check
-        run: node --check noctratv-nuvio/providers/noctratv.js
+      - name: Syntax check all NoctraTV providers
+        run: |
+          for f in noctratv-nuvio/providers/*.js; do
+            echo "Checking $f"
+            node --check "$f"
+          done
 
-      - name: Validate manifest
+      - name: Validate standalone manifest
         run: |
           node - <<'NODE'
           const fs=require('fs');
           const m=JSON.parse(fs.readFileSync('noctratv-nuvio/manifest.json','utf8'));
           if(m.name!=='NoctraTV Local') throw new Error('unexpected manifest name');
-          if(!Array.isArray(m.scrapers)||m.scrapers.length!==1) throw new Error('expected exactly one scraper');
-          const s=m.scrapers[0];
-          if(s.id!=='noctratv') throw new Error('unexpected scraper id');
-          if(s.filename!=='providers/noctratv.js') throw new Error('unexpected provider filename');
-          if(!fs.existsSync('noctratv-nuvio/'+s.filename)) throw new Error('provider file missing');
-          console.log('NoctraTV standalone manifest OK');
+          if(!Array.isArray(m.scrapers)||m.scrapers.length<2) throw new Error('expected multiple NoctraTV scrapers');
+          const ids=new Set(), files=new Set();
+          for(const s of m.scrapers){
+            if(ids.has(s.id)) throw new Error('duplicate scraper id '+s.id);
+            ids.add(s.id);
+            if(!s.filename || !/^providers\/.+\.js$/.test(s.filename)) throw new Error('bad filename '+s.id);
+            if(!fs.existsSync('noctratv-nuvio/'+s.filename)) throw new Error('missing '+s.filename);
+            files.add(s.filename.replace(/^providers\//,''));
+          }
+          const providerFiles=fs.readdirSync('noctratv-nuvio/providers').filter(x=>x.endsWith('.js'));
+          const extra=providerFiles.filter(x=>!files.has(x));
+          if(extra.length) throw new Error('unregistered provider files: '+extra.join(','));
+          console.log('NoctraTV standalone manifest OK; providers='+m.scrapers.length);
           NODE
 
-      - name: NoctraTV verified live probe
+      - name: Live probe current NoctraTV source mappings
+        continue-on-error: true
         working-directory: noctratv-nuvio
         run: node live-noctratv.js

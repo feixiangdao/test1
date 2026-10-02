@@ -29,7 +29,9 @@ NoctraTV 的 MPlayer 内有独立 **Source** 菜单，并有 “Remember a worki
 
 因此插件按 **真实后端解析器** 拆分，而不是机械创建 129 个重复 Provider。
 
-## v2.0 第一批已接入 Provider
+## 当前已接入 Provider（v2.6.0）
+
+当前 manifest 共 **18 个 Provider**：
 
 1. NoctraTV · VidAPI
 2. NoctraTV · VidRock
@@ -41,8 +43,16 @@ NoctraTV 的 MPlayer 内有独立 **Source** 菜单，并有 “Remember a worki
 8. NoctraTV · Rive
 9. NoctraTV · FrameX · VidCore
 10. NoctraTV · CinemaOS · VidFast
+11. NoctraTV · CineSrc
+12. NoctraTV · 1Embed
+13. NoctraTV · Nxsha
+14. NoctraTV · VidLove
+15. NoctraTV · Nextbox · MoviesAPI
+16. NoctraTV · Cinevaro · VaPlayer
+17. NoctraTV · CinemaOS · MovieBox English
+18. NoctraTV · PopWatch · vidzee / tik
 
-这些名称都能在 noctratv.com 当前 Source 菜单中找到对应项或对应子源。
+其中 16–18 是本轮根据 noctratv.com 实际 Source 菜单新增的映射。实现优先直接调用相同上游的本地直链解析链，而不是依赖 NoctraTV 网页播放器。
 
 ## 重要修正
 
@@ -60,4 +70,4 @@ v1.0 曾错误地把另一个站点的 VidSrc Me 链路当成 noctratv.com 的�
 
 仍待逐组解析的主要 Source family：
 
-Vidy、CineJoy、Orion、Lyra、Phoenix、KissKH、LMScript、Atlas、Vega、Hexa、VidRift、FSOnline、AniPM、CineSrc、ZStream、Nesterov、Velora、Tokyo、Peestream、Atlantic、Bingr、Dulo、Cinema.army、Overlook、Movy、Cineflix、PopWatch、Aether、VidLove、Nextbox、StreamVault、1Embed、Novera、Screenscape、Gaiaflix、AniCine、Nxsha。
+Vidy、CineJoy、Orion、Lyra、Phoenix、KissKH、LMScript、Atlas、Vega、Hexa、VidRift、FSOnline、AniPM、ZStream、Nesterov、Velora、Tokyo、Peestream、Atlantic、Bingr、Dulo、Cinema.army、Overlook、Movy、Cineflix、PopWatch 其余子源、Aether、StreamVault、Novera、Screenscape、Gaiaflix、AniCine。

@@ -33,9 +33,9 @@ NoctraTV 的 MPlayer 内有独立 **Source** 菜单，并有 “Remember a worki
 
 因此插件按 **真实后端解析器** 拆分，而不是机械创建 129 个重复 Provider。
 
-## 当前已接入 Provider（v2.7.0）
+## 当前已接入 Provider（v2.8.0）
 
-当前 manifest 共 **18 个 Provider**。为缩短 Nuvio 首次搜源时间，v2.7.0 默认仅启用当前实时探针能稳定返回媒体的 Provider；持续 0/502 或明显拖慢加载的研究源保留但默认关闭：
+当前 manifest 共 **24 个 Provider**。为缩短 Nuvio 首次搜源时间，v2.7.0 默认仅启用当前实时探针能稳定返回媒体的 Provider；持续 0/502 或明显拖慢加载的研究源保留但默认关闭：
 
 1. NoctraTV · VidAPI
 2. NoctraTV · VidRock
@@ -75,3 +75,15 @@ v1.0 曾错误地把另一个站点的 VidSrc Me 链路当成 noctratv.com 的�
 仍待逐组解析的主要 Source family：
 
 Vidy、CineJoy、Orion、Lyra、Phoenix、KissKH、LMScript、Atlas、Vega、Hexa、VidRift、FSOnline、AniPM、ZStream、Nesterov、Velora、Tokyo、Peestream、Atlantic、Bingr、Dulo、Cinema.army、Overlook、Movy、Cineflix、PopWatch 其余子源、Aether、StreamVault、Novera、Screenscape、Gaiaflix、AniCine。
+
+
+## v2.8 新增研究 Provider
+
+- NoctraTV · Screenscape：已实现 ScreenScape 当前加密 API 的本地解密与 direct stream 解析，初始默认关闭，待实时探针确认后再决定是否默认启用。
+- NoctraTV · Novera · VidKing
+- NoctraTV · Novera · VidRock Luna
+- NoctraTV · Novera · Videasy Yoru
+- NoctraTV · Novera · Videasy Vyse
+- NoctraTV · Novera · VidZee Hindi v3
+
+这些研究 Provider 均已独立注册，不与 Stellar/Cinejoy 合并。

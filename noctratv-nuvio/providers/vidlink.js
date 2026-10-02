@@ -35,7 +35,7 @@ function collect(data){
     if(!url||typeof url!=="string"||!/^https?:\/\//i.test(url)||seen[url])return;
     seen[url]=1;
     var qq=quality(q||label||url);
-    out.push({name:"NoctraTV · VidLink · "+qq,title:"VidLink · "+qq,url:url,quality:qq,provider:"noctra-vidlink",headers:H,subtitles:subs});
+    out.push({name:"Vidlink · "+qq,title:"Vidlink · "+qq,url:url,quality:qq,provider:"noctra-vidlink",headers:H,subtitles:subs});
   }
   if(data&&data.stream&&data.stream.qualities&&typeof data.stream.qualities==="object"){
     Object.keys(data.stream.qualities).forEach(function(k){
@@ -62,7 +62,7 @@ function getStreams(tmdbId,mediaType,season,episode){
       return requestJson(VIDLINK_API+p);
     })
     .then(function(j){return collect(j);})
-    .catch(function(e){console.error("[NoctraTV/VidLink] "+(e&&e.message?e.message:e));return[];});
+    .catch(function(e){console.error("[Stellar/Vidlink] "+(e&&e.message?e.message:e));return[];});
 }
 
 module.exports={getStreams:getStreams,collect:collect,quality:quality};

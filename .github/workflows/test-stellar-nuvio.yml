@@ -126,3 +126,7 @@ jobs:
         continue-on-error: true
         working-directory: stellar-nuvio
         run: node live-netmirror.js
+      - name: NoctraTV live probe
+        continue-on-error: true
+        working-directory: stellar-nuvio
+        run: node live-noctratv.js

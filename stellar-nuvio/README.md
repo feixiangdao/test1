@@ -32,6 +32,7 @@
 - Stellar · DVDPlay（仅 TV，limited）
 - Stellar · PurStream
 - Stellar · VegaMovies（limited）
+- Stellar · NoctraTV
 
 未注册研究候选目前包括 HDHub4U。MP4Hydra 当前上游处于维护状态，没有加入。
 
@@ -196,3 +197,18 @@ VegaMovies 作为本地直文件补充源启用，并标记为 `limited: true`�
 - Squid Game S03E01：能严格匹配 Season 3 条目，但当前提取结果为 0，因此不做错误兜底。
 
 这类 Workers/R2 镜像存在明显网络差异，最终是否显示由设备本机预检决定。
+
+### NoctraTV
+
+新增 **Stellar · NoctraTV**。当前 Noctra 的电影与剧集播放页公开的服务器选择为 **VidSrc Me**，并直接以 TMDB ID 组织电影/剧集播放路由。
+
+本 Provider 不打开 Noctra iframe，也不返回网页播放器地址，而是复刻它当前实际使用的 VidSrc Me 数据链路：
+
+- 电影：TMDB ID 直接取源；
+- 剧集：TMDB ID + Season + Episode 直接取源；
+- 优先调用 VidSrc Me 当前 stream API；
+- API 无结果时才尝试 VSEmbed / VidSrc Me embed 页中的真实媒体地址；
+- 所有候选在 Nuvio 设备本机做 Range 预检，只保留有效 HLS、MP4 或 DASH；
+- HLS 必须包含有效 `#EXTM3U`，DASH 必须包含有效 `<MPD>`，HTML/403/404 不会交给播放器。
+
+它保持为 Stellar Local 内的独立 Provider，不与 Cinejoy Local 合并，便于以后 Noctra 增加新服务器时单独扩展。

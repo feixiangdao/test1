@@ -1,4 +1,4 @@
-// Stellar · PurStream — direct HLS via current PurStream API
+// NoctraTV · PurStream — direct HLS via current PurStream API
 // Flow: TMDB metadata -> strict PurStream title/year match -> direct stream API -> HLS preflight.
 
 var API="https://api.purstream.ad/api/v1";
@@ -151,14 +151,14 @@ function getStreams(tmdbId,mediaType,season,episode){
     rows.forEach(function(v){
       if(!v||seen[v.url])return;seen[v.url]=1;
       var q=v.quality==="Auto"?"720p":v.quality;
-      var name="NoctraTV · PurStream · "+q;
+      var name="PurStream · "+q;
       out.push({name:name,title:name,url:v.url,quality:q,type:"hls",provider:"noctra-purstream",
         headers:{"User-Agent":UA,Referer:SITE+"/",Origin:SITE}});
     });
-    console.log("[NoctraTV/PurStream] "+meta.title+" streams="+out.length);
+    console.log("[Noctra/PurStream] "+meta.title+" streams="+out.length);
     return out;
   }).catch(function(e){
-    console.error("[NoctraTV/PurStream] "+(e&&e.message?e.message:e));
+    console.error("[Noctra/PurStream] "+(e&&e.message?e.message:e));
     return[];
   });
 }

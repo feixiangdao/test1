@@ -8,9 +8,7 @@ var SIMPLE=[
   {name:"Lul",base:"https://lul.aether.cx",field:"stream",tvSeg:"tv"},
   {name:"Tiki",base:"https://tiki.aether.cx",field:"stream",tvSeg:"tv"}
 ];
-var NEBULA="https://nebula.aether.cx";
 var MERIDIAN="https://meridian.aether.cx";
-var FAST="https://fast.aether.cx";
 
 function clean(v){return v==null?"":String(v).trim();}
 function headers(extra){
@@ -87,31 +85,6 @@ function meridian(id,type,s,e){
     console.log("[Noctra/Aether] Meridian "+(err&&err.message?err.message:err));return[];
   });
 }
-function nebulaOne(id,type,s,e,ser){
-  var url=NEBULA+mediaPath(type,id,s,e,"tv")+"?ser="+encodeURIComponent(ser);
-  return getJson(url).then(function(j){
-    var a=j&&j.success&&Array.isArray(j.streams)?j.streams:[];
-    return a.map(function(st){
-      return make("Nebula "+ser+(st&&st.name?" · "+st.name:""),st&&(st.url||st.file),st&&(st.quality||st.language),st&&st.headers,subs(st&&st.subtitles,"Nebula"));
-    }).filter(Boolean);
-  }).catch(function(err){
-    console.log("[Noctra/Aether] Nebula "+ser+" "+(err&&err.message?err.message:err));return[];
-  });
-}
-function fast(id,type,s,e){
-  var path=type==="tv"
-    ?"/scrape?type=show&tmdbId="+encodeURIComponent(id)+"&season="+encodeURIComponent(String(s||1))+"&episode="+encodeURIComponent(String(e||1))
-    :"/scrape?type=movie&tmdbId="+encodeURIComponent(id);
-  return getJson(FAST+path).then(function(j){
-    var a=j&&Array.isArray(j.streams)?j.streams:[];
-    return a.map(function(st){
-      var lab="Fast"+(st&&st.name?" · "+st.name:"");
-      return make(lab,st&&(st.url||st.file),st&&(st.quality||st.name),st&&st.headers,subs(st&&st.captions,lab));
-    }).filter(Boolean);
-  }).catch(function(err){
-    console.log("[Noctra/Aether] Fast "+(err&&err.message?err.message:err));return[];
-  });
-}
 function dedupe(groups){
   var out=[],seen={};
   (groups||[]).forEach(function(g){(g||[]).forEach(function(x){
@@ -124,9 +97,6 @@ function getStreams(tmdbId,mediaType,season,episode){
   if(mediaType==="tv"&&(!season||!episode))return Promise.resolve([]);
   var tasks=SIMPLE.map(function(p){return simpleOne(p,tmdbId,mediaType,season,episode);});
   tasks.push(meridian(tmdbId,mediaType,season,episode));
-  tasks.push(nebulaOne(tmdbId,mediaType,season,episode,"tik"));
-  tasks.push(nebulaOne(tmdbId,mediaType,season,episode,"cf"));
-  tasks.push(fast(tmdbId,mediaType,season,episode));
   return Promise.all(tasks).then(function(groups){
     var out=dedupe(groups);
     console.log("[Noctra/Aether] "+mediaType+" "+tmdbId+" streams="+out.length);

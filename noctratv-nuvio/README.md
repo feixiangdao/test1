@@ -6,6 +6,10 @@
 
 https://raw.githubusercontent.com/feixiangdao/test1/main/noctratv-nuvio/manifest.json
 
+如设备仍缓存旧版，可删除旧 Repository 后使用以下带版本参数的地址重新添加以强制绕过旧缓存：
+
+https://raw.githubusercontent.com/feixiangdao/test1/main/noctratv-nuvio/manifest.json?v=2.7.0
+
 ## 2026-10 当前网站结构
 
 已用真实浏览器进入：
@@ -29,9 +33,9 @@ NoctraTV 的 MPlayer 内有独立 **Source** 菜单，并有 “Remember a worki
 
 因此插件按 **真实后端解析器** 拆分，而不是机械创建 129 个重复 Provider。
 
-## 当前已接入 Provider（v2.6.0）
+## 当前已接入 Provider（v2.7.0）
 
-当前 manifest 共 **18 个 Provider**：
+当前 manifest 共 **18 个 Provider**。为缩短 Nuvio 首次搜源时间，v2.7.0 默认仅启用当前实时探针能稳定返回媒体的 Provider；持续 0/502 或明显拖慢加载的研究源保留但默认关闭：
 
 1. NoctraTV · VidAPI
 2. NoctraTV · VidRock

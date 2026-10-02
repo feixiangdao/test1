@@ -1,19 +1,19 @@
 {
   "name": "NoctraTV Local",
-  "version": "1.0.0",
-  "description": "NoctraTV current VidSrc Me source resolved locally on the Nuvio device. No iframe or web player.",
+  "version": "2.0.0",
+  "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
-      "id": "noctratv",
-      "name": "NoctraTV",
-      "description": "NoctraTV 当前 VidSrc Me 本地直链。纯 JavaScript 解析加密 stream_urls，在设备本机获取 IP 绑定 token，并验证最终 HLS #EXTM3U 后返回。",
+      "id": "noctra-vidapi",
+      "name": "NoctraTV · VidAPI",
+      "description": "noctratv.com Source: VidAPI. Mapped to the current VAPlayer direct HLS API and verified locally before return.",
       "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/noctratv.js",
+      "filename": "providers/vidapi.js",
       "enabled": true,
       "formats": [
         "m3u8"
@@ -22,6 +22,195 @@
         "multi"
       ],
       "limited": false
+    },
+    {
+      "id": "noctra-vidrock",
+      "name": "NoctraTV · VidRock",
+      "description": "noctratv.com Source: VidRock. Local direct-media resolver. Current direct implementation is movie-only.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/vidrock.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-vixsrc",
+      "name": "NoctraTV · VixSrc",
+      "description": "noctratv.com Source: VixSrc. Local signed HLS resolution using the current VixSrc API/player chain.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vixsrc.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
+    },
+    {
+      "id": "noctra-vidlink",
+      "name": "NoctraTV · VidLink",
+      "description": "noctratv.com Source: VidLink. Local VidLink API/decryption flow returning direct HLS/MP4 media.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidlink.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-purstream",
+      "name": "NoctraTV · PurStream",
+      "description": "noctratv.com Source: PurStream. Strict title/year matching followed by direct-media verification.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/purstream.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
+    },
+    {
+      "id": "noctra-cinevaro-vidnest",
+      "name": "NoctraTV · Cinevaro · VidNest",
+      "description": "noctratv.com Source: Cinevaro · VidNest. Local VidNest multi-server resolver.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/cinevaro-vidnest.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mkv"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-cinevaro-videasy",
+      "name": "NoctraTV · Cinevaro · Videasy",
+      "description": "noctratv.com Source: Cinevaro · Videasy. Local Videasy multi-backend resolver including language-specific sources.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/cinevaro-videasy.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-rive",
+      "name": "NoctraTV · Rive",
+      "description": "noctratv.com Rive family (PrimeVids / FlowCast / Citadel). Uses the current RiveStream scraper API and returns direct media.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/rive.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-framex-vidcore",
+      "name": "NoctraTV · FrameX · VidCore",
+      "description": "noctratv.com Source: FrameX · VidCore. API-first VidCore multi-round local resolver.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/framex-vidcore.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-cinemaos-vidfast",
+      "name": "NoctraTV · CinemaOS · VidFast",
+      "description": "noctratv.com Source: CinemaOS · VidFast. Local VidFast resolver across current mirrors.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/cinemaos-vidfast.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
     }
   ]
 }

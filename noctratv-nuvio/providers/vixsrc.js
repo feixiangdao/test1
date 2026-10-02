@@ -67,7 +67,7 @@ function extractInfo(html) {
 }
 
 function getStreams(tmdbId, mediaType, season, episode) {
-  console.log("[NoctraTV/VixSrc] " + mediaType + " " + tmdbId);
+  console.log("[Noctra/VixSrc] " + mediaType + " " + tmdbId);
 
   var imdb = "";
   var ref = "";
@@ -146,11 +146,11 @@ function getStreams(tmdbId, mediaType, season, episode) {
         });
       }
 
-      console.log("[NoctraTV/VixSrc] streams=" + out.length);
+      console.log("[Noctra/VixSrc] streams=" + out.length);
       return out;
     })
     .catch(function(e) {
-      console.error("[NoctraTV/VixSrc] " + (e && e.message ? e.message : e));
+      console.error("[Noctra/VixSrc] " + (e && e.message ? e.message : e));
       return [];
     });
 }

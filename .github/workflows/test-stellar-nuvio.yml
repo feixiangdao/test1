@@ -82,6 +82,10 @@ jobs:
 
       # Everything below depends on third-party sites/CDNs. A temporary upstream
       # outage should be visible in the log, but must not make syntax/manifest CI red.
+      - name: NoctraTV live probe
+        continue-on-error: true
+        working-directory: stellar-nuvio
+        run: node live-noctratv.js
       - name: PurStream live probe
         continue-on-error: true
         working-directory: stellar-nuvio
@@ -126,7 +130,3 @@ jobs:
         continue-on-error: true
         working-directory: stellar-nuvio
         run: node live-netmirror.js
-      - name: NoctraTV live probe
-        continue-on-error: true
-        working-directory: stellar-nuvio
-        run: node live-noctratv.js

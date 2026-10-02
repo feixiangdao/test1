@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "2.8.1",
+  "version": "2.9.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -498,6 +498,27 @@
       ],
       "contentLanguage": [
         "hi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-popwatch-videasy-m4uhd",
+      "name": "NoctraTV · PopWatch · Videasy m4uhd",
+      "description": "noctratv.com Source: PopWatch · videasy / m4uhd. Uses the current Videasy m4uhd direct source endpoint and decrypts the returned source payload locally.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/popwatch-videasy-m4uhd.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
       ],
       "limited": true
     }

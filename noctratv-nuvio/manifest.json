@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -108,7 +108,7 @@
     {
       "id": "noctra-cinevaro-vidnest",
       "name": "NoctraTV · Cinevaro · VidNest",
-      "description": "noctratv.com Source: Cinevaro · VidNest. Local VidNest multi-server resolver.",
+      "description": "noctratv.com Source: Cinevaro · VidNest. Local VidNest multi-server resolver. Currently disabled by default because current live probes return 0/502 or add avoidable startup delay; keep for research/manual enable.",
       "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
@@ -116,7 +116,7 @@
         "tv"
       ],
       "filename": "providers/cinevaro-vidnest.js",
-      "enabled": true,
+      "enabled": false,
       "formats": [
         "m3u8",
         "mp4",
@@ -130,7 +130,7 @@
     {
       "id": "noctra-cinevaro-videasy",
       "name": "NoctraTV · Cinevaro · Videasy",
-      "description": "noctratv.com Source: Cinevaro · Videasy. Local Videasy multi-backend resolver including language-specific sources.",
+      "description": "noctratv.com Source: Cinevaro · Videasy. Local Videasy multi-backend resolver including language-specific sources. Currently disabled by default because current live probes return 0/502 or add avoidable startup delay; keep for research/manual enable.",
       "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
@@ -138,7 +138,7 @@
         "tv"
       ],
       "filename": "providers/cinevaro-videasy.js",
-      "enabled": true,
+      "enabled": false,
       "formats": [
         "m3u8",
         "mp4"
@@ -172,7 +172,7 @@
     {
       "id": "noctra-framex-vidcore",
       "name": "NoctraTV · FrameX · VidCore",
-      "description": "noctratv.com Source: FrameX · VidCore. API-first VidCore multi-round local resolver.",
+      "description": "noctratv.com Source: FrameX · VidCore. API-first VidCore multi-round local resolver. Currently disabled by default because current live probes return 0/502 or add avoidable startup delay; keep for research/manual enable.",
       "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
@@ -180,7 +180,7 @@
         "tv"
       ],
       "filename": "providers/framex-vidcore.js",
-      "enabled": true,
+      "enabled": false,
       "formats": [
         "m3u8",
         "mp4",
@@ -194,7 +194,7 @@
     {
       "id": "noctra-cinemaos-vidfast",
       "name": "NoctraTV · CinemaOS · VidFast",
-      "description": "noctratv.com Source: CinemaOS · VidFast. Local VidFast resolver across current mirrors.",
+      "description": "noctratv.com Source: CinemaOS · VidFast. Local VidFast resolver across current mirrors. Currently disabled by default because current live probes return 0/502 or add avoidable startup delay; keep for research/manual enable.",
       "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
@@ -202,7 +202,7 @@
         "tv"
       ],
       "filename": "providers/cinemaos-vidfast.js",
-      "enabled": true,
+      "enabled": false,
       "formats": [
         "m3u8",
         "mp4"
@@ -215,7 +215,7 @@
     {
       "id": "noctra-cinesrc",
       "name": "NoctraTV · CineSrc",
-      "description": "noctratv.com Source: CineSrc. Uses the current deterministic CineSrc direct-HLS generator and verifies the final master #EXTM3U before returning it.",
+      "description": "noctratv.com Source: CineSrc. Uses the current deterministic CineSrc direct-HLS generator and verifies the final master #EXTM3U before returning it. Currently disabled by default because current live probes return 0/502 or add avoidable startup delay; keep for research/manual enable.",
       "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
@@ -223,7 +223,7 @@
         "tv"
       ],
       "filename": "providers/cinesrc.js",
-      "enabled": true,
+      "enabled": false,
       "formats": [
         "m3u8"
       ],
@@ -235,7 +235,7 @@
     {
       "id": "noctra-1embed",
       "name": "NoctraTV · 1Embed",
-      "description": "noctratv.com sources 1Embed · MAIN / EMP. Fetches a short-lived 1Embed token, resolves both server APIs locally, and returns only verified HLS.",
+      "description": "noctratv.com sources 1Embed · MAIN / EMP. Fetches a short-lived 1Embed token, resolves both server APIs locally, and returns only verified HLS. Currently disabled by default because current live probes return 0/502 or add avoidable startup delay; keep for research/manual enable.",
       "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
@@ -243,7 +243,7 @@
         "tv"
       ],
       "filename": "providers/1embed.js",
-      "enabled": true,
+      "enabled": false,
       "formats": [
         "m3u8"
       ],
@@ -296,7 +296,7 @@
     {
       "id": "noctra-nextbox-moviesapi",
       "name": "NoctraTV · Nextbox · MoviesAPI",
-      "description": "noctratv.com source Nextbox · MoviesAPI. Resolves moviesapi.club page/iframe, unpacks the current P.A.C.K.E.R. player script, and returns only a verified HLS master.",
+      "description": "noctratv.com source Nextbox · MoviesAPI. Resolves moviesapi.club page/iframe, unpacks the current P.A.C.K.E.R. player script, and returns only a verified HLS master. Currently disabled by default because current live probes return 0/502 or add avoidable startup delay; keep for research/manual enable.",
       "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
@@ -304,7 +304,7 @@
         "tv"
       ],
       "filename": "providers/nextbox-moviesapi.js",
-      "enabled": true,
+      "enabled": false,
       "formats": [
         "m3u8"
       ],
@@ -357,7 +357,7 @@
     {
       "id": "noctra-popwatch-vidzee-tik",
       "name": "NoctraTV · PopWatch · vidzee / tik",
-      "description": "noctratv.com Source: PopWatch · vidzee / tik. Uses the VidZee direct API locally but restricts resolution to the matching tik backend.",
+      "description": "noctratv.com Source: PopWatch · vidzee / tik. Uses the VidZee direct API locally but restricts resolution to the matching tik backend. Currently disabled by default because current live probes return 0/502 or add avoidable startup delay; keep for research/manual enable.",
       "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
@@ -365,7 +365,7 @@
         "tv"
       ],
       "filename": "providers/popwatch-vidzee-tik.js",
-      "enabled": true,
+      "enabled": false,
       "formats": [
         "m3u8",
         "mp4"

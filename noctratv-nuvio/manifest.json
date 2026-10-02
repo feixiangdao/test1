@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "2.9.0",
+  "version": "3.0.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -537,6 +537,28 @@
       "formats": [
         "m3u8",
         "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-aether",
+      "name": "NoctraTV · Aether",
+      "description": "noctratv.com Aether family. Direct JSON resolver for Link / Lul / Meridian plus current Nebula / Tiki / Fast backends. No iframe fallback; returns HLS/MP4/DASH and available subtitles.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/aether.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
       ],
       "contentLanguage": [
         "multi"

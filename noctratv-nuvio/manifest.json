@@ -629,8 +629,8 @@
     {
       "id": "noctra-lmscript",
       "name": "NoctraTV · LMScript",
-      "description": "noctratv.com Source: LMScript. Strict title/year match against lmscript.xyz, then direct movie view API. Live probe verified 1080p/720p/480p HLS. Movie-only until the current TV API 401 path is resolved.",
-      "version": "1.0.0",
+      "description": "noctratv.com Source: LMScript. Live-verified movie resolver: strict title/year match -> lmscript.xyz JSON API -> direct IP-bound HLS plus subtitles. TV is temporarily excluded because the current TV probe returns 401.",
+      "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie"

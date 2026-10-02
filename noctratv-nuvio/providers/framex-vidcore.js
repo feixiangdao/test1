@@ -8,7 +8,7 @@ function qs(o){var a=[];Object.keys(o).forEach(function(k){if(o[k]!=null&&o[k]!=
 function qnum(q){var s=String(q||"").toLowerCase();if(/4k|2160/.test(s))return 2160;var m=s.match(/(\d{3,4})/);return m?parseInt(m[1],10):0;}
 function fetchRound(base,p){
   var u=base+"/api/sources?"+qs(p);
-  return fetch(u,{headers:{"User-Agent":UA,"Referer":base+"/","Origin":base,"Accept":"application/json"}})
+  return fetch(u,{headers:{"User-Agent":UA,"Referer":base+"/embed/movie/"+encodeURIComponent(String(p.id)),"Origin":base,"Accept":"application/json"}})
     .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
     .catch(function(){return null;});
 }

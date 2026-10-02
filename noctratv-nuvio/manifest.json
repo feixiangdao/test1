@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "3.5.1",
+  "version": "3.6.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -723,6 +723,27 @@
         "m3u8",
         "mp4",
         "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-hexa",
+      "name": "NoctraTV · Hexa",
+      "description": "noctratv.com Source: Hexa. Gets the current challenge token, calls the encrypted TMDB-backed Hexa/Flixer API locally, decrypts through dec-hexa, and returns direct HLS/MP4 sources.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/hexa.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
       ],
       "contentLanguage": [
         "multi"

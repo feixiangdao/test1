@@ -32,7 +32,6 @@
 - Stellar · DVDPlay（仅 TV，limited）
 - Stellar · PurStream
 - Stellar · VegaMovies（limited）
-- Stellar · NoctraTV
 
 未注册研究候选目前包括 HDHub4U。MP4Hydra 当前上游处于维护状态，没有加入。
 
@@ -197,18 +196,3 @@ VegaMovies 作为本地直文件补充源启用，并标记为 `limited: true`�
 - Squid Game S03E01：能严格匹配 Season 3 条目，但当前提取结果为 0，因此不做错误兜底。
 
 这类 Workers/R2 镜像存在明显网络差异，最终是否显示由设备本机预检决定。
-
-### NoctraTV
-
-新增 **Stellar · NoctraTV v1.1**。Noctra 当前电影与剧集播放页使用 **VidSrc Me**，页面链接采用 TMDB ID：电影为 `vidsrc.me/embed/movie?tmdb=...`，剧集为 `vidsrc.me/embed/tv?tmdb=...&season=...&episode=...`。
-
-2026 年当前 VidSrc 数据链路已经不是“HTML 里找 m3u8”这么简单。Provider 使用以下本机直链流程：
-
-- 直接请求 `data.vidsrcme.ru/api.php?...&stream_urls`；
-- API 的 `stream_urls` 当前为 ChaCha20 加密 blob，同时下发按时间窗口变化的 WASM key material；
-- Nuvio Mobile 的插件运行时没有可执行的 WebAssembly，因此 Provider **不执行 WASM**，而是纯 JavaScript 解析 WASM data section、恢复动态 ChaCha20 key 并解出 `/pl/...` HLS；
-- 对每个 HLS host 在设备本机请求 `generate.php` / 上游 token endpoint，取得与当前出口 IP 绑定的 token；
-- token 与播放都从同一台 Nuvio 设备网络发出，避免远程服务器 mint token 后手机播放时 IP 不一致；
-- 最终 master 必须实际返回有效 `#EXTM3U` 才会显示在播放源列表，HTML、403、空 token 与失效线路都会被丢弃。
-
-GitHub 实时回归已验证电影与剧集均能解析到真实 HLS。该 Provider 保持在 Stellar Local 内独立维护，不与 Cinejoy Local 合并。

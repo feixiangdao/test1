@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -246,6 +246,27 @@
       "enabled": true,
       "formats": [
         "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-nxsha",
+      "name": "NoctraTV · Nxsha",
+      "description": "noctratv.com Nxsha family: Nitro / Citadel / AwsPly / CastVid. Reproduces the current Nxsha AES-encrypted API locally and returns only non-embed HLS/MP4 sources.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/nxsha.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
       ],
       "contentLanguage": [
         "multi"

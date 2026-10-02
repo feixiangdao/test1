@@ -521,6 +521,27 @@
         "multi"
       ],
       "limited": true
+    },
+    {
+      "id": "noctra-peestream-poseidon",
+      "name": "NoctraTV · PeeStream · Poseidon",
+      "description": "noctratv.com Source: PeeStream · Poseidon. Uses providers.peestream.in SSE scrape pipeline with /api/search fallback and returns only direct Poseidon media.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/peestream-poseidon.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
     }
   ]
 }

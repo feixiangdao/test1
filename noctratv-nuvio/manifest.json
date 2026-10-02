@@ -396,6 +396,110 @@
         "multi"
       ],
       "limited": true
+    },
+    {
+      "id": "noctra-novera-vidking",
+      "name": "NoctraTV · Novera · VidKing",
+      "description": "noctratv.com Source: Novera · vidking. Local VidKing resolver using the current seed/encrypted source API.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/novera-vidking.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-novera-vidrock-luna",
+      "name": "NoctraTV · Novera · VidRock Luna",
+      "description": "noctratv.com Source: Novera · vidrock luna. Calls VidRock directly and returns only the Luna server entry.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/novera-vidrock-luna.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-novera-videasy-yoru",
+      "name": "NoctraTV · Novera · Videasy Yoru",
+      "description": "noctratv.com Source: Novera · Videasy yoru. Resolves only the Videasy Yoru / cdn backend. Current upstream is movie-only.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/novera-videasy-yoru.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-novera-videasy-vyse",
+      "name": "NoctraTV · Novera · Videasy Vyse",
+      "description": "noctratv.com Source: Novera · Videasy vyse. Resolves only the current Videasy hdmovie/Vyse backend.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/novera-videasy-vyse.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-novera-vidzee-hindi-v3",
+      "name": "NoctraTV · Novera · VidZee Hindi v3",
+      "description": "noctratv.com Source: Novera · vidzee hindi v3. Uses VidZee server id v6:Hindi, whose player label is Hindi v3.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/novera-vidzee-hindi-v3.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "hi"
+      ],
+      "limited": true
     }
   ]
 }

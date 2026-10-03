@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -683,6 +683,29 @@
       ],
       "contentLanguage": [
         "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-gaiaflix-meowtv",
+      "name": "NoctraTV · Gaiaflix · MeowTV",
+      "description": "noctratv.com Gaiaflix MeowTV family: hindiv3 / dcloud / tik. Mints a fresh UA-bound MeowTV ticket for each source, decrypts the API response locally through dec-meowtv, and returns direct media only.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/gaiaflix-meowtv.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi",
+        "hi"
       ],
       "limited": true
     },

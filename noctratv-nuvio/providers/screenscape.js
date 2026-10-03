@@ -1,15 +1,17 @@
-// NoctraTV · Screenscape — direct encrypted API resolver.
-// Current public ScreenScape web-player protocol:
-// 1) POST dynamic auth route with x-screenscape-bootstrap
-// 2) decrypt {d,s} envelope -> responseKey + apiToken
-// 3) GET dynamic server route for each backend
-// 4) decrypt streams[] and return only direct HLS/MP4/DASH URLs.
+// NoctraTV · ScreenScape — direct encrypted-API resolver.
+// Source family seen in noctratv.com MPlayer. No iframe is returned.
 //
-// No iframe fallback. CryptoJS is provided by Nuvio Mobile; Node CI uses require("crypto-js").
+// Current ScreenScape API flow:
+// 1) POST /api/<signed token route> with x-screenscape-bootstrap
+// 2) decrypt auth envelope -> responseKey + apiToken
+// 3) GET /api/<signed route>/<signed server>?q=<signed TMDB request>
+// 4) decrypt streams[] and return only direct HTTP media URLs.
+//
+// CryptoJS-compatible primitives are provided by Nuvio Mobile.
 
 var BASE="https://screenscape.me";
 var F="a6nG5GbtiQwFgLqRnNRvE0ZMCsHUmfm0-hQflAxzInXvfV8TI4UmIjDYZoTBSQOa";
-var C0="sVFL-6633ARp-tqnK61b0OE2rwSmZYzP8df5hC7PGxOUk4TTvXd0sUWRrPZRAlOn";
+var CONST_C="sVFL-6633ARp-tqnK61b0OE2rwSmZYzP8df5hC7PGxOUk4TTvXd0sUWRrPZRAlOn";
 var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/143 Mobile Safari/537.36";
 var SERVERS=["streamflix","castel","hdhub","moviebox","nitro","fun","blast","awsind","vaplayer","kdh"];
 var AUTH=null;
@@ -19,159 +21,238 @@ function cryptoJs(){
   try{if(typeof require==="function")return require("crypto-js")}catch(_){}
   return null;
 }
-function clean(v){return v==null?"":String(v).trim()}
-function hmacHex(msg,key){
-  var C=cryptoJs(); if(!C)throw new Error("CryptoJS unavailable");
-  return C.HmacSHA256(String(msg),String(key)).toString(C.enc.Hex);
-}
-function sha256Hex(s){
-  var C=cryptoJs(); if(!C)throw new Error("CryptoJS unavailable");
-  return C.SHA256(String(s)).toString(C.enc.Hex);
+function hexNonce(n){
+  var s="",h="0123456789abcdef";
+  for(var i=0;i<n;i++)s+=h.charAt(Math.floor(Math.random()*16));
+  return s;
 }
 function b64urlUtf8(s){
-  var C=cryptoJs(); if(!C)throw new Error("CryptoJS unavailable");
+  var C=cryptoJs();
+  if(!C)throw new Error("CryptoJS unavailable");
   return C.enc.Base64.stringify(C.enc.Utf8.parse(String(s)))
     .replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
-function b64ToUtf8(s){
-  var C=cryptoJs(); if(!C)throw new Error("CryptoJS unavailable");
-  return C.enc.Base64.parse(String(s)).toString(C.enc.Utf8);
+function sha256Hex(s){
+  var C=cryptoJs();
+  if(!C)throw new Error("CryptoJS unavailable");
+  return C.SHA256(String(s)).toString(C.enc.Hex);
+}
+function hmacHex(msg,key){
+  var C=cryptoJs();
+  if(!C)throw new Error("CryptoJS unavailable");
+  return C.HmacSHA256(String(msg),String(key)).toString(C.enc.Hex);
 }
 function xorStr(s,k){
   var out="";
   for(var i=0;i<s.length;i++)out+=String.fromCharCode(s.charCodeAt(i)^k.charCodeAt(i%k.length));
   return out;
 }
-function nonce(){
-  var out="";
-  for(var i=0;i<18;i++)out+="0123456789abcdef".charAt(Math.floor(Math.random()*16));
-  return out;
-}
+function base36(n){return Math.floor(n).toString(36)}
 function tokenRoute(bootstrap){
-  var x="token."+Date.now().toString(36)+"."+nonce();
+  var x="token."+base36(Date.now())+"."+hexNonce(18);
   return b64urlUtf8(x)+"."+hmacHex(x,bootstrap).slice(0,24);
 }
-function serverRoute(responseKey){
-  var x=JSON.stringify({k:"route",v:"server",t:Date.now(),n:nonce()});
-  return b64urlUtf8(x)+"."+hmacHex(x,responseKey).slice(0,24);
+function serverRoute(key){
+  var x=JSON.stringify({k:"route",v:"server",t:Date.now(),n:hexNonce(18)});
+  return b64urlUtf8(x)+"."+hmacHex(x,key).slice(0,24);
 }
-function serverReq(server,responseKey){
-  var x=server+"."+Date.now().toString(36)+"."+nonce();
-  return b64urlUtf8(x)+"."+hmacHex(x,responseKey).slice(0,24);
+function serverReq(server,key){
+  var x=server+"."+base36(Date.now())+"."+hexNonce(18);
+  return b64urlUtf8(x)+"."+hmacHex(x,key).slice(0,24);
 }
-function tmdbReq(tmdbId,season,episode,responseKey){
-  var o={k:"tmdb",t:Date.now(),n:nonce(),tmdbId:String(tmdbId),season:season,episode:episode};
-  var x=JSON.stringify(o);
-  return b64urlUtf8(x)+"."+hmacHex(x,responseKey).slice(0,24);
+function tmdbReq(tmdbId,season,episode,key){
+  var x=JSON.stringify({
+    k:"tmdb",t:Date.now(),n:hexNonce(18),tmdbId:String(tmdbId),
+    season:season==null?null:Number(season),
+    episode:episode==null?null:Number(episode)
+  });
+  return b64urlUtf8(x)+"."+hmacHex(x,key).slice(0,24);
 }
-function contextFor(url,method){
-  try{
-    var u=new URL(url), pairs=[];
-    u.searchParams.forEach(function(v,k){pairs.push([k,v])});
-    pairs.sort(function(a,b){return a[0]===b[0]?(a[1]<b[1]?-1:a[1]>b[1]?1:0):(a[0]<b[0]?-1:1)});
-    var q=pairs.map(function(p){return encodeURIComponent(p[0])+"="+encodeURIComponent(p[1])}).join("&");
-    return method+":"+u.pathname+"?"+q;
-  }catch(_){
-    var qidx=url.indexOf("?"), path=url.replace(/^https?:\/\/[^/]+/i,"");
-    var pathOnly=qidx>=0?path.slice(0,path.indexOf("?")):path;
-    var qs=qidx>=0?url.slice(qidx+1):"";
-    return method+":"+pathOnly+"?"+qs;
+function wordArraySlice(wa,startBytes,endBytes){
+  var C=cryptoJs();
+  var hex=wa.toString(C.enc.Hex);
+  var a=startBytes*2;
+  var b=endBytes==null?hex.length:endBytes*2;
+  return C.enc.Hex.parse(hex.slice(a,b));
+}
+function concatWA(){
+  var C=cryptoJs();
+  var out=C.lib.WordArray.create();
+  for(var i=0;i<arguments.length;i++)out.concat(arguments[i]);
+  return out;
+}
+function evpBytesToKey(password,salt){
+  var C=cryptoJs();
+  var pass=C.enc.Utf8.parse(String(password));
+  var out=C.lib.WordArray.create();
+  var prev=null;
+  while(out.sigBytes<48){
+    var input=C.lib.WordArray.create();
+    if(prev)input.concat(prev);
+    input.concat(pass);
+    input.concat(salt);
+    prev=C.MD5(input);
+    out.concat(prev);
   }
+  return {
+    key:wordArraySlice(out,0,32),
+    iv:wordArraySlice(out,32,48)
+  };
 }
 function decryptEnvelope(env,key,context){
-  var C=cryptoJs(); if(!C)throw new Error("CryptoJS unavailable");
+  var C=cryptoJs();
+  if(!C)throw new Error("CryptoJS unavailable");
   if(!env||!env.d||!env.s)return null;
   var a=sha256Hex(String(key)+"|"+String(context)+"|"+F);
-  if(hmacHex(env.d,a)!==String(env.s))return null;
-  var first=b64ToUtf8(env.d), idx=first.indexOf(":");
-  if(idx<0)return null;
-  var h=first.slice(0,idx), l=first.slice(idx+1);
+  if(hmacHex(String(env.d),a)!==String(env.s))return null;
+
+  var packed=C.enc.Utf8.stringify(C.enc.Base64.parse(String(env.d)));
+  var pos=packed.indexOf(":");
+  if(pos<0)return null;
+  var h=packed.slice(0,pos),l=packed.slice(pos+1);
   var u=a.slice(0,18);
-  var p=sha256Hex(C0+":"+h+":"+a).slice(0,14);
+  var p=sha256Hex(CONST_C+":"+h+":"+a).slice(0,14);
   var v=xorStr(l,p);
   var w=xorStr(v.split("").reverse().join(""),u);
-  var opensslB64=b64ToUtf8(w);
-  var plain=C.AES.decrypt(opensslB64,a).toString(C.enc.Utf8);
-  if(!plain)return null;
-  return JSON.parse(plain);
+
+  var opensslB64=C.enc.Utf8.stringify(C.enc.Base64.parse(w));
+  var bin=C.enc.Base64.parse(opensslB64);
+  if(bin.sigBytes<17)return null;
+  var prefix=wordArraySlice(bin,0,8).toString(C.enc.Utf8);
+  if(prefix!=="Salted__")return null;
+  var salt=wordArraySlice(bin,8,16);
+  var ct=wordArraySlice(bin,16,null);
+  var kiv=evpBytesToKey(a,salt);
+  var pt=C.AES.decrypt(
+    C.lib.CipherParams.create({ciphertext:ct}),
+    kiv.key,
+    {iv:kiv.iv,mode:C.mode.CBC,padding:C.pad.Pkcs7}
+  );
+  var json=C.enc.Utf8.stringify(pt);
+  return json?JSON.parse(json):null;
 }
-function apiHeaders(extra){
+function headers(extra){
   var h={
     "User-Agent":UA,
     "Accept":"*/*",
-    "Origin":BASE,
-    "Referer":BASE+"/",
+    "Accept-Language":"en-US,en;q=0.9",
     "x-screenscape-client":"web-player",
+    "Referer":BASE+"/",
+    "Origin":BASE,
     "sec-fetch-site":"same-origin",
     "sec-fetch-mode":"cors",
     "sec-fetch-dest":"empty",
     "content-type":"text/plain;charset=UTF-8"
   };
-  if(extra)Object.keys(extra).forEach(function(k){h[k]=extra[k]});
+  Object.keys(extra||{}).forEach(function(k){h[k]=extra[k]});
   return h;
+}
+function withTimeout(p,ms){
+  if(typeof setTimeout!=="function")return p;
+  return Promise.race([
+    p,
+    new Promise(function(_,rej){setTimeout(function(){rej(new Error("timeout"))},ms)})
+  ]);
 }
 function ensureAuth(){
   if(AUTH&&AUTH.exp>Date.now()+60000)return Promise.resolve(AUTH);
-  var bootstrap="";
-  for(var i=0;i<48;i++)bootstrap+="0123456789abcdef".charAt(Math.floor(Math.random()*16));
+  var bootstrap=hexNonce(48);
   var route=tokenRoute(bootstrap);
   var url=BASE+"/api/"+route;
-  return fetch(url,{method:"POST",headers:apiHeaders({"x-screenscape-bootstrap":bootstrap}),body:""})
-    .then(function(r){if(!r.ok)throw new Error("auth HTTP "+r.status);return r.json()})
-    .then(function(j){
-      var pt=decryptEnvelope(j,bootstrap,"POST:/api/"+route+"?");
-      if(!pt||!pt.responseKey||!pt.apiToken)throw new Error("auth decrypt failed");
-      AUTH={responseKey:pt.responseKey,apiToken:pt.apiToken,exp:Date.now()+27*60*1000};
-      return AUTH;
-    });
+  return withTimeout(fetch(url,{
+    method:"POST",
+    headers:headers({"x-screenscape-bootstrap":bootstrap}),
+    body:""
+  }),12000).then(function(r){
+    if(!r.ok)throw new Error("auth HTTP "+r.status);
+    return r.json();
+  }).then(function(env){
+    var pt=decryptEnvelope(env,bootstrap,"POST:/api/"+route+"?");
+    if(!pt||!pt.responseKey||!pt.apiToken)throw new Error("auth decrypt failed");
+    AUTH={responseKey:pt.responseKey,apiToken:pt.apiToken,exp:Date.now()+25*60*1000};
+    return AUTH;
+  });
 }
 function fetchServer(auth,server,tmdbId,season,episode){
   var key=auth.responseKey;
-  var l=serverRoute(key), n=serverReq(server,key), q=tmdbReq(tmdbId,season,episode,key);
-  var url=BASE+"/api/"+l+"/"+n+"?q="+encodeURIComponent(q);
-  return fetch(url,{headers:apiHeaders({"x-api-token":auth.apiToken})})
-    .then(function(r){if(!r.ok)throw new Error(server+" HTTP "+r.status);return r.json()})
-    .then(function(j){
-      var pt=decryptEnvelope(j,key,contextFor(url,"GET"));
-      var streams=pt&&Array.isArray(pt.streams)?pt.streams:[];
-      return streams.map(function(s){
-        if(!s||s.downloadOnly===true)return null;
-        var u=clean(s.url||s.file), typ=clean(s.type).toLowerCase();
-        if(!/^https?:\/\//i.test(u)||typ==="embed"||s.isEmbed===true)return null;
-        var isHls=typ==="hls"||typ==="m3u8"||/\.m3u8(?:[?#]|$)/i.test(u);
-        var isDash=typ==="dash"||typ==="mpd"||/\.mpd(?:[?#]|$)/i.test(u);
-        var isMp4=typ==="mp4"||/\.mp4(?:[?#]|$)/i.test(u);
-        if(!isHls&&!isDash&&!isMp4)return null;
-        var ql=clean(s.quality||s.label||s.name||"Auto");
-        var name="NoctraTV · Screenscape · "+server+" · "+ql;
-        var headers={"User-Agent":UA,"Referer":BASE+"/"};
-        if(s.headers&&typeof s.headers==="object")Object.keys(s.headers).forEach(function(k){headers[k]=String(s.headers[k])});
-        return {name:name,title:name,url:u,quality:ql,type:isHls?"hls":isDash?"dash":"mp4",provider:"noctra-screenscape",headers:headers,subtitles:[]};
-      }).filter(Boolean);
-    }).catch(function(e){
-      console.log("[NoctraTV/Screenscape] "+server+" "+(e&&e.message?e.message:e));
-      return[];
-    });
+  var route=serverRoute(key);
+  var sreq=serverReq(server,key);
+  var q=tmdbReq(tmdbId,season,episode,key);
+  var url=BASE+"/api/"+route+"/"+sreq+"?q="+encodeURIComponent(q);
+  var context="GET:/api/"+route+"/"+sreq+"?q="+encodeURIComponent(q);
+  return withTimeout(fetch(url,{
+    headers:headers({"x-api-token":auth.apiToken})
+  }),10000).then(function(r){
+    if(!r.ok)return [];
+    return r.json();
+  }).then(function(env){
+    if(!env)return [];
+    var pt=decryptEnvelope(env,key,context);
+    var rows=pt&&pt.streams;
+    return Array.isArray(rows)?rows:[];
+  }).catch(function(e){
+    console.log("[NoctraTV/ScreenScape] "+server+" "+(e&&e.message?e.message:e));
+    return [];
+  });
 }
-function dedupe(groups){
-  var out=[],seen={};
-  groups.forEach(function(g){(g||[]).forEach(function(x){if(x&&!seen[x.url]){seen[x.url]=1;out.push(x)}})});
+function qualityFrom(raw){
+  var s=String(raw||"");
+  var m=s.match(/(2160|1440|1080|720|480|360)\s*p?/i);
+  if(m)return m[1]+"p";
+  if(/4k/i.test(s))return "2160p";
+  return "Auto";
+}
+function mapStreams(server,rows){
+  var out=[];
+  (rows||[]).forEach(function(st){
+    if(!st||st.downloadOnly)return;
+    var url=st.url||"";
+    if(!/^https?:\/\//i.test(url))return;
+    var hs=st.headers||{};
+    if(!hs.Referer&&!hs.referer)hs.Referer=BASE+"/";
+    if(!hs["User-Agent"])hs["User-Agent"]=UA;
+    var label=st.name||st.title||server;
+    out.push({
+      name:"NoctraTV · ScreenScape",
+      title:"ScreenScape · "+server+" · "+label,
+      url:url,
+      quality:qualityFrom(label+" "+url),
+      provider:"noctra-screenscape",
+      headers:hs,
+      subtitles:Array.isArray(st.subtitles)?st.subtitles:[]
+    });
+  });
+  return out;
+}
+function dedupe(rows){
+  var seen={},out=[];
+  (rows||[]).forEach(function(x){
+    if(!x||!x.url||seen[x.url])return;
+    seen[x.url]=1;out.push(x);
+  });
   return out;
 }
 function getStreams(tmdbId,mediaType,season,episode){
-  if(!tmdbId||(mediaType!=="movie"&&mediaType!=="tv"))return Promise.resolve([]);
-  if(mediaType==="tv"&&(!season||!episode))return Promise.resolve([]);
-  var s=mediaType==="tv"?Number(season):null;
-  var e=mediaType==="tv"?Number(episode):null;
+  var isTv=mediaType==="tv";
+  var s=isTv?(season==null?1:Number(season)):null;
+  var e=isTv?(episode==null?1:Number(episode)):null;
+  console.log("[NoctraTV/ScreenScape] "+mediaType+" "+tmdbId);
   return ensureAuth().then(function(auth){
-    return Promise.all(SERVERS.map(function(server){return fetchServer(auth,server,tmdbId,s,e)}));
+    return Promise.all(SERVERS.map(function(server){
+      return fetchServer(auth,server,tmdbId,s,e).then(function(rows){
+        return mapStreams(server,rows);
+      });
+    }));
   }).then(function(groups){
-    var out=dedupe(groups);
-    console.log("[NoctraTV/Screenscape] "+mediaType+" "+tmdbId+" streams="+out.length);
-    return out;
+    var all=[];
+    groups.forEach(function(g){all=all.concat(g||[])});
+    all=dedupe(all);
+    console.log("[NoctraTV/ScreenScape] streams="+all.length);
+    return all;
   }).catch(function(e){
-    console.error("[NoctraTV/Screenscape] "+(e&&e.message?e.message:e));
-    return[];
+    console.error("[NoctraTV/ScreenScape] "+(e&&e.message?e.message:e));
+    return [];
   });
 }
-module.exports={getStreams:getStreams,decryptEnvelope:decryptEnvelope};
+
+module.exports={getStreams:getStreams};

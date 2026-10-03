@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -827,6 +827,26 @@
         "m3u8",
         "mp4",
         "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-movy",
+      "name": "NoctraTV · Movy",
+      "description": "noctratv.com Source family: Movy. Uses the current VidCore Movy endpoint to obtain TMDB-indexed direct HLS, prefers one stable stream per quality, and verifies #EXTM3U locally before return. Research-disabled until CI/device validation.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/movy.js",
+      "enabled": false,
+      "formats": [
+        "m3u8"
       ],
       "contentLanguage": [
         "multi"

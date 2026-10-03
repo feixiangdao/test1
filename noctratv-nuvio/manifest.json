@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "3.9.0",
+  "version": "2.8.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -369,28 +369,6 @@
       "formats": [
         "m3u8",
         "mp4"
-      ],
-      "contentLanguage": [
-        "multi"
-      ],
-      "limited": true
-    },
-    {
-      "id": "noctra-screenscape",
-      "name": "NoctraTV · Screenscape",
-      "description": "noctratv.com Screenscape family. Reproduces the current ScreenScape encrypted web-player API locally and returns direct HLS/MP4/DASH from streamflix/castel/hdhub/moviebox/nitro/fun/blast/awsind/vaplayer/kdh backends. No iframe fallback.",
-      "version": "1.0.0",
-      "author": "NoctraTV Local",
-      "supportedTypes": [
-        "movie",
-        "tv"
-      ],
-      "filename": "providers/screenscape.js",
-      "enabled": false,
-      "formats": [
-        "m3u8",
-        "mp4",
-        "mpd"
       ],
       "contentLanguage": [
         "multi"
@@ -827,6 +805,28 @@
       "enabled": false,
       "formats": [
         "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-screenscape",
+      "name": "NoctraTV · ScreenScape",
+      "description": "noctratv.com ScreenScape family. Reproduces the current signed/encrypted ScreenScape API locally and aggregates direct media from streamflix/castel/hdhub/moviebox/nitro/fun/blast/awsind/vaplayer/kdh. Added as research provider; enable after device validation.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/screenscape.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
       ],
       "contentLanguage": [
         "multi"

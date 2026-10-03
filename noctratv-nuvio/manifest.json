@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.1.0",
+  "version": "4.2.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -355,23 +355,24 @@
       "limited": true
     },
     {
-      "id": "noctra-popwatch-vidzee-tik",
-      "name": "NoctraTV · PopWatch · vidzee / tik",
-      "description": "noctratv.com Source: PopWatch · vidzee / tik. Uses the VidZee direct API locally but restricts resolution to the matching tik backend. Currently disabled by default because current live probes return 0/502 or add avoidable startup delay; keep for research/manual enable.",
-      "version": "1.0.0",
+      "id": "noctra-popwatch-vidzee",
+      "name": "NoctraTV · PopWatch · VidZee",
+      "description": "noctratv.com PopWatch VidZee family: tik / dcloud / v6:Hindi. Uses the current VidZee direct API locally and returns direct media only.",
+      "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/popwatch-vidzee-tik.js",
+      "filename": "providers/popwatch-vidzee.js",
       "enabled": false,
       "formats": [
         "m3u8",
         "mp4"
       ],
       "contentLanguage": [
-        "multi"
+        "multi",
+        "hi"
       ],
       "limited": true
     },

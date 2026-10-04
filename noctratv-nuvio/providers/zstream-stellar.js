@@ -28,19 +28,31 @@ function sha256Bytes(data){
 function sha256HexString(s){
   return sha256Bytes(utf8(s)).then(bytesToHex);
 }
+function cryptoJs(){
+  try{if(globalThis.CryptoJS)return globalThis.CryptoJS;}catch(_){}
+  try{if(typeof require==="function")return require("crypto-js");}catch(_){}
+  return null;
+}
 function solvePoW(challenge,difficulty){
   var target="";
   for(var i=0;i<Number(difficulty||0);i++)target+="0";
-  var n=0,limit=5000000;
+  var C=cryptoJs(),limit=5000000;
+  if(C&&C.SHA256&&C.enc&&C.enc.Hex){
+    for(var n=0;n<=limit;n++){
+      var h=C.SHA256(challenge+String(n)).toString(C.enc.Hex);
+      if(h.indexOf(target)===0)return Promise.resolve(String(n));
+    }
+    return Promise.reject(new Error("PoW timed out"));
+  }
+  var x=0;
   function batch(){
-    var end=Math.min(n+500,limit+1);
-    var jobs=[];
-    for(;n<end;n++){
-      (function(v){jobs.push(sha256HexString(challenge+String(v)).then(function(h){return h.indexOf(target)===0?String(v):null;}));})(n);
+    var end=Math.min(x+256,limit+1),jobs=[];
+    for(;x<end;x++){
+      (function(v){jobs.push(sha256HexString(challenge+String(v)).then(function(h){return h.indexOf(target)===0?String(v):null;}));})(x);
     }
     return Promise.all(jobs).then(function(rows){
       for(var j=0;j<rows.length;j++)if(rows[j]!=null)return rows[j];
-      if(n>limit)throw new Error("PoW timed out");
+      if(x>limit)throw new Error("PoW timed out");
       return batch();
     });
   }

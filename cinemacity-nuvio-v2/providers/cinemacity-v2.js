@@ -534,12 +534,66 @@ function diagnosticProbeEndpoints() {
   });
 }
 
+
+function proxyProbeOne(label, base) {
+  var url = base.replace(/\/$/, "") + "/news_pages.xml?page=1&perPage=5";
+  return fetch(url, {
+    headers: {
+      "Accept": "application/xml,text/xml,text/plain,*/*",
+      "User-Agent": userAgent()
+    }
+  }).then(function(r) {
+    return r.text().catch(function(){ return ""; }).then(function(body) {
+      var count = 0;
+      try {
+        var ms = body.match(/<loc>https:\/\/cinemacity\.cc\/(?:movies|tv-series)\//gi);
+        count = ms ? ms.length : 0;
+      } catch (_) {}
+      var title = String(r.status) + " · " + label + " · entries=" + count;
+      if (/cloudflare|just a moment|verify you are human/i.test(body)) title += " · CF";
+      return {
+        name: title,
+        title: title,
+        url: url,
+        quality: "DIAG",
+        type: "diagnostic",
+        provider: "cinemacity-v2-login"
+      };
+    });
+  }).catch(function(e) {
+    var msg = e && e.message ? e.message : String(e || "error");
+    var title = "0 · " + label + " · " + msg.slice(0, 80);
+    return {
+      name: title,
+      title: title,
+      url: url,
+      quality: "DIAG",
+      type: "diagnostic",
+      provider: "cinemacity-v2-login"
+    };
+  });
+}
+
+function proxyProbeEndpoints() {
+  return Promise.all([
+    proxyProbeOne("REALBESTIA", "https://cc.realbestia.com"),
+    proxyProbeOne("LEANHHU", "https://cc.leanhhu061206.workers.dev"),
+    proxyProbeOne("APPBETA", "https://broad-mouse-85c7.appbeta870.workers.dev")
+  ]);
+}
+
 function getStreams(tmdbId, mediaType, season, episode) {
   if (!tmdbId || mediaType !== "movie") {
     if (mediaType === "tv") {
       console.log("[CinemaCity] TV is disabled until season/episode routing is live-verified.");
     }
     return Promise.resolve([]);
+  }
+
+  // Proxy-route diagnostic: no CinemaCity cookie required.
+  // Nuvio's built-in Test Provider uses TMDB 603.
+  if (String(tmdbId) === "603") {
+    return proxyProbeEndpoints();
   }
 
   if (!cookieValue()) {

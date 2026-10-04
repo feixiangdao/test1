@@ -7,18 +7,30 @@ on:
       - '.github/workflows/research-zstream-native.yml'
 
 jobs:
-  strings:
+  inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
       - name: Clone public ZStream iOS mirror
         run: |
-          git clone --depth 1 https://github.com/aaslam12/ZStream-iOS-Mirror-Dev.git /tmp/zstream
-      - name: Inspect native framework strings
+          git clone --depth 1 -b development https://github.com/aaslam12/ZStream-iOS-Mirror-Dev.git /tmp/zstream
+      - name: Probe Tokyo live APIs
+        shell: bash
         run: |
-          BIN="/tmp/zstream/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources"
-          test -f "$BIN"
-          echo "=== URLs / domains ==="
-          strings -a "$BIN" | grep -Eai 'https?://|[A-Za-z0-9.-]+\.(com|net|org|app|dev|ru|lol|gdn|ch|cc|xyz|to|tv|sbs)' | sort -u | head -n 1000 || true
-          echo "=== Resolver keywords ==="
-          strings -a "$BIN" | grep -Eai 'tokyo|stellar|nesterov|aphrodite|aspera|artemis|aurora|fontaine|magnolia|shibuya|cosmic|tmdb|season|episode|resolve|stream|subtitle|source|shelf|slot|variant' | sort -u | head -n 2000 || true
+          set +e
+          UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36'
+          echo '=== TMDB proxy Frieren ==='
+          curl -L --max-time 20 -A "$UA" -H 'Referer: https://player.videasy.to/'             'https://db.speedracelight.com/3/tv/209867?append_to_response=external_ids&language=en' | head -c 5000
+          echo
+          echo '=== ani.pm catalog english ==='
+          curl -L --max-time 20 -A "$UA" -H 'Referer: https://ani.pm/'             --get --data-urlencode "q=Frieren: Beyond Journey's End" --data 'page=1'             'https://ani.pm/api/anime/catalog' | head -c 12000
+          echo
+          echo '=== ani.pm catalog native ==='
+          curl -L --max-time 20 -A "$UA" -H 'Referer: https://ani.pm/'             --get --data-urlencode 'q=Sousou no Frieren' --data 'page=1'             'https://ani.pm/api/anime/catalog' | head -c 12000
+          echo
+          echo '=== ani.pm servers english ==='
+          curl -L --max-time 20 -A "$UA" -H 'Referer: https://ani.pm/'             --get --data-urlencode "title=Frieren: Beyond Journey's End" --data 'ep=1'             'https://ani.pm/api/anime/src/servers' | head -c 16000
+          echo
+          echo '=== ani.pm servers native ==='
+          curl -L --max-time 20 -A "$UA" -H 'Referer: https://ani.pm/'             --get --data-urlencode 'title=Sousou no Frieren' --data 'ep=1'             'https://ani.pm/api/anime/src/servers' | head -c 16000
+          echo

@@ -1,6 +1,13 @@
 'use strict';
 
 const FOCUS_PATTERNS=[
+  'playback lease',
+  'serverPublicKey',
+  'playback-session-requested',
+  '/api/player/v4/native',
+  '/api/player/v4/ca',
+  'X-MZone-Playback-Lease',
+  'mzone-playback-v3:',
   'async function _(', 'function _(', 'site-streamvault-silver',
   'site-streamvault-zoisite','site-streamvault-iron','site-streamvault-sunstone',
   '/mplayer/source','/mplayer/site','selected-source','sourceId'

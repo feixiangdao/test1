@@ -444,10 +444,10 @@ function resolveFromDetail(detail) {
 }
 
 function getStreams(tmdbId, mediaType, season, episode) {
-  if (!tmdbId || (mediaType !== "movie" && mediaType !== "tv")) {
-    return Promise.resolve([]);
-  }
-  if (mediaType === "tv" && (!season || !episode)) {
+  if (!tmdbId || mediaType !== "movie") {
+    if (mediaType === "tv") {
+      console.log("[CinemaCity] TV is disabled until season/episode routing is live-verified.");
+    }
     return Promise.resolve([]);
   }
 
@@ -456,17 +456,13 @@ function getStreams(tmdbId, mediaType, season, episode) {
     return Promise.resolve([]);
   }
 
-  console.log("[CinemaCity] " + mediaType + " tmdb=" + tmdbId +
-    (mediaType === "tv" ? " S" + season + "E" + episode : ""));
+  console.log("[CinemaCity] movie tmdb=" + tmdbId);
 
   return tmdbMeta(tmdbId, mediaType)
     .then(function(meta) {
       return locateDetail(meta, mediaType);
     })
     .then(function(detail) {
-      // Episode switching is site-specific. We do not guess an endpoint.
-      // If the authenticated page exposes episode-specific direct media,
-      // it will be returned; otherwise the provider fails closed.
       return resolveFromDetail(detail);
     })
     .then(function(streams) {

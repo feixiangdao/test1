@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.19.0",
+  "version": "4.20.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -904,15 +904,15 @@
     {
       "id": "noctra-nesterov",
       "name": "NoctraTV · Nesterov",
-      "description": "noctratv.com Nesterov family. Updated from the stale Helios/AES route to the current NextGenCloud/VaPlayer TMDB data API discovered from ZStream native code; resolves data.stream_urls locally and returns only verified HLS masters.",
-      "version": "2.0.0",
+      "description": "noctratv.com Nesterov family. Current NextGenCloud/VaPlayer TMDB data API resolver; resolves data.stream_urls locally and returns only verified HLS masters. Enabled after repeated CI verification across Fight Club, Game of Thrones, Dune Part Two and Breaking Bad.",
+      "version": "2.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
       "filename": "providers/nesterov.js",
-      "enabled": false,
+      "enabled": true,
       "formats": [
         "m3u8"
       ],

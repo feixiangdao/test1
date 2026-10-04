@@ -532,6 +532,7 @@ function diagnosticProbeEndpoints() {
     };
     return [first].concat(rows || []);
   });
+}
 
 function getStreams(tmdbId, mediaType, season, episode) {
   if (!tmdbId || mediaType !== "movie") {

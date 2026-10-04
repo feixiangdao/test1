@@ -70,17 +70,6 @@ jobs:
             await run('zstream-stellar.js','Stellar',[
               ['movie',[238,'movie']],['tv',[1399,'tv',1,1]]
             ]);
-            console.log('Vidy candidate city probe');
-            const st=require('./providers/zstream-stellar.js');
-            for(const src of ['Miami','Boise','Orlando','Atlanta','Tampa','Portland']){
-              try{
-                const r=await timeout(st._resolveOne('movie',238,null,null,src),20000,'city '+src);
-                const v=r&&r.url?await timeout(st._verifyResolved(r),12000,'verify '+src):null;
-                console.log('CITY '+src+' source='+(r&&r.source?r.source:'none')+' playable='+(v?1:0));
-              }catch(e){
-                console.log('CITY '+src+' error '+(e&&e.message?e.message:e));
-              }
-            }
             const tokyo=await run('zstream-tokyo.js','Tokyo',[
               ['Frieren S01E01',[209867,'tv',1,1]]
             ]);

@@ -9,41 +9,23 @@ on:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 5
     steps:
-      - name: Download public ZStream native binary
-        run: |
-          set -euxo pipefail
-          curl -L --fail --retry 3 -o /tmp/ZStreamNativeSources \
-            https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources
-          file /tmp/ZStreamNativeSources
-          sha256sum /tmp/ZStreamNativeSources
-
-      - name: Basic symbols and strings
-        run: |
-          set -euo pipefail
-          echo "=== resolver symbols ==="
-          llvm-nm --defined-only /tmp/ZStreamNativeSources \
-            | c++filt \
-            | grep -Ei 'zs_(aphrodite|aspera|nesterov|stellar|tokyo)Resolve|resolveArtemisKeyless' || true
-          echo "=== compact endpoint list ==="
-          strings -a -n 4 /tmp/ZStreamNativeSources \
-            | grep -E 'https?://|/api/|/movie/|/tv/|/stream|/seed|/search|sources-with-title|fontaine|wingsdatabase|speedracelight|zstream\.mov' \
-            | sort -u || true
-
-      - name: Install Mach-O analysis helpers
-        run: python3 -m pip install --quiet lief capstone
-
-      - name: Probe current Nesterov/VaPlayer endpoints
+      - name: Probe current Nesterov and VaPlayer endpoints
+        shell: bash
         run: |
           set -euo pipefail
           UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36'
-          for url in \
-            'https://nextgencloudfabric.com?tmdb=238&type=movie' \
-            'https://streamdata.vaplayer.ru/api.php?tmdb=238&type=movie' \
-            'https://nextgencloudfabric.com?tmdb=1399&type=tv&season=1&episode=1' \
-            'https://streamdata.vaplayer.ru/api.php?tmdb=1399&type=tv&season=1&episode=1'; do
+          urls=(
+            'https://nextgencloudfabric.com?tmdb=238&type=movie'
+            'https://streamdata.vaplayer.ru/api.php?tmdb=238&type=movie'
+            'https://nextgencloudfabric.com?tmdb=1399&type=tv&season=1&episode=1'
+            'https://streamdata.vaplayer.ru/api.php?tmdb=1399&type=tv&season=1&episode=1'
+          )
+          for url in "${urls[@]}"; do
             echo "===== $url ====="
+            : > /tmp/h
+            : > /tmp/b
             curl -L -sS --max-time 15 -D /tmp/h \
               -A "$UA" \
               -H 'Origin: https://nextgencloudfabric.com' \
@@ -51,131 +33,5 @@ jobs:
               "$url" -o /tmp/b || true
             head -n 1 /tmp/h || true
             grep -iE '^(content-type|location):' /tmp/h || true
-            python3 - <<'PY'
-import json
-raw=open('/tmp/b','rb').read()
-print('bytes=',len(raw))
-txt=raw.decode('utf-8','replace')
-try:
-    j=json.loads(txt)
-    print('json_keys=',list(j)[:20] if isinstance(j,dict) else type(j).__name__)
-    if isinstance(j,dict):
-        d=j.get('data')
-        print('data_type=',type(d).__name__)
-        if isinstance(d,dict):
-            print('data_keys=',list(d)[:30])
-            su=d.get('stream_urls')
-            print('stream_urls_type=',type(su).__name__,'count=',len(su) if isinstance(su,list) else None)
-            if isinstance(su,list) and su:
-                print('stream0_host=',__import__('urllib.parse').parse.urlparse(str(su[0])).hostname)
-except Exception:
-    print('prefix=',txt[:240].replace('\n',' '))
-PY
+            python3 -c 'import json,urllib.parse; raw=open("/tmp/b","rb").read(); print("bytes=",len(raw)); txt=raw.decode("utf-8","replace"); try:  j=json.loads(txt); print("json_keys=",list(j)[:20] if isinstance(j,dict) else type(j).__name__); d=j.get("data") if isinstance(j,dict) else None; print("data_type=",type(d).__name__); print("data_keys=",list(d)[:30] if isinstance(d,dict) else None); su=d.get("stream_urls") if isinstance(d,dict) else None; print("stream_urls_type=",type(su).__name__,"count=",len(su) if isinstance(su,list) else None); print("stream0_host=",urllib.parse.urlparse(str(su[0])).hostname if isinstance(su,list) and su else None) except Exception: print("prefix=",txt[:240].replace(chr(10)," "))'
           done
-
-      - name: Map resolver functions to referenced strings
-        run: |
-          cat > /tmp/xrefs.py <<'PY'
-          import lief, re
-          from capstone import Cs, CS_ARCH_ARM64, CS_MODE_ARM, arm64
-
-          path="/tmp/ZStreamNativeSources"
-          fat=lief.MachO.parse(path)
-          binary=fat.at(0) if hasattr(fat, "at") else fat
-
-          # Collect null-terminated printable strings by virtual address from all readable sections.
-          strmap={}
-          for sec in binary.sections:
-              data=bytes(sec.content)
-              base=int(sec.virtual_address)
-              i=0
-              while i < len(data):
-                  if 32 <= data[i] < 127:
-                      j=i
-                      while j<len(data) and 32 <= data[j] < 127:
-                          j+=1
-                      if j-i>=3:
-                          try:
-                              s=data[i:j].decode("ascii")
-                              strmap[base+i]=s
-                          except Exception:
-                              pass
-                      i=j+1
-                  else:
-                      i+=1
-
-          textsec=None
-          for sec in binary.sections:
-              if sec.name=="__text":
-                  textsec=sec; break
-          if textsec is None:
-              raise SystemExit("__text not found")
-          text_base=int(textsec.virtual_address)
-          text_data=bytes(textsec.content)
-
-          syms=[]
-          for s in binary.symbols:
-              name=s.name or ""
-              val=int(s.value)
-              if val and text_base <= val < text_base+len(text_data):
-                  syms.append((val,name))
-          syms=sorted(set(syms))
-
-          targets=["zs_aphroditeResolve","zs_asperaResolve","zs_nesterovResolve","zs_stellarResolve","zs_tokyoResolve","resolveArtemisKeyless"]
-
-          md=Cs(CS_ARCH_ARM64, CS_MODE_ARM)
-          md.detail=True
-
-          def nearby_string(addr):
-              if addr in strmap: return strmap[addr]
-              # Sometimes address lands a few bytes into a string.
-              for a,s in strmap.items():
-                  if a <= addr < a+len(s):
-                      return s[addr-a:]
-              return None
-
-          def function_range(idx):
-              start,name=syms[idx]
-              end=text_base+len(text_data)
-              for j in range(idx+1,len(syms)):
-                  if syms[j][0]>start:
-                      end=syms[j][0]; break
-              return start,end,name
-
-          for idx,(start,name) in enumerate(syms):
-              if not any(t in name for t in targets):
-                  continue
-              end, nm = None, name
-              s,e,nm=function_range(idx)
-              off=s-text_base
-              blob=text_data[off:off+(e-s)]
-              regs={}
-              refs=[]
-              for ins in md.disasm(blob,s):
-                  try:
-                      if ins.id==arm64.ARM64_INS_ADRP and len(ins.operands)>=2 and ins.operands[0].type==arm64.ARM64_OP_REG and ins.operands[1].type==arm64.ARM64_OP_IMM:
-                          regs[ins.operands[0].reg]=ins.operands[1].imm
-                      elif ins.id==arm64.ARM64_INS_ADR and len(ins.operands)>=2 and ins.operands[0].type==arm64.ARM64_OP_REG and ins.operands[1].type==arm64.ARM64_OP_IMM:
-                          addr=ins.operands[1].imm
-                          regs[ins.operands[0].reg]=addr
-                          ss=nearby_string(addr)
-                          if ss: refs.append((ins.address,addr,ss))
-                      elif ins.id==arm64.ARM64_INS_ADD and len(ins.operands)>=3:
-                          dst,src,imm=ins.operands[:3]
-                          if dst.type==arm64.ARM64_OP_REG and src.type==arm64.ARM64_OP_REG and imm.type==arm64.ARM64_OP_IMM and src.reg in regs:
-                              addr=regs[src.reg]+imm.imm
-                              regs[dst.reg]=addr
-                              ss=nearby_string(addr)
-                              if ss: refs.append((ins.address,addr,ss))
-                  except Exception:
-                      pass
-              print("\n===== FUNCTION", nm, hex(s), "-", hex(e), "=====")
-              seen=set()
-              for ia,a,ss in refs:
-                  key=(a,ss)
-                  if key in seen: continue
-                  seen.add(key)
-                  if len(ss)>500: ss=ss[:500]
-                  print(hex(ia), "->", hex(a), repr(ss))
-          PY
-          python3 /tmp/xrefs.py

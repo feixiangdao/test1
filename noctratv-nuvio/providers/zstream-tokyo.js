@@ -7,6 +7,10 @@
 
 var ANI="https://ani.pm";
 var EMBED="https://embed.settlar.io";
+var MEGAPLAY_KEY="i?LMTAx0Q6,:}50U";
+var MEGAPLAY_IV="W0;27ToaUpl_P%'c";
+var MEGAPLAY_CDN_SECRET="MpCdnT0k3n!9f2K#xQ7vL5mR8wN1pY4s";
+var MEGAPLAY_TTL=21600;
 var TMDB="https://api.themoviedb.org/3";
 var TMDB_KEY="439c478a771f35c05022f9feabcca01c";
 var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
@@ -145,7 +149,7 @@ function subtitleRows(list,label){
 function bootstrap(id,episode,channel){
   var u=ANI+"/api/anime/playback-bootstrap/settlar/"+
     encodeURIComponent(String(id))+"?ep="+encodeURIComponent(String(episode))+
-    "&lang="+encodeURIComponent(channel);
+    "&lang="+encodeURIComponent(channel)+"&backup=1";
   return getJson(u,ANI+"/",12000).catch(function(e){
     throw new Error("bootstrap "+(e&&e.message?e.message:e));
   });
@@ -166,13 +170,116 @@ function embedSession(embedUrl){
   var tok;
   try{tok=decodeURIComponent(m[1]);}catch(_){tok=m[1];}
   var u=EMBED+"/api/embed/session?t="+encodeURIComponent(tok);
-  return getJson(u,embedUrl,15000).catch(function(e){
+  var h={
+    "User-Agent":UA,
+    "Accept":"application/json",
+    "Accept-Language":"en-US,en;q=0.9",
+    "Referer":embedUrl,
+    "Sec-Fetch-Site":"same-origin",
+    "Sec-Fetch-Mode":"cors",
+    "Sec-Fetch-Dest":"empty"
+  };
+  return withTimeout(fetch(u,{headers:h}),15000,"embed-session").then(function(r){
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    return r.json();
+  }).catch(function(e){
     throw new Error("embed-session "+(e&&e.message?e.message:e));
   });
 }
-function verifyHls(url){
+function cryptoJs(){
+  try{if(globalThis.CryptoJS)return globalThis.CryptoJS;}catch(_){}
+  try{if(typeof require==="function")return require("crypto-js");}catch(_){}
+  return null;
+}
+function b64urlToWord(s){
+  var C=cryptoJs(); if(!C)throw new Error("CryptoJS unavailable");
+  s=String(s||"").replace(/-/g,"+").replace(/_/g,"/");
+  while(s.length%4)s+="=";
+  return C.enc.Base64.parse(s);
+}
+function wordToB64url(w){
+  var C=cryptoJs(); if(!C)throw new Error("CryptoJS unavailable");
+  return C.enc.Base64.stringify(w).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function megaplayDecrypt(enc){
+  var C=cryptoJs(); if(!C)return"";
+  try{
+    var keyBytes=[];
+    for(var i=0;i<MEGAPLAY_KEY.length;i++)keyBytes.push(MEGAPLAY_KEY.charCodeAt(i)&255);
+    while(keyBytes.length<32)keyBytes.push(0);
+    var ivBytes=[];
+    for(var j=0;j<MEGAPLAY_IV.length;j++)ivBytes.push(MEGAPLAY_IV.charCodeAt(j)&255);
+    while(ivBytes.length<16)ivBytes.push(0);
+    function wa(bytes){
+      var hex="";for(var k=0;k<bytes.length;k++)hex+=bytes[k].toString(16).padStart(2,"0");
+      return C.enc.Hex.parse(hex);
+    }
+    var cp=C.lib.CipherParams.create({ciphertext:b64urlToWord(enc)});
+    var plain=C.AES.decrypt(cp,wa(keyBytes.slice(0,32)),{iv:wa(ivBytes.slice(0,16)),mode:C.mode.CBC,padding:C.pad.Pkcs7});
+    var text=plain.toString(C.enc.Utf8);
+    var data=JSON.parse(text);
+    if(typeof data==="string")return data;
+    if(data&&data.file)return data.file;
+    if(Array.isArray(data)&&data.length)return clean(data[0].file||data[0].url);
+  }catch(_){}
+  return"";
+}
+function signMegaplayUrl(url){
+  var C=cryptoJs(); if(!C||!url||/[?&]token=/.test(url))return url;
+  var m=String(url).match(/\/([a-f0-9]{32})\/([a-f0-9]{32})\//i);
+  if(!m)return url;
+  var path=m[1].toLowerCase()+"/"+m[2].toLowerCase();
+  var msg=(Math.floor(Date.now()/1000)+MEGAPLAY_TTL)+"|"+path;
+  var lhs=wordToB64url(C.enc.Utf8.parse(msg));
+  var rhs=wordToB64url(C.HmacSHA256(msg,MEGAPLAY_CDN_SECRET));
+  return url+(url.indexOf("?")>=0?"&":"?")+"token="+lhs+"."+rhs;
+}
+function resolveMegaPlay(boot,channel){
+  var be=boot&&boot.backupEmbed;
+  if(!be||be.available===false||!clean(be.url))return Promise.resolve(null);
+  var pageUrl=clean(be.url),mm=/^(https?:\/\/[^/]+)/.exec(pageUrl);
+  if(!mm)return Promise.resolve(null);
+  var host=mm[1];
+  return withTimeout(fetch(pageUrl,{headers:{"User-Agent":UA,"Referer":ANI+"/"}}),12000,"megaplay-page")
+    .then(function(r){if(!r.ok)throw new Error("page HTTP "+r.status);return r.text();})
+    .then(function(html){
+      var m=/data-id="(\d+)"/.exec(String(html||""));
+      if(!m)throw new Error("data-id missing");
+      return withTimeout(fetch(host+"/stream/getSources?id="+encodeURIComponent(m[1]),{
+        headers:{"User-Agent":UA,"Referer":host+"/","X-Requested-With":"XMLHttpRequest","Accept":"application/json"}
+      }),12000,"megaplay-api");
+    })
+    .then(function(r){if(!r.ok)throw new Error("api HTTP "+r.status);return r.json();})
+    .then(function(sd){
+      var u="";
+      if(sd&&sd.sources){
+        if(typeof sd.sources==="string")u=sd.sources;
+        else if(sd.sources.file)u=sd.sources.file;
+        else if(Array.isArray(sd.sources)&&sd.sources.length)u=clean(sd.sources[0].file||sd.sources[0].url);
+      }
+      if(!u&&sd&&sd.enc)u=megaplayDecrypt(sd.enc);
+      if(!u)throw new Error("stream missing");
+      u=signMegaplayUrl(u);
+      return verifyHlsWithHeaders(u,{"User-Agent":UA,"Referer":host+"/"}).then(function(v){
+        var lab=channel==="dub"?"DUB":"SUB";
+        var q=v.quality;
+        var name="NoctraTV · ZStream · Tokyo · MegaPlay · "+lab+" · "+q;
+        return{
+          name:name,title:name,url:u,quality:q,type:"hls",
+          provider:"noctra-zstream-tokyo",
+          headers:{"User-Agent":UA,"Referer":host+"/"},
+          subtitles:[],
+          language:channel==="dub"?"en":"ja"
+        };
+      });
+    }).catch(function(e){
+      console.log("[Noctra/ZStream/Tokyo] "+channel+" megaplay "+(e&&e.message?e.message:e));
+      return null;
+    });
+}
+function verifyHlsWithHeaders(url,h){
   if(!/^https:\/\//i.test(clean(url)))return Promise.reject(new Error("bad HLS URL"));
-  return withTimeout(fetch(url,{headers:{"User-Agent":UA,"Accept":"application/vnd.apple.mpegurl,*/*"}}),12000,"HLS")
+  return withTimeout(fetch(url,{headers:h||{"User-Agent":UA}}),12000,"HLS")
     .then(function(r){
       if(!r.ok)throw new Error("HLS HTTP "+r.status);
       return r.text();
@@ -181,36 +288,43 @@ function verifyHls(url){
       return{quality:maxQuality(body),body:body};
     });
 }
+function verifyHls(url){
+  return verifyHlsWithHeaders(url,{"User-Agent":UA,"Accept":"application/vnd.apple.mpegurl,*/*"});
+}
 function resolveChannel(anime,episode,channel){
   var id=anime&&anime.id;
   if(!id)return Promise.resolve(null);
+  var bootObj=null;
   return bootstrap(id,episode,channel).then(function(b){
-    if(!b||!clean(b.settlarSelection))return null;
-    var effective=clean(b.effectiveLanguage)==="dub"?"dub":"sub";
+    bootObj=b;
+    var effective=clean(b&&b.effectiveLanguage)==="dub"?"dub":"sub";
     if(effective!==channel)return null;
-    if(b.availability&&b.availability[channel]===false)return null;
-    return formalSession(clean(b.settlarSelection),episode,channel);
-  }).then(function(s){
-    if(!s||!clean(s.embedUrl))return null;
-    return embedSession(clean(s.embedUrl));
-  }).then(function(e){
-    if(!e||clean(e.kind)!=="hls"||!/^https:\/\//i.test(clean(e.source)))return null;
-    return verifyHls(clean(e.source)).then(function(v){
-      var lab=channel==="dub"?"DUB":"SUB";
-      var q=v.quality;
-      var name="NoctraTV · ZStream · Tokyo · ani.pm · "+lab+" · "+q;
-      return{
-        name:name,
-        title:name,
-        url:clean(e.source),
-        quality:q,
-        type:"hls",
-        provider:"noctra-zstream-tokyo",
-        headers:{"User-Agent":UA},
-        subtitles:subtitleRows(e.subtitles,lab),
-        language:clean(e.audioLang)||(channel==="dub"?"en":"ja")
-      };
+    if(b&&b.availability&&b.availability[channel]===false)return null;
+    if(!b||!clean(b.settlarSelection))return null;
+    return formalSession(clean(b.settlarSelection),episode,channel).then(function(s){
+      if(!s||!clean(s.embedUrl))return null;
+      return embedSession(clean(s.embedUrl)).then(function(e){
+        if(!e||clean(e.kind)!=="hls"||!/^https:\/\//i.test(clean(e.source)))return null;
+        return verifyHls(clean(e.source)).then(function(v){
+          var lab=channel==="dub"?"DUB":"SUB";
+          var q=v.quality;
+          var name="NoctraTV · ZStream · Tokyo · ani.pm · "+lab+" · "+q;
+          return{
+            name:name,title:name,url:clean(e.source),quality:q,type:"hls",
+            provider:"noctra-zstream-tokyo",
+            headers:{"User-Agent":UA},
+            subtitles:subtitleRows(e.subtitles,lab),
+            language:clean(e.audioLang)||(channel==="dub"?"en":"ja")
+          };
+        });
+      });
+    }).catch(function(err){
+      console.log("[Noctra/ZStream/Tokyo] "+channel+" settlar "+(err&&err.message?err.message:err));
+      return null;
     });
+  }).then(function(primary){
+    if(primary)return primary;
+    return resolveMegaPlay(bootObj,channel);
   }).catch(function(err){
     console.log("[Noctra/ZStream/Tokyo] "+channel+" "+(err&&err.message?err.message:err));
     return null;

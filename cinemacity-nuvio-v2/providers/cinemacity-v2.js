@@ -692,6 +692,125 @@ function directOriginProbes() {
   });
 }
 
+
+function inspectSearchBody(body) {
+  var html = clean(body);
+  var links = [];
+  var seen = {};
+  var re = /href\s*=\s*["']([^"']+\/(?:movies|tv-series)\/[^"']+\.html(?:\?[^"']*)?)["']/ig;
+  var m;
+  while ((m = re.exec(html)) !== null) {
+    var u = resolveUrl(m[1], BASE + "/");
+    if (u && isCinemaCityHost(u) && !seen[u]) {
+      seen[u] = 1;
+      links.push(u);
+      if (links.length >= 8) break;
+    }
+  }
+
+  var hash = "";
+  var hm = html.match(/(?:dle_login_hash|dle_hash)\s*[:=]\s*["']([^"']+)["']/i);
+  if (hm) hash = hm[1];
+
+  return {
+    links: links,
+    hashFound: hash ? 1 : 0,
+    hash: hash
+  };
+}
+
+function browserNavHeaders(referer) {
+  var h = baseHeaders(referer || (BASE + "/"), true);
+  h["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
+  h["Cache-Control"] = "no-cache";
+  h["Pragma"] = "no-cache";
+  h["Upgrade-Insecure-Requests"] = "1";
+  h["Sec-Fetch-Dest"] = "document";
+  h["Sec-Fetch-Mode"] = "navigate";
+  h["Sec-Fetch-Site"] = "same-origin";
+  h["Sec-Fetch-User"] = "?1";
+  return h;
+}
+
+function searchAndCandidateProbe() {
+  var q = "The Matrix";
+  var searchUrl = BASE + "/index.php?do=search";
+  var headers = baseHeaders(BASE + "/", true);
+  headers["X-Requested-With"] = "XMLHttpRequest";
+  headers["Origin"] = BASE;
+  headers["Content-Type"] = "application/x-www-form-urlencoded";
+  var body = "do=search&subaction=search&story=" + encodeURIComponent(q);
+
+  return fetch(searchUrl, {
+    method: "POST",
+    headers: headers,
+    body: body
+  }).then(function(r) {
+    return r.text().then(function(html) {
+      var info = inspectSearchBody(html);
+      var cf = challengeHtml(html) ? 1 : 0;
+      var guest = guestBlocked(html) ? 1 : 0;
+
+      var searchTitle = String(r.status) + " · SEARCH2 · CF=" + cf +
+        " G=" + guest +
+        " L=" + String(html.length) +
+        " LINKS=" + String(info.links.length) +
+        " HASH=" + String(info.hashFound);
+
+      var searchRow = {
+        name: searchTitle,
+        title: searchTitle,
+        url: searchUrl,
+        quality: "DIAG",
+        type: "diagnostic",
+        provider: "cinemacity-v2-login"
+      };
+
+      if (!info.links.length) return [searchRow];
+
+      var candidate = info.links[0];
+      return fetch(candidate, {
+        headers: browserNavHeaders(searchUrl)
+      }).then(function(cr) {
+        return cr.text().then(function(ch) {
+          var ctitle = String(cr.status) + " · CANDIDATE · CF=" + (challengeHtml(ch) ? 1 : 0) +
+            " G=" + (guestBlocked(ch) ? 1 : 0) +
+            " A=" + (/atob\s*\(/i.test(ch) ? 1 : 0) +
+            " L=" + String(ch.length);
+          return [searchRow, {
+            name: ctitle,
+            title: ctitle,
+            url: candidate,
+            quality: "DIAG",
+            type: "diagnostic",
+            provider: "cinemacity-v2-login"
+          }];
+        });
+      }).catch(function(e) {
+        var msg = e && e.message ? e.message : String(e || "error");
+        return [searchRow, {
+          name: "0 · CANDIDATE · " + msg.slice(0, 90),
+          title: "0 · CANDIDATE · " + msg.slice(0, 90),
+          url: candidate,
+          quality: "DIAG",
+          type: "diagnostic",
+          provider: "cinemacity-v2-login"
+        }];
+      });
+    });
+  }).catch(function(e) {
+    var msg = e && e.message ? e.message : String(e || "error");
+    return [{
+      name: "0 · SEARCH2 · " + msg.slice(0, 100),
+      title: "0 · SEARCH2 · " + msg.slice(0, 100),
+      url: searchUrl,
+      quality: "DIAG",
+      type: "diagnostic",
+      provider: "cinemacity-v2-login"
+    }];
+  });
+}
+
 function getStreams(tmdbId, mediaType, season, episode) {
   if (!tmdbId || mediaType !== "movie") {
     if (mediaType === "tv") {
@@ -703,7 +822,9 @@ function getStreams(tmdbId, mediaType, season, episode) {
   // Direct-origin diagnostic using the user's current Cookie + User-Agent.
   // Nuvio's built-in Test Provider uses TMDB 603.
   if (String(tmdbId) === "603") {
-    return directOriginProbes();
+    return searchAndCandidateProbe().then(function(rows) {
+      return [localSessionDiagnostic()].concat(rows || []);
+    });
   }
 
   if (!cookieValue()) {

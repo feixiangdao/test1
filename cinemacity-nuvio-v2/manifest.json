@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.2.0",
-  "description": "Fresh-path CinemaCity Nuvio plugin to avoid stale repository/provider cache. Movie-only experimental authenticated resolver with local Session Cookie and User-Agent settings.",
+  "version": "0.2.1",
+  "description": "CinemaCity V2 diagnostic build. Test Provider now returns a visible diagnostic result on Cookie, login, Cloudflare, search, or media-resolution failure instead of silently returning zero streams.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "Movie-only experimental CinemaCity resolver. Configure your own signed-in CinemaCity Session Cookie and matching browser User-Agent in Provider Settings. Returns direct HLS/MP4/DASH only.",
-      "version": "0.2.0",
+      "description": "Movie-only CinemaCity diagnostic resolver. Configure your own signed-in Session Cookie and matching browser User-Agent. Test Provider shows the failure stage instead of silently returning 0.",
+      "version": "0.2.1",
       "supportedTypes": [
         "movie"
       ],

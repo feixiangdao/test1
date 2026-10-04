@@ -5,10 +5,11 @@ var SITE="https://aether.ist";
 var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/146 Mobile Safari/537.36";
 var SIMPLE=[
   {name:"Link",base:"https://link.aether.cx",field:"stream",tvSeg:"tv"},
-  {name:"Lul",base:"https://lul.aether.cx",field:"stream",tvSeg:"tv"},
-  {name:"Tiki",base:"https://tiki.aether.cx",field:"stream",tvSeg:"tv"}
+  {name:"Lul",base:"https://lul.aether.cx",field:"stream",tvSeg:"tv"}
 ];
 var MERIDIAN="https://meridian.aether.cx";
+var SUBTITULADO="https://le.aether.cx";
+var GALLIC="https://api.pope-walrus-spiffy.workers.dev";
 
 function clean(v){return v==null?"":String(v).trim();}
 function headers(extra){
@@ -85,6 +86,30 @@ function meridian(id,type,s,e){
     console.log("[Noctra/Aether] Meridian "+(err&&err.message?err.message:err));return[];
   });
 }
+
+function subtitulado(id,type,s,e){
+  var path=type==="tv"?"/tv/"+id+"/"+Number(s||1)+"/"+Number(e||1)+"?ser=tik":"/movie/"+id+"?lang=sub";
+  return getJson(SUBTITULADO+path).then(function(j){
+    var x=make("Subtitulado",j&&j.url,j&&(j.quality||j.label),null,subs(j&&j.subtitles,"Subtitulado"));
+    if(x)x.language="Spanish";
+    return x?[x]:[];
+  }).catch(function(err){
+    console.log("[Noctra/Aether] Subtitulado "+(err&&err.message?err.message:err));return[];
+  });
+}
+function gallic(id,type,s,e){
+  var path=type==="tv"?"/tv/"+id+"/"+Number(s||1)+"/"+Number(e||1):"/movie/"+id;
+  return getJson(GALLIC+path).then(function(j){
+    var a=j&&j.success&&Array.isArray(j.streams)?j.streams:[];
+    return a.map(function(row){
+      var x=make("Gallic"+(row&&row.provider?" / "+row.provider:""),row&&(row.url||row.file),row&&(row.quality||row.title),null,[]);
+      if(x)x.language="French";
+      return x;
+    }).filter(Boolean);
+  }).catch(function(err){
+    console.log("[Noctra/Aether] Gallic "+(err&&err.message?err.message:err));return[];
+  });
+}
 function dedupe(groups){
   var out=[],seen={};
   (groups||[]).forEach(function(g){(g||[]).forEach(function(x){
@@ -97,6 +122,8 @@ function getStreams(tmdbId,mediaType,season,episode){
   if(mediaType==="tv"&&(!season||!episode))return Promise.resolve([]);
   var tasks=SIMPLE.map(function(p){return simpleOne(p,tmdbId,mediaType,season,episode);});
   tasks.push(meridian(tmdbId,mediaType,season,episode));
+  tasks.push(subtitulado(tmdbId,mediaType,season,episode));
+  tasks.push(gallic(tmdbId,mediaType,season,episode));
   return Promise.all(tasks).then(function(groups){
     var out=dedupe(groups);
     console.log("[Noctra/Aether] "+mediaType+" "+tmdbId+" streams="+out.length);

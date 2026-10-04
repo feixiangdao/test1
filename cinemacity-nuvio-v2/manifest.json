@@ -1,0 +1,28 @@
+{
+  "name": "CinemaCity Local V2",
+  "version": "0.2.0",
+  "description": "Fresh-path CinemaCity Nuvio plugin to avoid stale repository/provider cache. Movie-only experimental authenticated resolver with local Session Cookie and User-Agent settings.",
+  "scrapers": [
+    {
+      "id": "cinemacity-v2-login",
+      "name": "CinemaCity V2 · Login Session",
+      "description": "Movie-only experimental CinemaCity resolver. Configure your own signed-in CinemaCity Session Cookie and matching browser User-Agent in Provider Settings. Returns direct HLS/MP4/DASH only.",
+      "version": "0.2.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/cinemacity-v2.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true,
+      "hasSettings": true
+    }
+  ]
+}

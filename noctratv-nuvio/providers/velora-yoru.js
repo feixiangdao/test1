@@ -3,7 +3,8 @@
 // No iframe / WebView fallback.
 
 var API="https://api.speedracelight.com";
-var DB="https://db.speedracelight.com/3";
+var TMDB="https://api.themoviedb.org/3";
+var TMDB_KEY="68e094699525b18a70bab2f86b1fa706";
 var PLAYER="https://player.videasy.to";
 var UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 var F=[1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580];
@@ -56,16 +57,16 @@ function decryptPayload(payload,seed,mediaId){
   return utf8(r.subarray(MAGIC.length));
 }
 function headers(){return{"User-Agent":UA,"Referer":PLAYER+"/","Origin":PLAYER,"Accept":"application/json, text/plain, */*"};}
-function fetchJson(url){return fetch(url,{headers:headers()}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();});}
+function fetchJson(url,label){return fetch(url,{headers:headers()}).then(function(r){if(!r.ok)throw new Error((label||"HTTP")+" "+r.status);return r.json();});}
 function meta(id,type){
   var t=type==="tv"?"tv":"movie";
-  return fetchJson(DB+"/"+t+"/"+encodeURIComponent(String(id))+"?append_to_response=external_ids").then(function(d){
+  return fetchJson(TMDB+"/"+t+"/"+encodeURIComponent(String(id))+"?api_key="+encodeURIComponent(TMDB_KEY)+"&append_to_response=external_ids","TMDB").then(function(d){
     var date=clean(t==="tv"?d.first_air_date:d.release_date);
     return{title:clean(t==="tv"?(d.name||d.original_name):(d.title||d.original_title)),year:date?date.slice(0,4):"",imdb:clean(d&&d.external_ids&&d.external_ids.imdb_id),type:t,totalSeasons:d&&d.number_of_seasons};
   });
 }
 function seed(mediaId){
-  return fetchJson(API+"/seed?mediaId="+encodeURIComponent(String(mediaId))).then(function(j){
+  return fetchJson(API+"/seed?mediaId="+encodeURIComponent(String(mediaId)),"seed").then(function(j){
     var s=clean(j&&j.seed);if(!s)throw new Error("seed missing");return s;
   });
 }

@@ -255,11 +255,6 @@ function resolveMegaPlay(boot,channel){
       });
     })
     .then(function(sd){
-      try{
-        console.log("[Noctra/ZStream/Tokyo] "+channel+" megaplay keys="+Object.keys(sd||{}).join(",")+
-          " sourcesType="+(sd&&sd.sources==null?"null":Array.isArray(sd&&sd.sources)?"array":typeof(sd&&sd.sources))+
-          " encType="+(sd&&sd.enc==null?"null":typeof(sd&&sd.enc)));
-      }catch(_){}
       var u="";
       if(sd&&sd.sources){
         if(typeof sd.sources==="string")u=sd.sources;

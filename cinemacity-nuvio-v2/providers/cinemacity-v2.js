@@ -443,6 +443,21 @@ function resolveFromDetail(detail) {
   });
 }
 
+function diagnosticResult(stage, detail) {
+  var safeStage = clean(stage) || "unknown";
+  var safeDetail = clean(detail).replace(/\s+/g, " ").slice(0, 220);
+  var title = "CinemaCity DIAG · " + safeStage;
+  if (safeDetail) title += " · " + safeDetail;
+  return [{
+    name: title,
+    title: title,
+    url: BASE + "/#nuvio-diagnostic-" + encodeURIComponent(safeStage),
+    quality: "DIAG",
+    type: "diagnostic",
+    provider: "cinemacity-v2-login"
+  }];
+}
+
 function getStreams(tmdbId, mediaType, season, episode) {
   if (!tmdbId || mediaType !== "movie") {
     if (mediaType === "tv") {
@@ -453,26 +468,38 @@ function getStreams(tmdbId, mediaType, season, episode) {
 
   if (!cookieValue()) {
     console.log("[CinemaCity] Configure your own signed-in Session Cookie in provider settings.");
-    return Promise.resolve([]);
+    return Promise.resolve(diagnosticResult("NO_COOKIE", "Session Cookie is empty in SCRAPER_SETTINGS"));
   }
 
   console.log("[CinemaCity] movie tmdb=" + tmdbId);
 
+  var stage = "TMDB";
   return tmdbMeta(tmdbId, mediaType)
     .then(function(meta) {
+      stage = "SEARCH";
       return locateDetail(meta, mediaType);
     })
     .then(function(detail) {
+      stage = "PLAYER";
       return resolveFromDetail(detail);
     })
     .then(function(streams) {
       streams = dedupeStreams(streams);
       console.log("[CinemaCity] streams=" + streams.length);
+      if (!streams.length) {
+        return diagnosticResult("NO_MEDIA", "Authenticated page matched, but no direct HLS/MP4/DASH was exposed");
+      }
       return streams;
     })
     .catch(function(e) {
-      console.log("[CinemaCity] " + (e && e.message ? e.message : e));
-      return [];
+      var msg = e && e.message ? e.message : String(e || "unknown error");
+      console.log("[CinemaCity] " + msg);
+      var code = stage;
+      if (/Cloudflare challenge/i.test(msg)) code = "CLOUDFLARE";
+      else if (/not authenticated|expired|Guests are not allowed|Registration is required/i.test(msg)) code = "LOGIN";
+      else if (/search returned no matching|strict title\/year match failed/i.test(msg)) code = "SEARCH";
+      else if (/TMDB/i.test(msg)) code = "TMDB";
+      return diagnosticResult(code, msg);
     });
 }
 

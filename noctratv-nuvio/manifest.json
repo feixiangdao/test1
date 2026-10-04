@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.15.0",
+  "version": "4.16.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -443,8 +443,8 @@
     {
       "id": "noctra-popwatch-vidcore",
       "name": "NoctraTV · PopWatch · VidCore",
-      "description": "noctratv.com PopWatch VidCore family (UI label includes vidsuper-castle). Uses the current VidCore headless token/catalog/decrypt flow and returns direct media only; kept disabled until live catalog mapping is verified.",
-      "version": "1.0.0",
+      "description": "noctratv.com PopWatch VidCore family (UI label includes vidsuper-castle). Uses VidCore's current two-stage headless token/catalog/decrypt flow and returns direct media only; disabled until live catalog mapping is verified.",
+      "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",

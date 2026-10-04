@@ -165,8 +165,4 @@ function getStreams(tmdbId,mediaType,season,episode){
     return[];
   });
 }
-module.exports={
-  getStreams:getStreams,
-  _resolveOne:resolveOne,
-  _verifyResolved:verifyResolved
-};
+module.exports={getStreams:getStreams};

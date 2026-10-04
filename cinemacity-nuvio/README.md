@@ -18,12 +18,12 @@ https://raw.githubusercontent.com/feixiangdao/test1/main/cinemacity-nuvio/manife
 - 网站目前还有 Cloudflare 人机验证，自动化浏览器在未完成人工验证时无法进入真实播放器 DOM；
 - 因此当前没有把任何“猜测的 provider / iframe / 假直链”注册为可用播放源。
 
-## v0.1.0 做了什么
+## v0.1.1 做了什么
 
 首版先完成登录态适配骨架，不伪造一个“已测试可播”的源：
 
 1. 通过 TMDB ID 获取英文标题 / 原始标题 / 年份；
-2. 使用 CinemaCity 自己的搜索入口查找 movie / TV 详情页；
+2. 使用 DataLife Engine 风格的 CinemaCity 搜索请求尝试定位 movie 详情页；该具体 POST/GET 路由尚需登录态实机确认；
 3. 严格比对标题和年份，避免错片；
 4. Provider 设置里允许填写你自己的 Session Cookie；
 5. 可额外填写与该 Cookie 对应的浏览器 User-Agent，用于 Cloudflare cf_clearance 场景；
@@ -52,11 +52,11 @@ Session Cookie 等价于临时登录凭证。只应放在你自己的 Nuvio 本�
 
 公开页面明确要求登录；当前自动化浏览器又被 Cloudflare challenge 挡在播放器之前，因此目前还不能负责任地声称 CinemaCity 的实际登录后播放器直链已经验证成功。
 
-v0.1.0 的原则是：可安装、可配置、可进行真实设备测试，但没有经过登录态验证的 backend 不标记为“已成功”。
+v0.1.1 的原则是：可安装、可配置、可进行真实设备测试，但没有经过登录态验证的 backend 不标记为“已成功”。当前 manifest 只启用 movie；TV 在季/集路由确认前明确禁用。
 
 ### 2. TV episode selector 仍需实机抓一次
 
-电影页和 TV 详情页结构已确认，但第几季第几集如何切换到实际播放器请求，需要在登录后的真实页面抓一次。首版不会猜 endpoint。
+TV 详情页公开结构已确认，但第几季第几集如何切换到实际播放器请求，需要在登录后的真实页面抓一次。因此 v0.1.1 manifest 暂不声明 TV 支持，也不会猜 endpoint。
 
 ### 3. Cloudflare
 
@@ -64,7 +64,7 @@ v0.1.0 的原则是：可安装、可配置、可进行真实设备测试，但�
 
 ## 下一步
 
-在 Nuvio 中安装这个 v0.1.0 后，用一部电影测试即可。
+在 Nuvio 中安装这个 v0.1.1 后，先只用一部电影测试。
 
 如果结果仍然是 0 条，下一轮只需要针对一次真实登录会话定位：
 

@@ -1,19 +1,27 @@
 {
   "name": "CinemaCity Local",
-  "version": "0.1.0",
-  "description": "Independent Nuvio local provider for cinemacity.cc. Uses the user's own authenticated CinemaCity session and returns direct HLS/MP4/DASH only; no iframe/web-player fallback.",
+  "version": "0.1.1",
+  "description": "Independent Nuvio local provider for cinemacity.cc. Experimental authenticated movie resolver: uses the user's own CinemaCity session and returns direct HLS/MP4/DASH only; no iframe/web-player fallback. TV stays disabled until episode routing is verified.",
   "scrapers": [
     {
       "id": "cinemacity-auth",
       "name": "CinemaCity · Authenticated",
-      "description": "Searches cinemacity.cc, strictly matches the requested TMDB title/year, reuses the user's locally configured authenticated session, and extracts direct media URLs exposed by the authenticated CinemaCity page or same-origin player page.",
-      "version": "0.1.0",
+      "description": "Experimental movie-only resolver. Uses the user's locally configured authenticated CinemaCity session, tries strict TMDB title/year matching, and returns only direct media exposed by the authenticated CinemaCity page or same-origin player page. TV is intentionally disabled until season/episode routing is verified.",
+      "version": "0.1.1",
       "author": "CinemaCity Local",
-      "supportedTypes": ["movie", "tv"],
+      "supportedTypes": [
+        "movie"
+      ],
       "filename": "providers/cinemacity.js",
       "enabled": true,
-      "formats": ["m3u8", "mp4", "mpd"],
-      "contentLanguage": ["multi"],
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
       "limited": true,
       "hasSettings": true
     }

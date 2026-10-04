@@ -135,25 +135,28 @@ function getStreams(tmdbId,mediaType,season,episode){
   if(mediaType==="tv"&&(!season||!episode))return Promise.resolve([]);
   var mt=mediaType==="tv"?"tv":"movie";
   var firstResult=null;
-  return resolveOne(mt,tmdbId,season,episode,null).then(function(first){
-    firstResult=first;
-    return verifyResolved(first);
-  }).then(function(x){
-    if(x)return[x];
-    var avail=firstResult&&Array.isArray(firstResult.availableSources)?firstResult.availableSources:[];
-    var i=0;
-    function fallback(){
-      if(i>=avail.length)return Promise.resolve([]);
-      var src=avail[i++];
-      if(firstResult&&src===firstResult.source)return fallback();
-      return resolveOne(mt,tmdbId,season,episode,src).then(verifyResolved).then(function(v){
-        return v?[v]:fallback();
-      }).catch(function(e){
-        console.log("[Noctra/ZStream/Stellar] fallback "+src+" "+(e&&e.message?e.message:e));
-        return fallback();
-      });
-    }
-    return fallback();
+  return resolveOne(mt,tmdbId,season,episode,"Miami").then(verifyResolved).then(function(preferred){
+    if(preferred)return[preferred];
+    return resolveOne(mt,tmdbId,season,episode,null).then(function(first){
+      firstResult=first;
+      return verifyResolved(first);
+    }).then(function(x){
+      if(x)return[x];
+      var avail=firstResult&&Array.isArray(firstResult.availableSources)?firstResult.availableSources:[];
+      var i=0;
+      function fallback(){
+        if(i>=avail.length)return Promise.resolve([]);
+        var src=avail[i++];
+        if(src==="Miami"||(firstResult&&src===firstResult.source))return fallback();
+        return resolveOne(mt,tmdbId,season,episode,src).then(verifyResolved).then(function(v){
+          return v?[v]:fallback();
+        }).catch(function(e){
+          console.log("[Noctra/ZStream/Stellar] fallback "+src+" "+(e&&e.message?e.message:e));
+          return fallback();
+        });
+      }
+      return fallback();
+    });
   }).then(function(out){
     console.log("[Noctra/ZStream/Stellar] "+mediaType+" "+tmdbId+" streams="+out.length);
     return out;

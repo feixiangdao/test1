@@ -1,0 +1,28 @@
+{
+  "name": "CinemaCity Local V3",
+  "version": "0.3.0",
+  "description": "Fresh-path CinemaCity diagnostic build using the syntax-fixed provider. Avoids stale Nuvio cache from V2 and shows compact H/M/S/A endpoint probe results.",
+  "scrapers": [
+    {
+      "id": "cinemacity-v3-login",
+      "name": "CinemaCity V3 · Login Session",
+      "description": "Movie-only CinemaCity diagnostic resolver. Test Provider reports H=HOME, M=MOVIES, S=SEARCH, A=AJAX endpoint status codes.",
+      "version": "0.3.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/cinemacity-v3.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true,
+      "hasSettings": true
+    }
+  ]
+}

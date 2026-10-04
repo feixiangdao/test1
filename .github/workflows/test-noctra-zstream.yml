@@ -21,6 +21,7 @@ jobs:
         run: |
           node --check noctratv-nuvio/providers/zstream-aphrodite.js
           node --check noctratv-nuvio/providers/zstream-stellar.js
+          node --check noctratv-nuvio/providers/zstream-tokyo.js
       - name: ZStream focused live probe
         working-directory: noctratv-nuvio
         run: |
@@ -48,19 +49,28 @@ jobs:
               });
             });
           }
-          async function run(file,label){
+          async function run(file,label,cases){
             const p=require('./providers/'+file);
-            for(const [name,args] of [
-              ['movie',[238,'movie']],
-              ['tv',[1399,'tv',1,1]]
-            ]){
-              const rows=await timeout(p.getStreams(...args),45000,label+' '+name);
-              console.log(label+' '+name+': streams='+(rows||[]).length);
+            let total=0;
+            for(const [name,args] of cases){
+              const rows=await timeout(p.getStreams(...args),55000,label+' '+name);
+              const n=(rows||[]).length;
+              total+=n;
+              console.log(label+' '+name+': streams='+n);
               (rows||[]).slice(0,5).forEach((x,i)=>console.log('  '+(i+1)+'. '+x.name+' '+x.url));
             }
+            return total;
           }
           (async()=>{
-            await run('zstream-aphrodite.js','Aphrodite');
-            await run('zstream-stellar.js','Stellar');
+            await run('zstream-aphrodite.js','Aphrodite',[
+              ['movie',[238,'movie']],['tv',[1399,'tv',1,1]]
+            ]);
+            await run('zstream-stellar.js','Stellar',[
+              ['movie',[238,'movie']],['tv',[1399,'tv',1,1]]
+            ]);
+            const tokyo=await run('zstream-tokyo.js','Tokyo',[
+              ['Frieren S01E01',[209867,'tv',1,1]]
+            ]);
+            if(tokyo<1)throw new Error('Tokyo focused anime probe returned zero streams');
           })().catch(e=>{console.error(e);process.exitCode=1});
           NODE

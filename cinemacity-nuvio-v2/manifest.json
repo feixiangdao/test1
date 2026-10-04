@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.2.1",
-  "description": "CinemaCity V2 diagnostic build. Test Provider now returns a visible diagnostic result on Cookie, login, Cloudflare, search, or media-resolution failure instead of silently returning zero streams.",
+  "version": "0.2.2",
+  "description": "CinemaCity V2 endpoint-probe diagnostic build. On Test Provider search 403, probes HOME, MOVIES, DLE SEARCH_POST and AJAX_SEARCH to identify which CinemaCity routes are usable from Nuvio.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "Movie-only CinemaCity diagnostic resolver. Configure your own signed-in Session Cookie and matching browser User-Agent. Test Provider shows the failure stage instead of silently returning 0.",
-      "version": "0.2.1",
+      "description": "Movie-only CinemaCity diagnostic resolver. Test Provider probes alternate CinemaCity endpoints when the normal search route returns 403.",
+      "version": "0.2.2",
       "supportedTypes": [
         "movie"
       ],

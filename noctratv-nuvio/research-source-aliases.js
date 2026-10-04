@@ -48,6 +48,16 @@ function urlsNear(s,i){
   for(const u of assets){
     let s;
     try{s=await txt(u)}catch(e){console.log('ASSET ERR '+u+' '+e.message);continue}
+    const domains=[...new Set((s.match(/https?:\\?\/\\?\/[^"'\\s)]+/g)||[]).map(function(x){
+      try{return new URL(x.replace(/\\\//g,'/')).hostname}catch(_){return''}
+    }).filter(Boolean))].sort();
+    if(domains.length)console.log('\nDOMAINS '+u+' '+domains.join(' | '));
+    const apiPaths=[...new Set((s.match(/["'`]\\?\/(?:api|v1|v2|graphql|sources?|providers?|servers?|playback)[^"'\`\\s]{0,180}/ig)||[])
+      .map(x=>x.slice(1).replace(/\\\//g,'/')))].slice(0,250);
+    if(apiPaths.length)console.log('API_PATHS '+u+' '+apiPaths.join(' | '));
+    const interesting=[...new Set((s.match(/["'`][^"'\`]{0,100}(?:provider|source|server|playback)[^"'\`]{0,100}["'`]/ig)||[])
+      .map(x=>x.slice(1,-1)).filter(x=>x.length<220))].slice(0,200);
+    if(interesting.length)console.log('INTERESTING '+u+' '+interesting.join(' || '));
     for(const t of TARGETS){
       let from=0,found=0;
       while(found<6){

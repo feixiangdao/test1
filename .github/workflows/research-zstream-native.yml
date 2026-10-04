@@ -9,54 +9,36 @@ on:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 6
     steps:
-      - name: Inspect Settlar embed final media chain
+      - name: Probe Settlar final HLS API
         shell: bash
         run: |
           python - <<'PY'
-          import json,re,urllib.request,urllib.parse
+          import json,urllib.request,urllib.parse
           UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36'
           ANI='https://ani.pm'
-          def get(url,referer=None,accept='*/*'):
-              req=urllib.request.Request(url,headers={
-                  'User-Agent':UA,'Referer':referer or ANI+'/','Accept':accept
-              })
-              with urllib.request.urlopen(req,timeout=30) as r:
-                  return r.status,r.geturl(),r.read().decode('utf-8','ignore')
-          st,_,b=get(ANI+'/api/anime/playback-bootstrap/settlar/6351?ep=1&lang=sub',accept='application/json')
+          def get(url,referer,accept='*/*'):
+              q=urllib.request.Request(url,headers={'User-Agent':UA,'Referer':referer,'Accept':accept})
+              with urllib.request.urlopen(q,timeout=35) as r:
+                  return r.status,r.geturl(),dict(r.headers),r.read()
+          st,_,_,b=get(ANI+'/api/anime/playback-bootstrap/settlar/6351?ep=1&lang=sub',ANI+'/', 'application/json')
           sel=json.loads(b)['settlarSelection']
           qs=urllib.parse.urlencode({'selection':sel,'provider':'anipm','ep':'1','channel':'sub','telemetry':'0'})
-          st,_,b=get(ANI+'/api/anime/settlar/session?'+qs,accept='application/json')
+          st,_,_,b=get(ANI+'/api/anime/settlar/session?'+qs,ANI+'/', 'application/json')
           emb=json.loads(b)['embedUrl']
-          print('EMBED',emb)
-          st,final,html=get(emb,referer=ANI+'/')
-          print('EMBED_HTTP',st,'FINAL',final,'LEN',len(html))
-          print('=== EMBED HTML ===')
-          print(html[:30000])
-          scripts=[]
-          for x in re.findall(r'<script[^>]+src=["\']([^"\']+)["\']',html,re.I):
-              u=urllib.parse.urljoin(final,x)
-              if u not in scripts:scripts.append(u)
-          print('SCRIPTS',len(scripts))
-          for u in scripts:print('SCRIPT',u)
-          marks=['.m3u8','manifest','stream','source','playlist','media','token','resolve','/api/','fetch(','xhr','video','hls']
-          for u in scripts:
-              try:
-                  s,fu,js=get(u,referer=final)
-              except Exception as e:
-                  print('SCRIPT_ERR',u,repr(e));continue
-              print('\n=== JS',fu,'HTTP',s,'LEN',len(js),'===')
-              low=js.lower(); seen=set()
-              for mark in marks:
-                  pos=0
-                  while True:
-                      i=low.find(mark.lower(),pos)
-                      if i<0:break
-                      sn=js[max(0,i-600):min(len(js),i+1400)].replace('\n',' ')
-                      if sn not in seen:
-                          seen.add(sn);print(sn)
-                      pos=i+len(mark)
-                      if len(seen)>=80:break
-                  if len(seen)>=80:break
+          tok=urllib.parse.parse_qs(urllib.parse.urlparse(emb).query)['t'][0]
+          api='https://embed.settlar.io/api/embed/session?t='+urllib.parse.quote(tok,safe='')
+          st,final,h,b=get(api,emb,'application/json')
+          print('SESSION_HTTP',st,'FINAL',final,'CT',h.get('Content-Type'),'LEN',len(b))
+          print(b.decode('utf-8','ignore')[:30000])
+          j=json.loads(b)
+          src=j.get('source','')
+          print('KIND',j.get('kind'),'SOURCE',src)
+          if src:
+              st,final,h,b=get(src,emb,'application/vnd.apple.mpegurl,*/*')
+              print('HLS_HTTP',st,'FINAL',final,'CT',h.get('Content-Type'),'LEN',len(b))
+              txt=b.decode('utf-8','ignore')
+              print('HLS_HEAD',txt[:5000])
+              print('IS_M3U8',txt.startswith('#EXTM3U'))
           PY

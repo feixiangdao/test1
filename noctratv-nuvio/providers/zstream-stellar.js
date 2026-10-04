@@ -123,31 +123,38 @@ function verify(url,source){
     return{name:name,title:name,url:url,quality:q,type:"hls",provider:"noctra-zstream-stellar",headers:h,subtitles:[]};
   });
 }
-function dedupe(rows){
-  var out=[],seen={};
-  (rows||[]).forEach(function(x){if(x&&x.url&&!seen[x.url]){seen[x.url]=1;out.push(x);}});
-  return out;
+function verifyResolved(r){
+  if(!r||!r.url)return Promise.resolve(null);
+  return verify(r.url,r.source).catch(function(e){
+    console.log("[Noctra/ZStream/Stellar] "+(r.source||"default")+" "+(e&&e.message?e.message:e));
+    return null;
+  });
 }
 function getStreams(tmdbId,mediaType,season,episode){
   if(!tmdbId||(mediaType!=="movie"&&mediaType!=="tv"))return Promise.resolve([]);
   if(mediaType==="tv"&&(!season||!episode))return Promise.resolve([]);
   var mt=mediaType==="tv"?"tv":"movie";
+  var firstResult=null;
   return resolveOne(mt,tmdbId,season,episode,null).then(function(first){
-    if(!first||!first.url)return[];
-    var tasks=[verify(first.url,first.source)];
-    var avail=Array.isArray(first.availableSources)?first.availableSources:[];
-    avail.forEach(function(src){
-      if(src===first.source)return;
-      tasks.push(resolveOne(mt,tmdbId,season,episode,src).then(function(r){
-        return r&&r.url?verify(r.url,r.source||src):null;
+    firstResult=first;
+    return verifyResolved(first);
+  }).then(function(x){
+    if(x)return[x];
+    var avail=firstResult&&Array.isArray(firstResult.availableSources)?firstResult.availableSources:[];
+    var i=0;
+    function fallback(){
+      if(i>=avail.length)return Promise.resolve([]);
+      var src=avail[i++];
+      if(firstResult&&src===firstResult.source)return fallback();
+      return resolveOne(mt,tmdbId,season,episode,src).then(verifyResolved).then(function(v){
+        return v?[v]:fallback();
       }).catch(function(e){
-        console.log("[Noctra/ZStream/Stellar] "+src+" "+(e&&e.message?e.message:e));
-        return null;
-      }));
-    });
-    return Promise.all(tasks);
-  }).then(function(rows){
-    var out=dedupe(rows);
+        console.log("[Noctra/ZStream/Stellar] fallback "+src+" "+(e&&e.message?e.message:e));
+        return fallback();
+      });
+    }
+    return fallback();
+  }).then(function(out){
     console.log("[Noctra/ZStream/Stellar] "+mediaType+" "+tmdbId+" streams="+out.length);
     return out;
   }).catch(function(e){

@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "CinemaCity V2 authenticated-origin diagnostic. Retests cinemacity.cc directly with the complete saved Cookie and matching User-Agent instead of proxy routes.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity search diagnostic: counts detail links and hash markers, then tests the first search result page.",
-      "version": "0.3.1",
+      "description": "CinemaCity search diagnostic: strictly matches The Matrix (1999) before probing a candidate; shows LINKS/MATCH/HASH.",
+      "version": "0.3.2",
       "supportedTypes": [
         "movie"
       ],

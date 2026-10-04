@@ -699,26 +699,57 @@ function inspectSearchBody(body, expectedTitle, expectedYear) {
   var seen = {};
   var re = /<a\b[^>]*href\s*=\s*["']([^"']+\/(?:movies|tv-series)\/[^"']+\.html(?:\?[^"']*)?)["'][^>]*>([\s\S]*?)<\/a>/ig;
   var m;
+
+  function slugIdentity(url) {
+    var path = clean(url).replace(/[?#].*$/, "");
+    var last = path.slice(path.lastIndexOf("/") + 1).replace(/\.html$/i, "");
+    last = last.replace(/^\d+-/, "");
+    var ym = last.match(/-(19\d{2}|20\d{2})$/);
+    var y = ym ? ym[1] : "";
+    if (ym) last = last.slice(0, -(y.length + 1));
+    return {
+      title: last.replace(/-/g, " "),
+      year: y
+    };
+  }
+
   while ((m = re.exec(html)) !== null) {
     var u = resolveUrl(m[1], BASE + "/");
     if (!u || !isCinemaCityHost(u) || seen[u]) continue;
     seen[u] = 1;
-    var title = stripTags(m[2]);
-    items.push({ url: u, title: title });
-    if (items.length >= 40) break;
+    var anchorTitle = stripTags(m[2]);
+    var slug = slugIdentity(u);
+    items.push({
+      url: u,
+      title: anchorTitle,
+      slugTitle: slug.title,
+      slugYear: slug.year
+    });
+    if (items.length >= 100) break;
   }
 
   var want = normalizeTitle(expectedTitle || "");
   var year = clean(expectedYear || "");
   var best = null;
-  var bestScore = -1;
+  var bestScore = -999;
+
   items.forEach(function(item) {
-    var got = normalizeTitle(item.title);
+    var gotAnchor = normalizeTitle(item.title);
+    var gotSlug = normalizeTitle(item.slugTitle);
     var score = 0;
-    if (want && got === want) score += 10;
-    else if (want && got && (got.indexOf(want) >= 0 || want.indexOf(got) >= 0)) score += 5;
-    var hay = item.title + " " + item.url;
-    if (year && hay.indexOf(year) >= 0) score += 3;
+
+    if (want && gotAnchor === want) score += 12;
+    else if (want && gotAnchor && (gotAnchor.indexOf(want) >= 0 || want.indexOf(gotAnchor) >= 0)) score += 6;
+
+    if (want && gotSlug === want) score += 12;
+    else if (want && gotSlug && (gotSlug.indexOf(want) >= 0 || want.indexOf(gotSlug) >= 0)) score += 6;
+
+    if (year) {
+      if (item.slugYear === year) score += 5;
+      else if ((item.title + " " + item.url).indexOf(year) >= 0) score += 3;
+      else if (item.slugYear) score -= 4;
+    }
+
     if (score > bestScore) {
       bestScore = score;
       best = item;
@@ -731,7 +762,7 @@ function inspectSearchBody(body, expectedTitle, expectedYear) {
 
   return {
     items: items,
-    match: bestScore >= 8 ? best : null,
+    match: bestScore >= 12 ? best : null,
     bestScore: bestScore,
     hashFound: hash ? 1 : 0,
     hash: hash
@@ -775,6 +806,7 @@ function searchAndCandidateProbe() {
         " L=" + String(html.length) +
         " LINKS=" + String(info.items.length) +
         " MATCH=" + (info.match ? "1" : "0") +
+        " SCORE=" + String(info.bestScore) +
         " HASH=" + String(info.hashFound);
 
       var searchRow = {

@@ -535,8 +535,8 @@ function diagnosticProbeEndpoints() {
 }
 
 
-function proxyProbeOne(label, base) {
-  var url = base.replace(/\/$/, "") + "/news_pages.xml?page=1&perPage=5";
+function proxyProbeOne(label, base, path) {
+  var url = base.replace(/\/$/, "") + (path || "/news_pages.xml?page=1&perPage=500");
   return fetch(url, {
     headers: {
       "Accept": "application/xml,text/xml,text/plain,*/*",
@@ -550,6 +550,11 @@ function proxyProbeOne(label, base) {
         count = ms ? ms.length : 0;
       } catch (_) {}
       var title = String(r.status) + " · " + label + " · entries=" + count;
+      if (label === "LEANMOV") {
+        var hasAtob = /atob\s*\(/i.test(body);
+        var hasGuest = /guests are not allowed|sign in to watch|registration is required/i.test(body);
+        title += " · len=" + String(body.length) + " · atob=" + (hasAtob ? "1" : "0") + " · guest=" + (hasGuest ? "1" : "0");
+      }
       if (/cloudflare|just a moment|verify you are human/i.test(body)) title += " · CF";
       return {
         name: title,
@@ -576,9 +581,10 @@ function proxyProbeOne(label, base) {
 
 function proxyProbeEndpoints() {
   return Promise.all([
-    proxyProbeOne("REALBESTIA", "https://cc.realbestia.com"),
-    proxyProbeOne("LEANHHU", "https://cc.leanhhu061206.workers.dev"),
-    proxyProbeOne("APPBETA", "https://broad-mouse-85c7.appbeta870.workers.dev")
+    proxyProbeOne("LEAN500", "https://cc.leanhhu061206.workers.dev", "/news_pages.xml?page=1&perPage=500"),
+    proxyProbeOne("LEANRAW", "https://cc.leanhhu061206.workers.dev", "/news_pages.xml"),
+    proxyProbeOne("LEANP1", "https://cc.leanhhu061206.workers.dev", "/news_pages.xml?page=1"),
+    proxyProbeOne("LEANMOV", "https://cc.leanhhu061206.workers.dev", "/movies/379-the-patient.html")
   ]);
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.9.0",
+  "version": "4.10.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -968,15 +968,15 @@
     {
       "id": "noctra-anicine-vaplayer",
       "name": "NoctraTV · AniCine · VaPlayer",
-      "description": "noctratv.com AniCine · VaPlayer. Uses AniCine's current CinePro worker token API and returns only sources explicitly tagged VaPlayer.",
-      "version": "1.0.0",
+      "description": "noctratv.com AniCine · VaPlayer. Uses AniCine's token-backed CinePro worker and returns direct media only. Live probe verified 3 movie and 3 TV streams; the working aniwish.dekhovo worker is preferred with api.anicine-embed as fallback.",
+      "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
       "filename": "providers/anicine-vaplayer.js",
-      "enabled": false,
+      "enabled": true,
       "formats": [
         "m3u8",
         "mp4",

@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.3.2",
-  "description": "CinemaCity V2 strict search-match diagnostic. Matches Test Provider's The Matrix (1999) by anchor text and URL slug/year before probing the detail page.",
+  "version": "0.3.3",
+  "description": "CinemaCity V2 multi-search diagnostic. Tests four DLE search request formats and selects only a strict The Matrix (1999) match.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity strict search diagnostic. Uses title + year + URL slug scoring to avoid wrong candidates before probing the matched detail page.",
-      "version": "0.3.2",
+      "description": "CinemaCity multi-search diagnostic. A/B/C/D test different DLE request forms; N=count, M=match, S=score, H=hash.",
+      "version": "0.3.3",
       "supportedTypes": [
         "movie"
       ],

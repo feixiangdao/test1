@@ -44,5 +44,15 @@ async function probe(scraper,args,label){
   }));
   console.log('NoctraTV source probe summary');
   rows.forEach(x=>console.log(x.id+': movie='+x.movie+' tv='+x.tv));
+
+  // Nesterov/Helios has title-dependent coverage. Keep two upstream-known
+  // coverage samples so a 0 on The Godfather/GoT is not mistaken for a broken protocol.
+  const nesterov=manifest.scrapers.find(s=>s.id==='noctra-nesterov');
+  if(nesterov){
+    const dune=await probe(nesterov,[693134,'movie'],nesterov.name+' focused Dune Part Two');
+    const bb=await probe(nesterov,[1396,'tv',1,1],nesterov.name+' focused Breaking Bad S01E01');
+    console.log('noctra-nesterov-focused: movie='+dune+' tv='+bb);
+  }
+
   if(!rows.some(x=>x.movie>0||x.tv>0)) throw new Error('all NoctraTV provider probes returned zero streams');
 })().catch(e=>{console.error(e&&e.stack?e.stack:e);process.exitCode=1});

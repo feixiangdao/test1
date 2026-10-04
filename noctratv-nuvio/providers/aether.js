@@ -123,7 +123,6 @@ function getStreams(tmdbId,mediaType,season,episode){
   var tasks=SIMPLE.map(function(p){return simpleOne(p,tmdbId,mediaType,season,episode);});
   tasks.push(meridian(tmdbId,mediaType,season,episode));
   tasks.push(subtitulado(tmdbId,mediaType,season,episode));
-  tasks.push(gallic(tmdbId,mediaType,season,episode));
   return Promise.all(tasks).then(function(groups){
     var out=dedupe(groups);
     console.log("[Noctra/Aether] "+mediaType+" "+tmdbId+" streams="+out.length);

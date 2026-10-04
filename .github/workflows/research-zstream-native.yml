@@ -9,34 +9,54 @@ on:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 8
     steps:
-      - name: Probe ani.pm formal and preview sessions
+      - name: Inspect Settlar embed final media chain
         shell: bash
         run: |
           python - <<'PY'
-          import json, urllib.request, urllib.parse
+          import json,re,urllib.request,urllib.parse
           UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36'
-          BASE='https://ani.pm'
-          def req(url):
-              r=urllib.request.Request(url,headers={
-                  'User-Agent':UA,'Referer':BASE+'/','Accept':'application/json'
+          ANI='https://ani.pm'
+          def get(url,referer=None,accept='*/*'):
+              req=urllib.request.Request(url,headers={
+                  'User-Agent':UA,'Referer':referer or ANI+'/','Accept':accept
               })
-              with urllib.request.urlopen(r,timeout=35) as x:
-                  return x.status,x.read().decode('utf-8','ignore')
-          s,b=req(BASE+'/api/anime/playback-bootstrap/settlar/6351?ep=1&lang=sub')
-          j=json.loads(b); sel=j.get('settlarSelection','')
-          print('BOOT',s,'selection_len',len(sel),'effective',j.get('effectiveLanguage'))
-          params=urllib.parse.urlencode({
-              'selection':sel,'provider':'anipm','ep':'1','channel':'sub','telemetry':'0'
-          })
-          for path in ['/api/anime/settlar/session?'+params,
-                       '/api/anime/settlar/preview-session?'+params]:
-              print('\n===',path.split('?')[0],'===')
+              with urllib.request.urlopen(req,timeout=30) as r:
+                  return r.status,r.geturl(),r.read().decode('utf-8','ignore')
+          st,_,b=get(ANI+'/api/anime/playback-bootstrap/settlar/6351?ep=1&lang=sub',accept='application/json')
+          sel=json.loads(b)['settlarSelection']
+          qs=urllib.parse.urlencode({'selection':sel,'provider':'anipm','ep':'1','channel':'sub','telemetry':'0'})
+          st,_,b=get(ANI+'/api/anime/settlar/session?'+qs,accept='application/json')
+          emb=json.loads(b)['embedUrl']
+          print('EMBED',emb)
+          st,final,html=get(emb,referer=ANI+'/')
+          print('EMBED_HTTP',st,'FINAL',final,'LEN',len(html))
+          print('=== EMBED HTML ===')
+          print(html[:30000])
+          scripts=[]
+          for x in re.findall(r'<script[^>]+src=["\']([^"\']+)["\']',html,re.I):
+              u=urllib.parse.urljoin(final,x)
+              if u not in scripts:scripts.append(u)
+          print('SCRIPTS',len(scripts))
+          for u in scripts:print('SCRIPT',u)
+          marks=['.m3u8','manifest','stream','source','playlist','media','token','resolve','/api/','fetch(','xhr','video','hls']
+          for u in scripts:
               try:
-                  st,body=req(BASE+path)
-                  print('HTTP',st,'LEN',len(body))
-                  print(body[:50000])
+                  s,fu,js=get(u,referer=final)
               except Exception as e:
-                  print('ERR',repr(e))
+                  print('SCRIPT_ERR',u,repr(e));continue
+              print('\n=== JS',fu,'HTTP',s,'LEN',len(js),'===')
+              low=js.lower(); seen=set()
+              for mark in marks:
+                  pos=0
+                  while True:
+                      i=low.find(mark.lower(),pos)
+                      if i<0:break
+                      sn=js[max(0,i-600):min(len(js),i+1400)].replace('\n',' ')
+                      if sn not in seen:
+                          seen.add(sn);print(sn)
+                      pos=i+len(mark)
+                      if len(seen)>=80:break
+                  if len(seen)>=80:break
           PY

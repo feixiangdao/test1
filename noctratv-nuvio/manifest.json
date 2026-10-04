@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.10.0",
+  "version": "4.11.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -332,6 +332,28 @@
         "multi"
       ],
       "limited": false
+    },
+    {
+      "id": "noctra-cinemaos-family",
+      "name": "NoctraTV · CinemaOS",
+      "description": "noctratv.com CinemaOS family. Reproduces CinemaOS providerv4 double-HMAC request signing plus PBKDF2-SHA256/AES-256-GCM decryption locally, and returns all direct child media sources. Research-disabled until live probe confirms the current keys and _gt.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/cinemaos-family.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
     },
     {
       "id": "noctra-cinemaos-moviebox",

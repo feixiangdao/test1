@@ -88,8 +88,8 @@ function resolveOne(mediaType,id,season,episode,source){
   });
 }
 function quality(text){
-  var s=String(text||""),m,max=0,re=/RESOLUTION=(\d+)x(\d+)/ig;
-  while((m=re.exec(s))!==null){var h=parseInt(m[2],10)||0,w=parseInt(m[1],10)||0;var q=Math.max(h,w);if(q>max)max=q;}
+  var s=String(text||""),m,max=0,re=/RESOLUTION=\d+x(\d+)/ig;
+  while((m=re.exec(s))!==null){var h=parseInt(m[1],10)||0;if(h>max)max=h;}
   if(max>=2160)return"4K";
   if(max>=1440)return"1440p";
   if(max>=1080)return"1080p";

@@ -9,57 +9,134 @@ on:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Download public ZStream native binary
         run: |
           set -euxo pipefail
-          curl -L --fail --retry 3 \
-            -o /tmp/ZStreamNativeSources \
+          curl -L --fail --retry 3 -o /tmp/ZStreamNativeSources \
             https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources
           file /tmp/ZStreamNativeSources
           sha256sum /tmp/ZStreamNativeSources
 
-      - name: Extract ordered resolver string contexts
+      - name: Basic symbols and strings
         run: |
           set -euo pipefail
-          strings -a -n 3 /tmp/ZStreamNativeSources > /tmp/strings.txt
-          nl -ba /tmp/strings.txt > /tmp/numbered.txt
+          echo "=== resolver symbols ==="
+          llvm-nm --defined-only /tmp/ZStreamNativeSources \
+            | c++filt \
+            | grep -Ei 'zs_(aphrodite|aspera|nesterov|stellar|tokyo)Resolve|resolveArtemisKeyless' || true
+          echo "=== compact endpoint list ==="
+          strings -a -n 4 /tmp/ZStreamNativeSources \
+            | grep -E 'https?://|/api/|/movie/|/tv/|/stream|/seed|/search|sources-with-title|fontaine|wingsdatabase|speedracelight|zstream\.mov' \
+            | sort -u || true
 
-          echo "=== key string contexts ==="
-          for needle in \
-            'https://zstream.mov' \
-            '/api/b/movie/' \
-            '/api/b/tv/' \
-            'tokyo.fontaine.lol' \
-            'aurora.fontaine.lol' \
-            'api.wingsdatabase.com' \
-            'db.wingsdatabase.com' \
-            'db.speedracelight.com' \
-            'enc-dec.app/api/enc-vidlink' \
-            '123animehub.cc' \
-            'ani.pm/api/anime' \
-            'anineko.to' \
-            'aphrodite-' \
-            'stellar-' \
-            'nesterov-' \
-            'tokyo-' \
-            'forbidden (stale version or origin check)'; do
-            echo
-            echo "##### CONTEXT: $needle #####"
-            grep -n -F -m 5 "$needle" /tmp/strings.txt | while IFS=: read -r line rest; do
-              start=$(( line > 35 ? line-35 : 1 ))
-              end=$(( line+55 ))
-              sed -n "${start},${end}p" /tmp/numbered.txt
-            done || true
-          done
+      - name: Install Mach-O analysis helpers
+        run: python3 -m pip install --quiet lief capstone
 
-          echo "=== JSON-ish/provider-ish strings ==="
-          grep -E '\{"|provider|source|server|variant|quality|language|url|headers|cookie|token|secret|signature|nonce|key' /tmp/strings.txt \
-            | grep -viE 'boringssl|swift|certificate|cipher|ssl|x509' \
-            | head -n 1600 || true
+      - name: Map resolver functions to referenced strings
+        run: |
+          cat > /tmp/xrefs.py <<'PY'
+          import lief, re
+          from capstone import Cs, CS_ARCH_ARM64, CS_MODE_ARM, arm64
 
-          echo "=== all resolver-related domains/paths ==="
-          grep -Eio 'https?://[^[:space:]"<>]+|([a-z0-9-]+\.)+[a-z]{2,}(/[^[:space:]"<>]*)?|/[A-Za-z0-9_.?=&%:-]{3,}' /tmp/strings.txt \
-            | grep -viE 'apple\.com|github\.com|ietf\.org|openssl|boringssl|swift' \
-            | sort -u | head -n 1800 || true
+          path="/tmp/ZStreamNativeSources"
+          fat=lief.MachO.parse(path)
+          binary=fat.at(0) if hasattr(fat, "at") else fat
+
+          # Collect null-terminated printable strings by virtual address from all readable sections.
+          strmap={}
+          for sec in binary.sections:
+              data=bytes(sec.content)
+              base=int(sec.virtual_address)
+              i=0
+              while i < len(data):
+                  if 32 <= data[i] < 127:
+                      j=i
+                      while j<len(data) and 32 <= data[j] < 127:
+                          j+=1
+                      if j-i>=3:
+                          try:
+                              s=data[i:j].decode("ascii")
+                              strmap[base+i]=s
+                          except Exception:
+                              pass
+                      i=j+1
+                  else:
+                      i+=1
+
+          textsec=None
+          for sec in binary.sections:
+              if sec.name=="__text":
+                  textsec=sec; break
+          if textsec is None:
+              raise SystemExit("__text not found")
+          text_base=int(textsec.virtual_address)
+          text_data=bytes(textsec.content)
+
+          syms=[]
+          for s in binary.symbols:
+              name=s.name or ""
+              val=int(s.value)
+              if val and text_base <= val < text_base+len(text_data):
+                  syms.append((val,name))
+          syms=sorted(set(syms))
+
+          targets=["zs_aphroditeResolve","zs_asperaResolve","zs_nesterovResolve","zs_stellarResolve","zs_tokyoResolve","resolveArtemisKeyless"]
+
+          md=Cs(CS_ARCH_ARM64, CS_MODE_ARM)
+          md.detail=True
+
+          def nearby_string(addr):
+              if addr in strmap: return strmap[addr]
+              # Sometimes address lands a few bytes into a string.
+              for a,s in strmap.items():
+                  if a <= addr < a+len(s):
+                      return s[addr-a:]
+              return None
+
+          def function_range(idx):
+              start,name=syms[idx]
+              end=text_base+len(text_data)
+              for j in range(idx+1,len(syms)):
+                  if syms[j][0]>start:
+                      end=syms[j][0]; break
+              return start,end,name
+
+          for idx,(start,name) in enumerate(syms):
+              if not any(t in name for t in targets):
+                  continue
+              end, nm = None, name
+              s,e,nm=function_range(idx)
+              off=s-text_base
+              blob=text_data[off:off+(e-s)]
+              regs={}
+              refs=[]
+              for ins in md.disasm(blob,s):
+                  try:
+                      if ins.id==arm64.ARM64_INS_ADRP and len(ins.operands)>=2 and ins.operands[0].type==arm64.ARM64_OP_REG and ins.operands[1].type==arm64.ARM64_OP_IMM:
+                          regs[ins.operands[0].reg]=ins.operands[1].imm
+                      elif ins.id==arm64.ARM64_INS_ADR and len(ins.operands)>=2 and ins.operands[0].type==arm64.ARM64_OP_REG and ins.operands[1].type==arm64.ARM64_OP_IMM:
+                          addr=ins.operands[1].imm
+                          regs[ins.operands[0].reg]=addr
+                          ss=nearby_string(addr)
+                          if ss: refs.append((ins.address,addr,ss))
+                      elif ins.id==arm64.ARM64_INS_ADD and len(ins.operands)>=3:
+                          dst,src,imm=ins.operands[:3]
+                          if dst.type==arm64.ARM64_OP_REG and src.type==arm64.ARM64_OP_REG and imm.type==arm64.ARM64_OP_IMM and src.reg in regs:
+                              addr=regs[src.reg]+imm.imm
+                              regs[dst.reg]=addr
+                              ss=nearby_string(addr)
+                              if ss: refs.append((ins.address,addr,ss))
+                  except Exception:
+                      pass
+              print("\n===== FUNCTION", nm, hex(s), "-", hex(e), "=====")
+              seen=set()
+              for ia,a,ss in refs:
+                  key=(a,ss)
+                  if key in seen: continue
+                  seen.add(key)
+                  if len(ss)>500: ss=ss[:500]
+                  print(hex(ia), "->", hex(a), repr(ss))
+          PY
+          python3 /tmp/xrefs.py

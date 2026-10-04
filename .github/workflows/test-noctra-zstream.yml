@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install crypto-js
+        run: npm install --no-save crypto-js@4
       - name: ZStream syntax
         run: |
           node --check noctratv-nuvio/providers/zstream-aphrodite.js

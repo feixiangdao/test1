@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.21.0",
+  "version": "4.22.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1084,6 +1084,26 @@
         "tv"
       ],
       "filename": "providers/zstream-aphrodite.js",
+      "enabled": false,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-zstream-stellar",
+      "name": "NoctraTV · ZStream · Stellar",
+      "description": "noctratv.com ZStream Stellar source. Solves stellar.gdn PoW locally, encrypts the resolve payload with Nuvio WebCrypto AES-256-GCM, then returns verified direct HLS sources. No iframe fallback.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/zstream-stellar.js",
       "enabled": false,
       "formats": [
         "m3u8"

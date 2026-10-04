@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.2.2",
-  "description": "CinemaCity V2 endpoint-probe diagnostic build. On Test Provider search 403, probes HOME, MOVIES, DLE SEARCH_POST and AJAX_SEARCH to identify which CinemaCity routes are usable from Nuvio.",
+  "version": "0.2.3",
+  "description": "CinemaCity V2 compact diagnostic build. Test Provider now shows a one-line status summary H/M/S/A so HTTP codes remain visible on narrow Android screens.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "Movie-only CinemaCity diagnostic resolver. Test Provider probes alternate CinemaCity endpoints when the normal search route returns 403.",
-      "version": "0.2.2",
+      "description": "Movie-only CinemaCity diagnostic resolver. Compact probe summary: H=HOME, M=MOVIES, S=SEARCH, A=AJAX.",
+      "version": "0.2.3",
       "supportedTypes": [
         "movie"
       ],

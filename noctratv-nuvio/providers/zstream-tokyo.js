@@ -146,7 +146,9 @@ function bootstrap(id,episode,channel){
   var u=ANI+"/api/anime/playback-bootstrap/settlar/"+
     encodeURIComponent(String(id))+"?ep="+encodeURIComponent(String(episode))+
     "&lang="+encodeURIComponent(channel);
-  return getJson(u,ANI+"/",12000);
+  return getJson(u,ANI+"/",12000).catch(function(e){
+    throw new Error("bootstrap "+(e&&e.message?e.message:e));
+  });
 }
 function formalSession(selection,episode,channel){
   var q="selection="+encodeURIComponent(selection)+
@@ -154,7 +156,9 @@ function formalSession(selection,episode,channel){
     "&ep="+encodeURIComponent(String(episode))+
     "&channel="+encodeURIComponent(channel)+
     "&telemetry=0";
-  return getJson(ANI+"/api/anime/settlar/session?"+q,ANI+"/",15000);
+  return getJson(ANI+"/api/anime/settlar/session?"+q,ANI+"/",15000).catch(function(e){
+    throw new Error("formal-session "+(e&&e.message?e.message:e));
+  });
 }
 function embedSession(embedUrl){
   var m=/[?&]t=([^&#]+)/.exec(clean(embedUrl));
@@ -162,7 +166,9 @@ function embedSession(embedUrl){
   var tok;
   try{tok=decodeURIComponent(m[1]);}catch(_){tok=m[1];}
   var u=EMBED+"/api/embed/session?t="+encodeURIComponent(tok);
-  return getJson(u,embedUrl,15000);
+  return getJson(u,embedUrl,15000).catch(function(e){
+    throw new Error("embed-session "+(e&&e.message?e.message:e));
+  });
 }
 function verifyHls(url){
   if(!/^https:\/\//i.test(clean(url)))return Promise.reject(new Error("bad HLS URL"));

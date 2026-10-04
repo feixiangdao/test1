@@ -5,6 +5,11 @@ const TARGETS=[
   'Vidy','Miami','Boise','Orlando','Atlanta','Tampa','Portland',
   'Apollo','Vienna','Chase','Tokyo','Barcelona','Kyoto'
 ];
+const EXTRA_ASSETS=[
+  'https://noctratv.com/assets/pStreamBackend-BO-fiiV-.js',
+  'https://noctratv.com/assets/vortexApiSource-B-QupYve.js',
+  'https://noctratv.com/assets/index-B_JGO8C1.js'
+];
 const PAGES=[
   'https://noctratv.com/watch/movie/238',
   'https://noctratv.com/watch/tv/1399/1/1',
@@ -44,6 +49,7 @@ function urlsNear(s,i){
       scripts(h,p).forEach(x=>assets.add(x));
     }catch(e){console.log('PAGE ERR '+e.message)}
   }
+  EXTRA_ASSETS.forEach(x=>assets.add(x));
   console.log('ASSETS '+assets.size);
   for(const u of assets){
     let s;

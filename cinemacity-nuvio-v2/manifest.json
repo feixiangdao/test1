@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.2.7",
-  "description": "CinemaCity V2 session diagnostic build. Shows non-sensitive presence flags for cf_clearance, DLE login cookies and User-Agent before proxy probes.",
+  "version": "0.2.8",
+  "description": "CinemaCity V2 cookie diagnostics. Test Provider shows only cookie length and cookie names, never values, plus CF/DLE/UA presence flags.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity diagnostic. Test Provider first shows CF/DLE/UA presence flags without exposing cookie values, then runs LEANHHU probes.",
-      "version": "0.2.7",
+      "description": "CinemaCity diagnostic. Shows LEN and cookie names only (no values) to verify whether Session Cookie was saved and what cookie keys are present.",
+      "version": "0.2.8",
       "supportedTypes": [
         "movie"
       ],

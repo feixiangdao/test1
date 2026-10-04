@@ -1,5 +1,10 @@
 'use strict';
 
+const FOCUS_PATTERNS=[
+  'async function _(', 'function _(', 'site-streamvault-silver',
+  'site-streamvault-zoisite','site-streamvault-iron','site-streamvault-sunstone',
+  '/mplayer/source','/mplayer/site','selected-source','sourceId'
+];
 const TARGETS=[
   'StreamVault','Zoisite','Sunstone','Silver','Iron',
   'Vidy','Miami','Boise','Orlando','Atlanta','Tampa','Portland',
@@ -64,6 +69,17 @@ function urlsNear(s,i){
     const interesting=[...new Set((s.match(/["'`][^"'\`]{0,100}(?:provider|source|server|playback)[^"'\`]{0,100}["'`]/ig)||[])
       .map(x=>x.slice(1,-1)).filter(x=>x.length<220))].slice(0,200);
     if(interesting.length)console.log('INTERESTING '+u+' '+interesting.join(' || '));
+    for(const fp of FOCUS_PATTERNS){
+      let at=0,count=0;
+      while(count<8){
+        const i=s.indexOf(fp,at);
+        if(i<0)break;
+        count++;at=i+fp.length;
+        const lo=Math.max(0,i-3000),hi=Math.min(s.length,i+7000);
+        console.log('\nFOCUS '+fp+' asset='+u);
+        console.log('CODE '+s.slice(lo,hi).replace(/\s+/g,' '));
+      }
+    }
     for(const t of TARGETS){
       let from=0,found=0;
       while(found<6){

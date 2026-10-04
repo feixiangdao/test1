@@ -458,6 +458,62 @@ function diagnosticResult(stage, detail) {
   }];
 }
 
+function diagnosticProbeItem(name, status, url, extra) {
+  var text = "CinemaCity PROBE · " + name + " · HTTP " + String(status);
+  if (extra) text += " · " + clean(extra).replace(/\s+/g, " ").slice(0, 100);
+  return {
+    name: text,
+    title: text,
+    url: url || (BASE + "/"),
+    quality: "DIAG",
+    type: "diagnostic",
+    provider: "cinemacity-v2-login"
+  };
+}
+
+function probeRequest(name, url, options) {
+  return fetch(url, options || {}).then(function(r) {
+    return r.text().catch(function(){ return ""; }).then(function(body) {
+      var extra = "";
+      if (challengeHtml(body)) extra = "Cloudflare challenge";
+      else if (guestBlocked(body)) extra = "guest/login gate";
+      return diagnosticProbeItem(name, r.status, r.url || url, extra);
+    });
+  }).catch(function(e) {
+    return diagnosticProbeItem(name, 0, url, e && e.message ? e.message : e);
+  });
+}
+
+function diagnosticProbeEndpoints() {
+  var h = baseHeaders(BASE + "/", true);
+  var postHeaders = {};
+  Object.keys(h).forEach(function(k){ postHeaders[k] = h[k]; });
+  postHeaders["Content-Type"] = "application/x-www-form-urlencoded";
+  postHeaders["Origin"] = BASE;
+  postHeaders["X-Requested-With"] = "XMLHttpRequest";
+
+  var ajaxHeaders = {};
+  Object.keys(h).forEach(function(k){ ajaxHeaders[k] = h[k]; });
+  ajaxHeaders["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8";
+  ajaxHeaders["Origin"] = BASE;
+  ajaxHeaders["X-Requested-With"] = "XMLHttpRequest";
+
+  return Promise.all([
+    probeRequest("HOME", BASE + "/", { headers: h }),
+    probeRequest("MOVIES", BASE + "/movies/", { headers: h }),
+    probeRequest("SEARCH_POST", BASE + "/index.php?do=search", {
+      method: "POST",
+      headers: postHeaders,
+      body: "do=search&subaction=search&story=" + encodeURIComponent("The Matrix")
+    }),
+    probeRequest("AJAX_SEARCH", BASE + "/engine/ajax/controller.php?mod=search", {
+      method: "POST",
+      headers: ajaxHeaders,
+      body: "query=" + encodeURIComponent("The Matrix")
+    })
+  ]);
+}
+
 function getStreams(tmdbId, mediaType, season, episode) {
   if (!tmdbId || mediaType !== "movie") {
     if (mediaType === "tv") {
@@ -499,6 +555,9 @@ function getStreams(tmdbId, mediaType, season, episode) {
       else if (/not authenticated|expired|Guests are not allowed|Registration is required/i.test(msg)) code = "LOGIN";
       else if (/search returned no matching|strict title\/year match failed/i.test(msg)) code = "SEARCH";
       else if (/TMDB/i.test(msg)) code = "TMDB";
+      if (String(tmdbId) === "603" && code === "SEARCH" && /HTTP 403/i.test(msg)) {
+        return diagnosticProbeEndpoints();
+      }
       return diagnosticResult(code, msg);
     });
 }

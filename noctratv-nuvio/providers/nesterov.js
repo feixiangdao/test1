@@ -1,136 +1,157 @@
-// NoctraTV · Nesterov — Moscow / Novo / Omsk direct resolver.
-// Current public reverse-engineered contract:
-//   GET https://stream.hls.lol/helios?tmdbId=<id>&type=movie|tv[&seasonId=&episodeId=]
-//   -> { sources: { Moscow:{url}, Novo:{url}, Omsk:{url} } }
-// Current upstream has used both "ns_<hex>" and "hl_<hex>" envelopes.
-// Both use AES-256-GCM: 12-byte IV || ciphertext || 16-byte tag.
-// This implementation uses WebCrypto so it runs in Nuvio Mobile; no Node crypto,
-// WebAssembly, iframe, or external web-player fallback.
+// NoctraTV · Nesterov — current direct resolver.
+//
+// ZStream native reverse-engineering (2026-10) shows the Nesterov resolver uses
+// the NextGenCloud/VaPlayer data shape:
+//   ?tmdb=<id>&type=movie
+//   ?tmdb=<id>&type=tv&season=<s>&episode=<e>
+// and reads data.stream_urls plus subtitle fields.
+//
+// The player origin is nextgencloudfabric.com; the current data endpoint is
+// streamdata.vaplayer.ru/api.php. No iframe, legacy Helios/AES envelope,
+// WebAssembly, or external player fallback is used here.
 
-var BASE="https://stream.hls.lol";
-var ORIGIN="https://atlantic.st";
-var KEY_HEX="e4b8a1d6f2c9037b5a8e4d1c6f9b2085a7c3e9f6d1b4a8c2e5f7a0d3b6c9e2f5";
-var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/143 Mobile Safari/537.36";
-var ORDER=["Moscow","Novo","Omsk"];
+var API="https://streamdata.vaplayer.ru/api.php";
+var ORIGIN="https://nextgencloudfabric.com";
+var REFERER=ORIGIN+"/";
+var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36";
 
-function clean(v){return v==null?"":String(v).trim()}
-function hdr(){
+function clean(v){return v==null?"":String(v).trim();}
+
+function headers(){
   return {
     "User-Agent":UA,
     "Origin":ORIGIN,
-    "Referer":ORIGIN+"/",
-    "Accept":"*/*",
-    "Accept-Language":"en-US,en;q=0.9",
-    "Sec-Fetch-Dest":"empty",
-    "Sec-Fetch-Mode":"cors",
-    "Sec-Fetch-Site":"cross-site"
+    "Referer":REFERER,
+    "Accept":"application/json, text/plain, */*"
   };
 }
+
 function hasTimers(){
-  try{return typeof setTimeout==="function"&&typeof clearTimeout==="function"}catch(_){return false}
+  try{return typeof setTimeout==="function"&&typeof clearTimeout==="function";}catch(_){return false;}
 }
-function timeout(p,ms,label){
+
+function withTimeout(p,ms,label){
   if(!hasTimers())return p;
   return new Promise(function(resolve,reject){
     var done=false;
-    var t=setTimeout(function(){if(done)return;done=true;reject(new Error(label+" timeout"))},ms);
-    Promise.resolve(p).then(function(v){if(done)return;done=true;clearTimeout(t);resolve(v)},function(e){if(done)return;done=true;clearTimeout(t);reject(e)});
+    var t=setTimeout(function(){
+      if(done)return;
+      done=true;
+      reject(new Error(label+" timeout"));
+    },ms);
+    Promise.resolve(p).then(function(v){
+      if(done)return;
+      done=true;clearTimeout(t);resolve(v);
+    },function(e){
+      if(done)return;
+      done=true;clearTimeout(t);reject(e);
+    });
   });
 }
-function hexBytes(s){
-  s=clean(s);
-  if(!s||s.length%2)return new Uint8Array(0);
-  var out=new Uint8Array(s.length/2);
-  for(var i=0;i<out.length;i++){
-    var n=parseInt(s.slice(i*2,i*2+2),16);
-    if(!isFinite(n))return new Uint8Array(0);
-    out[i]=n;
+
+function apiUrl(tmdbId,mediaType,season,episode){
+  var q="tmdb="+encodeURIComponent(String(tmdbId))+
+    "&type="+encodeURIComponent(mediaType==="tv"?"tv":"movie");
+  if(mediaType==="tv"){
+    q+="&season="+encodeURIComponent(String(season||1))+
+      "&episode="+encodeURIComponent(String(episode||1));
   }
-  return out;
+  return API+"?"+q;
 }
-function decodeUtf8(bytes){
-  if(typeof TextDecoder!=="undefined")return new TextDecoder("utf-8").decode(bytes);
-  var s="";for(var i=0;i<bytes.length;i++)s+=String.fromCharCode(bytes[i]);
-  try{return decodeURIComponent(escape(s))}catch(_){return s}
-}
-function subtle(){
-  try{
-    if(globalThis.crypto&&globalThis.crypto.subtle)return globalThis.crypto.subtle;
-  }catch(_){}
-  return null;
-}
-async function decryptNs(raw){
-  raw=clean(raw);
-  var prefix=raw.slice(0,3);
-  if(prefix!=="ns_"&&prefix!=="hl_")return raw;
-  var blob=hexBytes(raw.slice(3));
-  if(blob.length<29)throw new Error("nesterov payload too short");
-  var keyBytes=hexBytes(KEY_HEX);
-  var c=subtle();
-  if(!c)throw new Error("WebCrypto unavailable");
-  var key=await c.importKey("raw",keyBytes,{name:"AES-GCM"},false,["decrypt"]);
-  // WebCrypto expects ciphertext and the 16-byte auth tag concatenated.
-  var iv=blob.slice(0,12);
-  var cipherAndTag=blob.slice(12);
-  var plain=await c.decrypt({name:"AES-GCM",iv:iv,tagLength:128},key,cipherAndTag);
-  return decodeUtf8(new Uint8Array(plain));
-}
-function qualityFromMaster(body){
-  var max=0,m,re=/RESOLUTION=\d+x(\d+)/ig;
-  while((m=re.exec(body||"")))max=Math.max(max,Number(m[1])||0);
+
+function maxQuality(text){
+  var s=String(text||""),m,max=0,re=/RESOLUTION=\d+x(\d+)/ig;
+  while((m=re.exec(s))!==null){
+    var h=parseInt(m[1],10)||0;
+    if(h>max)max=h;
+  }
+  if(max>=2160)return"4K";
+  if(max>=1440)return"1440p";
+  if(max>=1080)return"1080p";
+  if(max>=720)return"720p";
+  if(max>=480)return"480p";
   return max?max+"p":"Auto";
 }
-async function verifyHls(url){
-  if(!/^https?:\/\//i.test(url))return null;
-  try{
-    var r=await timeout(fetch(url,{headers:hdr()}),7000,"master");
-    if(!r.ok)return null;
-    var body=await r.text();
-    if(!/^#EXTM3U/m.test(body||""))return null;
-    return {url:url,quality:qualityFromMaster(body)};
-  }catch(_){return null}
+
+function normalizeSubs(json){
+  var src=[];
+  if(Array.isArray(json&&json.default_subs))src=json.default_subs;
+  else if(json&&json.data&&Array.isArray(json.data.subtitles))src=json.data.subtitles;
+  return src.filter(function(x){
+    return x&&/^https?:\/\//i.test(clean(x.url||x.file));
+  }).slice(0,12).map(function(x){
+    var url=clean(x.url||x.file);
+    var lang=clean(x.language||x.lang||x.label||x.code)||"Unknown";
+    return {
+      url:url,
+      language:lang,
+      name:lang+" [Nesterov]"
+    };
+  });
 }
-async function getStreams(tmdbId,mediaType,season,episode){
-  if(!tmdbId||(mediaType!=="movie"&&mediaType!=="tv"))return[];
-  if(mediaType==="tv"&&(!season||!episode))return[];
-  var q="tmdbId="+encodeURIComponent(String(tmdbId))+"&type="+encodeURIComponent(mediaType);
-  if(mediaType==="tv"){
-    q+="&seasonId="+encodeURIComponent(String(season))+"&episodeId="+encodeURIComponent(String(episode));
-  }
-  var api=BASE+"/helios?"+q;
-  try{
-    var r=await timeout(fetch(api,{headers:hdr()}),8000,"helios");
-    if(!r.ok){console.log("[NoctraTV/Nesterov] API HTTP "+r.status);return[]}
-    var j=await r.json();
-    var sources=j&&j.sources&&typeof j.sources==="object"?j.sources:{};
-    var jobs=ORDER.map(async function(name){
-      var row=sources[name];
-      var raw=row&&typeof row.url==="string"?row.url:"";
-      if(!raw)return null;
-      var u;
-      try{u=await decryptNs(raw)}catch(e){console.log("[NoctraTV/Nesterov] "+name+" decrypt "+(e&&e.message?e.message:e));return null}
-      if(!/^https?:\/\//i.test(u))return null;
-      try{if(new URL(u).hostname==="atlantic.st")return null}catch(_){return null}
-      var v=await verifyHls(u);
-      if(!v)return null;
-      var title="NoctraTV · Nesterov · "+name+" · "+v.quality;
+
+function verify(url,index,subs){
+  var h=headers();
+  return withTimeout(fetch(url,{headers:h}),8000,"HLS "+(index+1))
+    .then(function(r){
+      if(!r.ok)throw new Error("HLS HTTP "+r.status);
+      return r.text();
+    })
+    .then(function(body){
+      if(String(body||"").indexOf("#EXTM3U")<0)throw new Error("not HLS");
+      var q=maxQuality(body);
+      var title="NoctraTV · Nesterov · HLS "+(index+1)+" · "+q;
       return {
         name:title,
         title:title,
-        url:v.url,
-        quality:v.quality,
+        url:url,
+        quality:q,
         type:"hls",
         provider:"noctra-nesterov",
-        headers:hdr()
+        headers:h,
+        subtitles:subs
       };
+    })
+    .catch(function(e){
+      console.log("[NoctraTV/Nesterov] stream "+(index+1)+" "+(e&&e.message?e.message:e));
+      return null;
     });
-    var rows=await Promise.all(jobs),out=[],seen={};
-    rows.forEach(function(x){if(x&&x.url&&!seen[x.url]){seen[x.url]=1;out.push(x)}});
-    console.log("[NoctraTV/Nesterov] "+mediaType+" "+tmdbId+" streams="+out.length);
-    return out;
-  }catch(e){
-    console.log("[NoctraTV/Nesterov] "+(e&&e.message?e.message:e));
-    return[];
-  }
 }
-module.exports={getStreams:getStreams};
+
+function getStreams(tmdbId,mediaType,season,episode){
+  if(!tmdbId||(mediaType!=="movie"&&mediaType!=="tv"))return Promise.resolve([]);
+  if(mediaType==="tv"&&(!season||!episode))return Promise.resolve([]);
+
+  var url=apiUrl(tmdbId,mediaType,season,episode);
+  return withTimeout(fetch(url,{headers:headers()}),9000,"Nesterov API")
+    .then(function(r){
+      if(!r.ok)throw new Error("API HTTP "+r.status);
+      return r.json();
+    })
+    .then(function(json){
+      var data=json&&json.data&&typeof json.data==="object"?json.data:{};
+      var urls=Array.isArray(data.stream_urls)?data.stream_urls:[];
+      urls=urls.map(clean).filter(function(u){return /^https?:\/\//i.test(u);});
+      var subs=normalizeSubs(json);
+      return Promise.all(urls.map(function(u,i){return verify(u,i,subs);}));
+    })
+    .then(function(rows){
+      var out=[],seen={};
+      (rows||[]).forEach(function(x){
+        if(!x||!x.url||seen[x.url])return;
+        seen[x.url]=1;out.push(x);
+      });
+      console.log("[NoctraTV/Nesterov] "+mediaType+" "+tmdbId+" streams="+out.length);
+      return out;
+    })
+    .catch(function(e){
+      console.log("[NoctraTV/Nesterov] "+(e&&e.message?e.message:e));
+      return [];
+    });
+}
+
+module.exports={
+  getStreams:getStreams,
+  apiUrl:apiUrl,
+  maxQuality:maxQuality
+};

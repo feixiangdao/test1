@@ -85,10 +85,17 @@ function getStreams(tmdbId,mediaType,season,episode){
   if(tmdbId==null)return Promise.resolve([]);
   var isTv=mediaType==="tv";
   var page=isTv
-    ?VIDCORE+"/tv/"+encodeURIComponent(String(tmdbId))+"/"+encodeURIComponent(String(season||1))+"/"+encodeURIComponent(String(episode||1))
-    :VIDCORE+"/movie/"+encodeURIComponent(String(tmdbId));
+    ?VIDCORE+"/tv/"+encodeURIComponent(String(tmdbId))+"/"+encodeURIComponent(String(season||1))+"/"+encodeURIComponent(String(episode||1))+"/"
+    :VIDCORE+"/movie/"+encodeURIComponent(String(tmdbId))+"/";
 
-  return fetch(page,{headers:{"User-Agent":UA,"Accept":"text/html,*/*"}})
+  var pageHeaders={
+    "User-Agent":UA,
+    "Accept":"text/html,*/*",
+    "Referer":VIDCORE+"/",
+    "X-Requested-With":"XMLHttpRequest"
+  };
+
+  return fetch(page,{headers:pageHeaders})
     .then(function(r){
       if(!r.ok)throw new Error("page HTTP "+r.status);
       return r.text();
@@ -96,16 +103,35 @@ function getStreams(tmdbId,mediaType,season,episode){
     .then(function(html){
       var token=tokenFrom(html);
       if(!token)throw new Error("page token missing");
-      return fetch(ENCDEC+"/enc-vidcore?text="+encodeURIComponent(token),{
-        headers:{"User-Agent":UA,"Accept":"application/json,*/*"}
-      }).then(function(r){
-        if(!r.ok)throw new Error("enc HTTP "+r.status);
-        return r.text();
+
+      // Current VidCore protocol is two-stage.
+      return fetch(
+        ENCDEC+"/enc-vidcore?text="+encodeURIComponent(token)+"&stage=1",
+        {headers:{"User-Agent":UA,"Accept":"application/json,*/*"}}
+      ).then(function(r){
+        if(!r.ok)throw new Error("stage1 HTTP "+r.status);
+        return r.json();
       });
     })
-    .then(function(t){
-      var initial=resultOf(parseJson(t));
-      if(!initial||!initial.servers||!initial.stream||!initial.token)throw new Error("bootstrap incomplete");
+    .then(function(j1){
+      var p1=resultOf(j1);
+      if(!p1||!p1.stage1||!p1.token)throw new Error("stage1 incomplete");
+      var h1=Object.assign({},baseHeaders(),{"X-CSRF-Token":String(p1.token)});
+      return post(p1.stage1,null,h1);
+    })
+    .then(function(stage1Text){
+      if(!stage1Text)throw new Error("stage1 response empty");
+      return fetch(
+        ENCDEC+"/enc-vidcore?text="+encodeURIComponent(stage1Text)+"&stage=2",
+        {headers:{"User-Agent":UA,"Accept":"application/json,*/*"}}
+      ).then(function(r){
+        if(!r.ok)throw new Error("stage2 HTTP "+r.status);
+        return r.json();
+      });
+    })
+    .then(function(j2){
+      var initial=resultOf(j2);
+      if(!initial||!initial.servers||!initial.stream||!initial.token)throw new Error("stage2 incomplete");
       var h=Object.assign({},baseHeaders(),{"X-CSRF-Token":String(initial.token)});
       return post(initial.servers,null,h).then(function(enc){
         return decrypt(enc,h);

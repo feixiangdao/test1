@@ -543,7 +543,25 @@ function localSessionDiagnostic() {
   var uid = /(?:^|;\s*)dle_user_id=/.test(c) ? 1 : 0;
   var pwd = /(?:^|;\s*)dle_password=/.test(c) ? 1 : 0;
   var uaf = clean(ua) ? 1 : 0;
-  var text = "CF=" + cf + " DLE_ID=" + uid + " DLE_PW=" + pwd + " UA=" + uaf;
+
+  var names = [];
+  try {
+    c.split(";").forEach(function(part) {
+      var i = part.indexOf("=");
+      var n = (i >= 0 ? part.slice(0, i) : part).trim();
+      if (n && names.indexOf(n) < 0) names.push(n);
+    });
+  } catch (_) {}
+  var nameText = names.slice(0, 8).join(",");
+  if (names.length > 8) nameText += ",...";
+
+  var text = "LEN=" + String(c.length) +
+    " CF=" + cf +
+    " ID=" + uid +
+    " PW=" + pwd +
+    " UA=" + uaf +
+    " NAMES=" + (nameText || "NONE");
+
   return {
     name: text,
     title: text,

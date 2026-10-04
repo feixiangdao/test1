@@ -9,16 +9,56 @@ on:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 10
     steps:
-      - name: Probe current ani.pm playback bootstrap
+      - name: Scan ani.pm JS API endpoints
         shell: bash
         run: |
-          set +e
+          python - <<'PY'
+          import re, urllib.request, urllib.parse, concurrent.futures
           UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36'
-          for U in             'https://ani.pm/api/anime/playback-bootstrap/settlar/6351?ep=1&lang=sub'             'https://ani.pm/api/anime/playback-bootstrap/settlar/frieren-beyond-journeys-end-6351?ep=1&lang=sub'             'https://ani.pm/api/anime/playback-bootstrap/settlar/6351?ep=1&lang=dub'             'https://ani.pm/api/anime/playback-bootstrap/settlar/frieren-beyond-journeys-end-6351?ep=1&lang=dub'
-          do
-            echo "=== $U ==="
-            curl -sS -L --max-time 25 -A "$UA"               -H 'Accept: application/json' -H 'Referer: https://ani.pm/'               -w '\nHTTP_STATUS:%{http_code}\n' "$U" | head -c 30000
-            echo
-          done
+          def get(url):
+              req=urllib.request.Request(url,headers={'User-Agent':UA,'Referer':'https://ani.pm/'})
+              with urllib.request.urlopen(req,timeout=20) as r:return r.read().decode('utf-8','ignore')
+          html=get('https://ani.pm/')
+          scripts=set(urllib.parse.urljoin('https://ani.pm/',x) for x in re.findall(r'<script[^>]+src=["\']([^"\']+\.js[^"\']*)',html,re.I))
+          for u in list(scripts):
+              if 'index-' not in u: continue
+              js=get(u)
+              for a in re.findall(r'["\'](assets/[^"\']+\.js)["\']',js):
+                  scripts.add(urllib.parse.urljoin('https://ani.pm/',a))
+          print('JS_COUNT',len(scripts))
+          markers=['settlarSelection','selection:','provider:','embedUrl','expiresAt','playback-bootstrap','anipm-server','dl-current']
+          def inspect(u):
+              try: js=get(u)
+              except Exception as e:return (u,[],[],repr(e))
+              eps=set()
+              for s in re.findall(r'["\']((?:/api)?/anime/[^"\']+)["\']',js,re.I):
+                  if any(k in s.lower() for k in ('src/','playback','selection','server','stream','resolve')):
+                      eps.add(s)
+              snippets=[]
+              low=js.lower()
+              for mark in markers:
+                  pos=0
+                  while True:
+                      i=low.find(mark.lower(),pos)
+                      if i<0: break
+                      snippets.append(js[max(0,i-500):min(len(js),i+1000)].replace('\n',' '))
+                      pos=i+len(mark)
+                      if len(snippets)>25: break
+                  if len(snippets)>25: break
+              return (u,sorted(eps),snippets,'')
+          with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+              rows=list(ex.map(inspect,sorted(scripts)))
+          all_eps=set()
+          for u,eps,snips,err in rows:
+              all_eps.update(eps)
+              if snips:
+                  print('\n===',u,'===')
+                  seen=set()
+                  for s in snips:
+                      if s not in seen:
+                          seen.add(s); print(s)
+          print('\n=== UNIQUE ENDPOINTS ===')
+          for e in sorted(all_eps):print(e)
+          PY

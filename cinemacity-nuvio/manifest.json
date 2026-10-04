@@ -1,0 +1,21 @@
+{
+  "name": "CinemaCity Local",
+  "version": "0.1.0",
+  "description": "Independent Nuvio local provider for cinemacity.cc. Uses the user's own authenticated CinemaCity session and returns direct HLS/MP4/DASH only; no iframe/web-player fallback.",
+  "scrapers": [
+    {
+      "id": "cinemacity-auth",
+      "name": "CinemaCity · Authenticated",
+      "description": "Searches cinemacity.cc, strictly matches the requested TMDB title/year, reuses the user's locally configured authenticated session, and extracts direct media URLs exposed by the authenticated CinemaCity page or same-origin player page.",
+      "version": "0.1.0",
+      "author": "CinemaCity Local",
+      "supportedTypes": ["movie", "tv"],
+      "filename": "providers/cinemacity.js",
+      "enabled": true,
+      "formats": ["m3u8", "mp4", "mpd"],
+      "contentLanguage": ["multi"],
+      "limited": true,
+      "hasSettings": true
+    }
+  ]
+}

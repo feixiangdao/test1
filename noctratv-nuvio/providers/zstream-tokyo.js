@@ -245,11 +245,15 @@ function resolveMegaPlay(boot,channel){
     .then(function(html){
       var m=/data-id="(\d+)"/.exec(String(html||""));
       if(!m)throw new Error("data-id missing");
-      return withTimeout(fetch(host+"/stream/getSources?id="+encodeURIComponent(m[1]),{
-        headers:{"User-Agent":UA,"Referer":host+"/","X-Requested-With":"XMLHttpRequest","Accept":"application/json"}
-      }),12000,"megaplay-api");
+      var id=encodeURIComponent(m[1]);
+      var hh={"User-Agent":UA,"Referer":pageUrl,"X-Requested-With":"XMLHttpRequest","Accept":"application/json"};
+      var newer=host+"/stream/getSourcesNew?id="+id+"&id="+id+"&type="+encodeURIComponent(channel);
+      return withTimeout(fetch(newer,{headers:hh}),12000,"megaplay-api-new").then(function(r){
+        if(r.ok)return r.json();
+        return withTimeout(fetch(host+"/stream/getSources?id="+id,{headers:hh}),12000,"megaplay-api-old")
+          .then(function(r2){if(!r2.ok)throw new Error("api HTTP "+r2.status);return r2.json();});
+      });
     })
-    .then(function(r){if(!r.ok)throw new Error("api HTTP "+r.status);return r.json();})
     .then(function(sd){
       var u="";
       if(sd&&sd.sources){

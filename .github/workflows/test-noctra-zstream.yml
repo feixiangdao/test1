@@ -26,10 +26,27 @@ jobs:
         run: |
           node - <<'NODE'
           async function timeout(p,ms,label){
-            return Promise.race([
-              Promise.resolve(p),
-              new Promise(r=>setTimeout(()=>{console.log(label+' timeout');r([])},ms))
-            ]).catch(e=>{console.log(label+' error '+(e&&e.message?e.message:e));return []});
+            return new Promise(resolve=>{
+              let done=false;
+              const timer=setTimeout(()=>{
+                if(done)return;
+                done=true;
+                console.log(label+' timeout');
+                resolve([]);
+              },ms);
+              Promise.resolve(p).then(v=>{
+                if(done)return;
+                done=true;
+                clearTimeout(timer);
+                resolve(v);
+              }).catch(e=>{
+                if(done)return;
+                done=true;
+                clearTimeout(timer);
+                console.log(label+' error '+(e&&e.message?e.message:e));
+                resolve([]);
+              });
+            });
           }
           async function run(file,label){
             const p=require('./providers/'+file);

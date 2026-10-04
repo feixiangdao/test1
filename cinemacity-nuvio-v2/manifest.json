@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.2.4",
-  "description": "CinemaCity V2 diagnostic build. Fixes v0.2.3 syntax error and keeps compact H/M/S/A endpoint status summary.",
+  "version": "0.2.5",
+  "description": "CinemaCity V2 proxy-probe build. Test Provider now checks three public CinemaCity proxy/catalog routes instead of hitting cinemacity.cc directly.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "Movie-only CinemaCity diagnostic resolver. Fixed v0.2.3 syntax error; Test Provider shows H/M/S/A endpoint status summary.",
-      "version": "0.2.4",
+      "description": "CinemaCity proxy diagnostic. Test Provider checks REALBESTIA, LEANHHU and APPBETA news_pages.xml routes; no CinemaCity Cookie is required for this test.",
+      "version": "0.2.5",
       "supportedTypes": [
         "movie"
       ],

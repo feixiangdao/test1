@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.5.0",
+  "version": "4.6.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -888,6 +888,72 @@
         "tv"
       ],
       "filename": "providers/velora-yoru.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-screenscape-hindibox",
+      "name": "NoctraTV · Screenscape · hindibox",
+      "description": "noctratv.com Screenscape current source 'hindibox'. Reuses ScreenScape's current encrypted web-player API locally and returns direct HLS/MP4/DASH only.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/screenscape-hindibox.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-screenscape-showbox",
+      "name": "NoctraTV · Screenscape · showbox",
+      "description": "noctratv.com Screenscape current source 'showbox'. Reuses ScreenScape's current encrypted web-player API locally and returns direct HLS/MP4/DASH only.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/screenscape-showbox.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-screenscape-goated",
+      "name": "NoctraTV · Screenscape · goated",
+      "description": "noctratv.com Screenscape current source 'goated'. Reuses ScreenScape's current encrypted web-player API locally and returns direct HLS/MP4/DASH only.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/screenscape-goated.js",
       "enabled": false,
       "formats": [
         "m3u8",

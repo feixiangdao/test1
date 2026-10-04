@@ -1,0 +1,38 @@
+name: Research ZStream Native
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-native.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download public ZStream native binary
+        run: |
+          set -euxo pipefail
+          curl -L --fail --retry 3 \
+            -o /tmp/ZStreamNativeSources \
+            https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources
+          file /tmp/ZStreamNativeSources
+          sha256sum /tmp/ZStreamNativeSources
+          ls -lh /tmp/ZStreamNativeSources
+
+      - name: Extract resolver strings
+        run: |
+          set -euo pipefail
+          strings -a -n 4 /tmp/ZStreamNativeSources > /tmp/all-strings.txt
+          echo "=== resolver names and nearby identifiers ==="
+          grep -iE 'tokyo|stellar|nesterov|aphrodite|aspera|artemis|fontaine|magnolia|shibuya|cosmic' /tmp/all-strings.txt | head -n 400 || true
+          echo "=== URLs ==="
+          grep -Eo 'https?://[^[:space:]"<>]+' /tmp/all-strings.txt | sort -u | head -n 500 || true
+          echo "=== likely hosts/domains ==="
+          grep -Eio '([a-z0-9-]+\.)+[a-z]{2,}(/[^[:space:]"<>]*)?' /tmp/all-strings.txt \
+            | grep -viE 'apple\.com|github\.com|swift|boringssl|openssl' \
+            | sort -u | head -n 800 || true
+          echo "=== API/path clues ==="
+          grep -iE '/api/|/movie/|/tv/|/stream|tmdb|season|episode|referer|origin|user-agent|authorization|enc-dec|m3u8|mpd' /tmp/all-strings.txt \
+            | sort -u | head -n 1200 || true

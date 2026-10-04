@@ -782,84 +782,173 @@ function browserNavHeaders(referer) {
   return h;
 }
 
-function searchAndCandidateProbe() {
-  var q = "The Matrix";
-  var searchUrl = BASE + "/index.php?do=search";
+function searchVariant(label, url, method, body) {
   var headers = baseHeaders(BASE + "/", true);
-  headers["X-Requested-With"] = "XMLHttpRequest";
   headers["Origin"] = BASE;
-  headers["Content-Type"] = "application/x-www-form-urlencoded";
-  var body = "do=search&subaction=search&story=" + encodeURIComponent(q);
+  headers["Referer"] = BASE + "/";
+  headers["X-Requested-With"] = "XMLHttpRequest";
+  if (method === "POST") headers["Content-Type"] = "application/x-www-form-urlencoded";
 
-  return fetch(searchUrl, {
-    method: "POST",
-    headers: headers,
-    body: body
-  }).then(function(r) {
+  var opts = { method: method, headers: headers };
+  if (body != null) opts.body = body;
+
+  return fetch(url, opts).then(function(r) {
     return r.text().then(function(html) {
       var info = inspectSearchBody(html, "The Matrix", "1999");
-      var cf = challengeHtml(html) ? 1 : 0;
-      var guest = guestBlocked(html) ? 1 : 0;
-
-      var searchTitle = String(r.status) + " · SEARCH2 · CF=" + cf +
-        " G=" + guest +
-        " L=" + String(html.length) +
-        " LINKS=" + String(info.items.length) +
-        " MATCH=" + (info.match ? "1" : "0") +
-        " SCORE=" + String(info.bestScore) +
-        " HASH=" + String(info.hashFound);
-
-      var searchRow = {
-        name: searchTitle,
-        title: searchTitle,
-        url: searchUrl,
-        quality: "DIAG",
-        type: "diagnostic",
-        provider: "cinemacity-v2-login"
+      return {
+        label: label,
+        status: r.status,
+        html: html,
+        info: info,
+        cf: challengeHtml(html) ? 1 : 0,
+        guest: guestBlocked(html) ? 1 : 0
       };
+    });
+  }).catch(function(e) {
+    return {
+      label: label,
+      status: 0,
+      html: "",
+      info: { items: [], match: null, bestScore: -999, hashFound: 0 },
+      cf: 0,
+      guest: 0,
+      error: e && e.message ? e.message : String(e || "error")
+    };
+  });
+}
 
-      if (!info.match) return [searchRow];
+function compactSearchRow(x) {
+  var t = x.label +
+    " " + String(x.status) +
+    " CF" + String(x.cf) +
+    " G" + String(x.guest) +
+    " N" + String((x.info.items || []).length) +
+    " M" + (x.info.match ? "1" : "0") +
+    " S" + String(x.info.bestScore) +
+    " H" + String(x.info.hashFound);
+  return {
+    name: t,
+    title: t,
+    url: BASE + "/#search-" + encodeURIComponent(x.label),
+    quality: "DIAG",
+    type: "diagnostic",
+    provider: "cinemacity-v2-login"
+  };
+}
 
-      var candidate = info.match.url;
-      return fetch(candidate, {
-        headers: browserNavHeaders(searchUrl)
-      }).then(function(cr) {
-        return cr.text().then(function(ch) {
-          var ctitle = String(cr.status) + " · CANDIDATE · CF=" + (challengeHtml(ch) ? 1 : 0) +
-            " G=" + (guestBlocked(ch) ? 1 : 0) +
-            " A=" + (/atob\s*\(/i.test(ch) ? 1 : 0) +
-            " L=" + String(ch.length);
-          return [searchRow, {
-            name: ctitle,
-            title: ctitle,
-            url: candidate,
-            quality: "DIAG",
-            type: "diagnostic",
-            provider: "cinemacity-v2-login"
-          }];
+function searchAndCandidateProbe() {
+  var q = "The Matrix";
+  var enc = encodeURIComponent(q);
+
+  var variants = [
+    searchVariant(
+      "A",
+      BASE + "/index.php?do=search",
+      "POST",
+      "do=search&subaction=search&story=" + enc
+    ),
+    searchVariant(
+      "B",
+      BASE + "/index.php?do=search&subaction=search",
+      "POST",
+      "story=" + enc
+    ),
+    searchVariant(
+      "C",
+      BASE + "/index.php?do=search&subaction=search&story=" + enc,
+      "GET",
+      null
+    ),
+    searchVariant(
+      "D",
+      BASE + "/?do=search&subaction=search&story=" + enc,
+      "GET",
+      null
+    )
+  ];
+
+  return Promise.all(variants).then(function(results) {
+    var rows = results.map(compactSearchRow);
+    var winner = null;
+
+    results.forEach(function(x) {
+      if (!x.info || !x.info.match) return;
+      if (!winner || x.info.bestScore > winner.info.bestScore) winner = x;
+    });
+
+    if (!winner) {
+      var bestItems = [];
+      results.forEach(function(x) {
+        (x.info.items || []).forEach(function(item) {
+          var slugText = clean(item.slugTitle || item.title || "");
+          if (!slugText) return;
+          bestItems.push({
+            label: x.label,
+            text: slugText,
+            year: item.slugYear || "",
+            url: item.url
+          });
         });
-      }).catch(function(e) {
-        var msg = e && e.message ? e.message : String(e || "error");
-        return [searchRow, {
-          name: "0 · CANDIDATE · " + msg.slice(0, 90),
-          title: "0 · CANDIDATE · " + msg.slice(0, 90),
+      });
+
+      var seen = {};
+      var preview = [];
+      bestItems.forEach(function(it) {
+        var key = normalizeTitle(it.text) + "|" + it.year;
+        if (seen[key]) return;
+        seen[key] = 1;
+        preview.push(it);
+      });
+
+      preview.slice(0, 3).forEach(function(it, idx) {
+        var t = "TOP" + String(idx + 1) + " " + it.label + " · " +
+          it.text.slice(0, 38) + (it.year ? " · " + it.year : "");
+        rows.push({
+          name: t,
+          title: t,
+          url: it.url,
+          quality: "DIAG",
+          type: "diagnostic",
+          provider: "cinemacity-v2-login"
+        });
+      });
+
+      return rows;
+    }
+
+    var candidate = winner.info.match.url;
+    return fetch(candidate, {
+      headers: browserNavHeaders(
+        BASE + "/index.php?do=search&subaction=search"
+      )
+    }).then(function(cr) {
+      return cr.text().then(function(ch) {
+        var ctitle = String(cr.status) + " · CANDIDATE · CF=" + (challengeHtml(ch) ? 1 : 0) +
+          " G=" + (guestBlocked(ch) ? 1 : 0) +
+          " A=" + (/atob\s*\(/i.test(ch) ? 1 : 0) +
+          " L=" + String(ch.length);
+        rows.push({
+          name: ctitle,
+          title: ctitle,
           url: candidate,
           quality: "DIAG",
           type: "diagnostic",
           provider: "cinemacity-v2-login"
-        }];
+        });
+        return rows;
       });
+    }).catch(function(e) {
+      var msg = e && e.message ? e.message : String(e || "error");
+      rows.push({
+        name: "0 · CANDIDATE · " + msg.slice(0, 90),
+        title: "0 · CANDIDATE · " + msg.slice(0, 90),
+        url: candidate,
+        quality: "DIAG",
+        type: "diagnostic",
+        provider: "cinemacity-v2-login"
+      });
+      return rows;
     });
-  }).catch(function(e) {
-    var msg = e && e.message ? e.message : String(e || "error");
-    return [{
-      name: "0 · SEARCH2 · " + msg.slice(0, 100),
-      title: "0 · SEARCH2 · " + msg.slice(0, 100),
-      url: searchUrl,
-      quality: "DIAG",
-      type: "diagnostic",
-      provider: "cinemacity-v2-login"
-    }];
   });
 }
 

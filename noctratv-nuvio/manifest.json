@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.24.0",
+  "version": "4.25.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1116,14 +1116,14 @@
     {
       "id": "noctra-zstream-tokyo",
       "name": "NoctraTV · ZStream · Tokyo",
-      "description": "ZStream Tokyo anime TV source. Exact-matches TMDB anime titles to ani.pm, resolves current Settlar sessions locally, bypasses iframe, and returns validated direct HLS with subtitles. Season 1 only until multi-season episode mapping is verified.",
-      "version": "1.0.0",
+      "description": "ZStream Tokyo anime TV source. Exact-matches TMDB anime titles to ani.pm, tries the current Settlar session locally, and automatically falls back to ani.pm's MegaPlay encrypted backup when Settlar is Cloudflare-blocked. Returns only verified direct HLS with SUB/DUB. Season 1 only until multi-season episode mapping is verified.",
+      "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "tv"
       ],
       "filename": "providers/zstream-tokyo.js",
-      "enabled": false,
+      "enabled": true,
       "formats": [
         "m3u8"
       ],

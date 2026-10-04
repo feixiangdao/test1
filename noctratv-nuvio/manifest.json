@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.12.0",
+  "version": "4.13.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -372,6 +372,27 @@
       ],
       "contentLanguage": [
         "en",
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-popwatch-vidrock",
+      "name": "NoctraTV · PopWatch · VidRock",
+      "description": "noctratv.com PopWatch VidRock family: Nova / Luna. Resolves VidRock API payloads locally, decrypts AES-GCM URLs, and returns direct media only.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/popwatch-vidrock.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
         "multi"
       ],
       "limited": true

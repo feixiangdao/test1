@@ -693,27 +693,46 @@ function directOriginProbes() {
 }
 
 
-function inspectSearchBody(body) {
+function inspectSearchBody(body, expectedTitle, expectedYear) {
   var html = clean(body);
-  var links = [];
+  var items = [];
   var seen = {};
-  var re = /href\s*=\s*["']([^"']+\/(?:movies|tv-series)\/[^"']+\.html(?:\?[^"']*)?)["']/ig;
+  var re = /<a\b[^>]*href\s*=\s*["']([^"']+\/(?:movies|tv-series)\/[^"']+\.html(?:\?[^"']*)?)["'][^>]*>([\s\S]*?)<\/a>/ig;
   var m;
   while ((m = re.exec(html)) !== null) {
     var u = resolveUrl(m[1], BASE + "/");
-    if (u && isCinemaCityHost(u) && !seen[u]) {
-      seen[u] = 1;
-      links.push(u);
-      if (links.length >= 8) break;
-    }
+    if (!u || !isCinemaCityHost(u) || seen[u]) continue;
+    seen[u] = 1;
+    var title = stripTags(m[2]);
+    items.push({ url: u, title: title });
+    if (items.length >= 40) break;
   }
+
+  var want = normalizeTitle(expectedTitle || "");
+  var year = clean(expectedYear || "");
+  var best = null;
+  var bestScore = -1;
+  items.forEach(function(item) {
+    var got = normalizeTitle(item.title);
+    var score = 0;
+    if (want && got === want) score += 10;
+    else if (want && got && (got.indexOf(want) >= 0 || want.indexOf(got) >= 0)) score += 5;
+    var hay = item.title + " " + item.url;
+    if (year && hay.indexOf(year) >= 0) score += 3;
+    if (score > bestScore) {
+      bestScore = score;
+      best = item;
+    }
+  });
 
   var hash = "";
   var hm = html.match(/(?:dle_login_hash|dle_hash)\s*[:=]\s*["']([^"']+)["']/i);
   if (hm) hash = hm[1];
 
   return {
-    links: links,
+    items: items,
+    match: bestScore >= 8 ? best : null,
+    bestScore: bestScore,
     hashFound: hash ? 1 : 0,
     hash: hash
   };
@@ -747,14 +766,15 @@ function searchAndCandidateProbe() {
     body: body
   }).then(function(r) {
     return r.text().then(function(html) {
-      var info = inspectSearchBody(html);
+      var info = inspectSearchBody(html, "The Matrix", "1999");
       var cf = challengeHtml(html) ? 1 : 0;
       var guest = guestBlocked(html) ? 1 : 0;
 
       var searchTitle = String(r.status) + " · SEARCH2 · CF=" + cf +
         " G=" + guest +
         " L=" + String(html.length) +
-        " LINKS=" + String(info.links.length) +
+        " LINKS=" + String(info.items.length) +
+        " MATCH=" + (info.match ? "1" : "0") +
         " HASH=" + String(info.hashFound);
 
       var searchRow = {
@@ -766,9 +786,9 @@ function searchAndCandidateProbe() {
         provider: "cinemacity-v2-login"
       };
 
-      if (!info.links.length) return [searchRow];
+      if (!info.match) return [searchRow];
 
-      var candidate = info.links[0];
+      var candidate = info.match.url;
       return fetch(candidate, {
         headers: browserNavHeaders(searchUrl)
       }).then(function(cr) {

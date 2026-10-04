@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.2.8",
-  "description": "CinemaCity V2 cookie diagnostics. Test Provider shows only cookie length and cookie names, never values, plus CF/DLE/UA presence flags.",
+  "version": "0.3.0",
+  "description": "CinemaCity V2 authenticated-origin diagnostic. Retests cinemacity.cc directly with the complete saved Cookie and matching User-Agent instead of proxy routes.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity diagnostic. Shows LEN and cookie names only (no values) to verify whether Session Cookie was saved and what cookie keys are present.",
-      "version": "0.2.8",
+      "description": "Authenticated CinemaCity origin diagnostic. Test Provider checks HOME, MOVIES, SEARCH and DETAIL directly with the saved Cookie/User-Agent and reports CF/GUEST/ATOB/LEN.",
+      "version": "0.3.0",
       "supportedTypes": [
         "movie"
       ],

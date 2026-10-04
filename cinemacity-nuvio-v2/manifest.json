@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.2.5",
-  "description": "CinemaCity V2 proxy-probe build. Test Provider now checks three public CinemaCity proxy/catalog routes instead of hitting cinemacity.cc directly.",
+  "version": "0.2.6",
+  "description": "CinemaCity V2 LEANHHU diagnostic build. Tests the production sitemap parameters used by existing providers plus a known movie detail page.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity proxy diagnostic. Test Provider checks REALBESTIA, LEANHHU and APPBETA news_pages.xml routes; no CinemaCity Cookie is required for this test.",
-      "version": "0.2.5",
+      "description": "CinemaCity LEANHHU diagnostic. Tests perPage=500, raw sitemap, page=1 and a known movie page to determine whether the worker is still usable.",
+      "version": "0.2.6",
       "supportedTypes": [
         "movie"
       ],

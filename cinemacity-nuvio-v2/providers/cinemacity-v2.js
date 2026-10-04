@@ -535,6 +535,25 @@ function diagnosticProbeEndpoints() {
 }
 
 
+
+function localSessionDiagnostic() {
+  var c = cookieValue();
+  var ua = userAgent();
+  var cf = /(?:^|;\s*)cf_clearance=/.test(c) ? 1 : 0;
+  var uid = /(?:^|;\s*)dle_user_id=/.test(c) ? 1 : 0;
+  var pwd = /(?:^|;\s*)dle_password=/.test(c) ? 1 : 0;
+  var uaf = clean(ua) ? 1 : 0;
+  var text = "CF=" + cf + " DLE_ID=" + uid + " DLE_PW=" + pwd + " UA=" + uaf;
+  return {
+    name: text,
+    title: text,
+    url: BASE + "/#session-flags",
+    quality: "DIAG",
+    type: "diagnostic",
+    provider: "cinemacity-v2-login"
+  };
+}
+
 function proxyProbeOne(label, base, path) {
   var url = base.replace(/\/$/, "") + (path || "/news_pages.xml?page=1&perPage=500");
   return fetch(url, {
@@ -585,7 +604,9 @@ function proxyProbeEndpoints() {
     proxyProbeOne("LEANRAW", "https://cc.leanhhu061206.workers.dev", "/news_pages.xml"),
     proxyProbeOne("LEANP1", "https://cc.leanhhu061206.workers.dev", "/news_pages.xml?page=1"),
     proxyProbeOne("LEANMOV", "https://cc.leanhhu061206.workers.dev", "/movies/379-the-patient.html")
-  ]);
+  ]).then(function(rows) {
+    return [localSessionDiagnostic()].concat(rows || []);
+  });
 }
 
 function getStreams(tmdbId, mediaType, season, episode) {

@@ -9,56 +9,47 @@ on:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 6
     steps:
-      - name: Scan ani.pm JS API endpoints
+      - name: Map AnimeDetails imported resolver functions
         shell: bash
         run: |
           python - <<'PY'
-          import re, urllib.request, urllib.parse, concurrent.futures
+          import re, urllib.request
           UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36'
           def get(url):
               req=urllib.request.Request(url,headers={'User-Agent':UA,'Referer':'https://ani.pm/'})
               with urllib.request.urlopen(req,timeout=20) as r:return r.read().decode('utf-8','ignore')
-          html=get('https://ani.pm/')
-          scripts=set(urllib.parse.urljoin('https://ani.pm/',x) for x in re.findall(r'<script[^>]+src=["\']([^"\']+\.js[^"\']*)',html,re.I))
-          for u in list(scripts):
-              if 'index-' not in u: continue
-              js=get(u)
-              for a in re.findall(r'["\'](assets/[^"\']+\.js)["\']',js):
-                  scripts.add(urllib.parse.urljoin('https://ani.pm/',a))
-          print('JS_COUNT',len(scripts))
-          markers=['settlarSelection','selection:','provider:','embedUrl','expiresAt','playback-bootstrap','anipm-server','dl-current']
-          def inspect(u):
-              try: js=get(u)
-              except Exception as e:return (u,[],[],repr(e))
-              eps=set()
-              for s in re.findall(r'["\']((?:/api)?/anime/[^"\']+)["\']',js,re.I):
-                  if any(k in s.lower() for k in ('src/','playback','selection','server','stream','resolve')):
-                      eps.add(s)
-              snippets=[]
-              low=js.lower()
-              for mark in markers:
-                  pos=0
-                  while True:
-                      i=low.find(mark.lower(),pos)
-                      if i<0: break
-                      snippets.append(js[max(0,i-500):min(len(js),i+1000)].replace('\n',' '))
-                      pos=i+len(mark)
-                      if len(snippets)>25: break
-                  if len(snippets)>25: break
-              return (u,sorted(eps),snippets,'')
-          with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
-              rows=list(ex.map(inspect,sorted(scripts)))
-          all_eps=set()
-          for u,eps,snips,err in rows:
-              all_eps.update(eps)
-              if snips:
-                  print('\n===',u,'===')
-                  seen=set()
-                  for s in snips:
-                      if s not in seen:
-                          seen.add(s); print(s)
-          print('\n=== UNIQUE ENDPOINTS ===')
-          for e in sorted(all_eps):print(e)
+          detail=get('https://ani.pm/assets/AnimeDetails-CNwua4lV.js')
+          index=get('https://ani.pm/assets/index-CJ_Rq2xX.js')
+          print('=== DETAIL HEAD ===')
+          print(detail[:12000])
+          m=re.search(r'import\{(.+?)\}from"\./index-CJ_Rq2xX\.js"',detail)
+          if not m:
+              print('IMPORT MAP NOT FOUND');raise SystemExit
+          body=m.group(1)
+          mapping={}
+          for part in body.split(','):
+              part=part.strip()
+              mm=re.match(r'([^ ]+) as ([^ ]+)$',part)
+              if mm:mapping[mm.group(2)]=mm.group(1)
+              else:mapping[part]=part
+          for local in ['zt','Ds','Os','Ps','Ae']:
+              print('MAP',local,'<=',mapping.get(local))
+          targets=[mapping.get(x) for x in ['zt','Ds','Os','Ps','Ae'] if mapping.get(x)]
+          print('=== INDEX TARGET CONTEXT ===')
+          for t in targets:
+              pats=[r'function\s+'+re.escape(t)+r'\s*\(',r'(?:const|let|var)\s+'+re.escape(t)+r'\s*=']
+              pos=-1
+              for p in pats:
+                  mm=re.search(p,index)
+                  if mm:pos=mm.start();break
+              if pos<0:
+                  # fallback first token occurrence
+                  mm=re.search(r'(?<![A-Za-z0-9_$])'+re.escape(t)+r'(?![A-Za-z0-9_$])',index)
+                  pos=mm.start() if mm else -1
+              print('\nTARGET',t,'POS',pos)
+              if pos>=0:print(index[max(0,pos-2500):min(len(index),pos+7000)])
+          print('=== EXPORT TAIL ===')
+          print(index[-30000:])
           PY

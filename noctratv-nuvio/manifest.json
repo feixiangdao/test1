@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.17.0",
+  "version": "4.18.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -966,8 +966,8 @@
     {
       "id": "noctra-velora-yoru",
       "name": "NoctraTV · Velora · Yoru",
-      "description": "noctratv.com Velora · Yoru. Uses direct TMDB metadata plus the current Videasy seed + enc=2 PRNG/XOR mvm1 protocol locally. Disabled until live probe confirms the current Yoru API path.",
-      "version": "1.1.0",
+      "description": "noctratv.com Velora · Yoru. Current Videasy Yoru endpoint maps to api.videasy.net/cdn/sources-with-title; decrypts with dec-videasy and returns direct media only. Disabled until live probe confirms current coverage.",
+      "version": "2.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",

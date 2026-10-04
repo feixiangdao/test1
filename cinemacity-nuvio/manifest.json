@@ -1,18 +1,17 @@
 {
   "name": "CinemaCity Local",
-  "version": "0.1.1",
-  "description": "Independent Nuvio local provider for cinemacity.cc. Experimental authenticated movie resolver: uses the user's own CinemaCity session and returns direct HLS/MP4/DASH only; no iframe/web-player fallback. TV stays disabled until episode routing is verified.",
+  "version": "0.1.2",
+  "description": "Independent CinemaCity Nuvio provider. v0.1.2 uses a fresh provider id/file to avoid stale Android plugin cache and exposes local Session Cookie/User-Agent settings when supported by the app.",
   "scrapers": [
     {
-      "id": "cinemacity-auth",
-      "name": "CinemaCity · Authenticated",
-      "description": "Experimental movie-only resolver. Uses the user's locally configured authenticated CinemaCity session, tries strict TMDB title/year matching, and returns only direct media exposed by the authenticated CinemaCity page or same-origin player page. TV is intentionally disabled until season/episode routing is verified.",
-      "version": "0.1.1",
-      "author": "CinemaCity Local",
+      "id": "cinemacity-session-v2",
+      "name": "CinemaCity · Login Session",
+      "description": "Experimental movie-only CinemaCity resolver. Configure your own signed-in CinemaCity Session Cookie and matching browser User-Agent in Provider Settings. Returns direct HLS/MP4/DASH only.",
+      "version": "0.1.2",
       "supportedTypes": [
         "movie"
       ],
-      "filename": "providers/cinemacity.js",
+      "filename": "providers/cinemacity-session-v2.js",
       "enabled": true,
       "formats": [
         "m3u8",

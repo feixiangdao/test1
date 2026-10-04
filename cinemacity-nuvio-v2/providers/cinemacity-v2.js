@@ -627,6 +627,71 @@ function proxyProbeEndpoints() {
   });
 }
 
+
+function directOriginProbeOne(label, url, options) {
+  var opts = options || {};
+  var headers = baseHeaders(opts.referer || (BASE + "/"), true);
+  if (opts.ajax) {
+    headers["X-Requested-With"] = "XMLHttpRequest";
+    headers["Origin"] = BASE;
+  }
+  if (opts.contentType) headers["Content-Type"] = opts.contentType;
+
+  var fetchOpts = { headers: headers };
+  if (opts.method) fetchOpts.method = opts.method;
+  if (opts.body != null) fetchOpts.body = opts.body;
+
+  return fetch(url, fetchOpts).then(function(r) {
+    return r.text().catch(function(){ return ""; }).then(function(body) {
+      var cf = challengeHtml(body) ? 1 : 0;
+      var guest = guestBlocked(body) ? 1 : 0;
+      var atobFound = /atob\s*\(/i.test(body) ? 1 : 0;
+      var title = String(r.status) + " · " + label +
+        " · CF=" + cf +
+        " GUEST=" + guest +
+        " ATOB=" + atobFound +
+        " LEN=" + String(body.length);
+      return {
+        name: title,
+        title: title,
+        url: url,
+        quality: "DIAG",
+        type: "diagnostic",
+        provider: "cinemacity-v2-login"
+      };
+    });
+  }).catch(function(e) {
+    var msg = e && e.message ? e.message : String(e || "error");
+    var title = "0 · " + label + " · " + msg.slice(0, 100);
+    return {
+      name: title,
+      title: title,
+      url: url,
+      quality: "DIAG",
+      type: "diagnostic",
+      provider: "cinemacity-v2-login"
+    };
+  });
+}
+
+function directOriginProbes() {
+  var q = "The Matrix";
+  var postBody = "do=search&subaction=search&story=" + encodeURIComponent(q);
+  return Promise.all([
+    directOriginProbeOne("HOME", BASE + "/"),
+    directOriginProbeOne("MOVIES", BASE + "/movies/"),
+    directOriginProbeOne("SEARCH", BASE + "/index.php?do=search", {
+      method: "POST",
+      ajax: true,
+      contentType: "application/x-www-form-urlencoded",
+      body: postBody
+    }),
+    directOriginProbeOne("DETAIL", BASE + "/movies/379-the-patient.html")
+  ]).then(function(rows) {
+    return [localSessionDiagnostic()].concat(rows || []);
+  });
+}
+
 function getStreams(tmdbId, mediaType, season, episode) {
   if (!tmdbId || mediaType !== "movie") {
     if (mediaType === "tv") {
@@ -635,10 +700,10 @@ function getStreams(tmdbId, mediaType, season, episode) {
     return Promise.resolve([]);
   }
 
-  // Proxy-route diagnostic: no CinemaCity cookie required.
+  // Direct-origin diagnostic using the user's current Cookie + User-Agent.
   // Nuvio's built-in Test Provider uses TMDB 603.
   if (String(tmdbId) === "603") {
-    return proxyProbeEndpoints();
+    return directOriginProbes();
   }
 
   if (!cookieValue()) {

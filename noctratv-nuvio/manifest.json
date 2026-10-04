@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.3.0",
+  "version": "4.4.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -357,7 +357,7 @@
     {
       "id": "noctra-popwatch-vidzee",
       "name": "NoctraTV · PopWatch · VidZee",
-      "description": "noctratv.com PopWatch VidZee family: tik / dcloud / v6:Hindi. Uses the current VidZee direct API locally and returns direct media only.",
+      "description": "noctratv.com PopWatch VidZee family: tik / dcloud / v6:Hindi. Uses the current VidZee direct API locally and returns direct media only. Live probe currently returns media for movie and TV samples; unavailable subservers are skipped.",
       "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
@@ -365,7 +365,7 @@
         "tv"
       ],
       "filename": "providers/popwatch-vidzee.js",
-      "enabled": false,
+      "enabled": true,
       "formats": [
         "m3u8",
         "mp4"
@@ -689,7 +689,7 @@
     {
       "id": "noctra-gaiaflix-meowtv",
       "name": "NoctraTV · Gaiaflix · MeowTV",
-      "description": "noctratv.com Gaiaflix MeowTV family: hindiv3 / dcloud / tik. Mints a fresh UA-bound MeowTV ticket for each source, decrypts the API response locally through dec-meowtv, and returns direct media only.",
+      "description": "noctratv.com Gaiaflix MeowTV research provider. Implements the current ALTCHA/ticket/decrypt flow, but upstream server IDs are rotating and current live probes return zero; kept disabled until a current mapping is verified.",
       "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [

@@ -7,30 +7,18 @@ on:
       - '.github/workflows/research-zstream-native.yml'
 
 jobs:
-  inspect:
+  strings:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe current VaPlayer data API
-        shell: bash
+      - name: Clone public ZStream iOS mirror
         run: |
-          set -euo pipefail
-          UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36'
-          urls=(
-            'https://streamdata.vaplayer.ru/api.php?tmdb=238&type=movie'
-            'https://streamdata.vaplayer.ru/api.php?tmdb=1399&type=tv&season=1&episode=1'
-          )
-          for url in "${urls[@]}"; do
-            echo "===== $url ====="
-            code=$(curl -L -sS --max-time 15 -w '%{http_code}' \
-              -A "$UA" \
-              -H 'Origin: https://nextgencloudfabric.com' \
-              -H 'Referer: https://nextgencloudfabric.com/' \
-              "$url" -o /tmp/b || true)
-            echo "HTTP $code bytes=$(wc -c < /tmp/b)"
-            if jq -e . /tmp/b >/dev/null 2>&1; then
-              jq '{top_keys:(keys), data_type:(.data|type), data_keys:(.data|if type=="object" then keys else null end), stream_urls_type:(.data.stream_urls|type), stream_urls_count:(.data.stream_urls|if type=="array" then length else null end), stream0:(.data.stream_urls|if type=="array" and length>0 then .[0] else null end)}' /tmp/b
-            else
-              head -c 300 /tmp/b; echo
-            fi
-          done
+          git clone --depth 1 https://github.com/aaslam12/ZStream-iOS-Mirror-Dev.git /tmp/zstream
+      - name: Inspect native framework strings
+        run: |
+          BIN="/tmp/zstream/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources"
+          test -f "$BIN"
+          echo "=== URLs / domains ==="
+          strings -a "$BIN" | grep -Eai 'https?://|[A-Za-z0-9.-]+\.(com|net|org|app|dev|ru|lol|gdn|ch|cc|xyz|to|tv|sbs)' | sort -u | head -n 1000 || true
+          echo "=== Resolver keywords ==="
+          strings -a "$BIN" | grep -Eai 'tokyo|stellar|nesterov|aphrodite|aspera|artemis|aurora|fontaine|magnolia|shibuya|cosmic|tmdb|season|episode|resolve|stream|subtitle|source|shelf|slot|variant' | sort -u | head -n 2000 || true

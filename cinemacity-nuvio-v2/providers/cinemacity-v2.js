@@ -459,15 +459,17 @@ function diagnosticResult(stage, detail) {
 }
 
 function diagnosticProbeItem(name, status, url, extra) {
-  var text = "CinemaCity PROBE · " + name + " · HTTP " + String(status);
-  if (extra) text += " · " + clean(extra).replace(/\s+/g, " ").slice(0, 100);
+  var text = String(status) + " · " + name;
+  if (extra) text += " · " + clean(extra).replace(/\s+/g, " ").slice(0, 70);
   return {
     name: text,
     title: text,
     url: url || (BASE + "/"),
     quality: "DIAG",
     type: "diagnostic",
-    provider: "cinemacity-v2-login"
+    provider: "cinemacity-v2-login",
+    _probeName: name,
+    _probeStatus: status
   };
 }
 
@@ -501,18 +503,35 @@ function diagnosticProbeEndpoints() {
   return Promise.all([
     probeRequest("HOME", BASE + "/", { headers: h }),
     probeRequest("MOVIES", BASE + "/movies/", { headers: h }),
-    probeRequest("SEARCH_POST", BASE + "/index.php?do=search", {
+    probeRequest("SEARCH", BASE + "/index.php?do=search", {
       method: "POST",
       headers: postHeaders,
       body: "do=search&subaction=search&story=" + encodeURIComponent("The Matrix")
     }),
-    probeRequest("AJAX_SEARCH", BASE + "/engine/ajax/controller.php?mod=search", {
+    probeRequest("AJAX", BASE + "/engine/ajax/controller.php?mod=search", {
       method: "POST",
       headers: ajaxHeaders,
       body: "query=" + encodeURIComponent("The Matrix")
     })
-  ]);
-}
+  ]).then(function(rows) {
+    var codes = {};
+    (rows || []).forEach(function(x) {
+      if (x && x._probeName) codes[x._probeName] = x._probeStatus;
+    });
+    var summary = "H=" + String(codes.HOME == null ? "?" : codes.HOME) +
+      " M=" + String(codes.MOVIES == null ? "?" : codes.MOVIES) +
+      " S=" + String(codes.SEARCH == null ? "?" : codes.SEARCH) +
+      " A=" + String(codes.AJAX == null ? "?" : codes.AJAX);
+    var first = {
+      name: summary,
+      title: summary,
+      url: BASE + "/#nuvio-probe-summary",
+      quality: "DIAG",
+      type: "diagnostic",
+      provider: "cinemacity-v2-login"
+    };
+    return [first].concat(rows || []);
+  });
 
 function getStreams(tmdbId, mediaType, season, episode) {
   if (!tmdbId || mediaType !== "movie") {

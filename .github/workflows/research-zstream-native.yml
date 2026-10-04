@@ -34,6 +34,45 @@ jobs:
       - name: Install Mach-O analysis helpers
         run: python3 -m pip install --quiet lief capstone
 
+      - name: Probe current Nesterov/VaPlayer endpoints
+        run: |
+          set -euo pipefail
+          UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36'
+          for url in \
+            'https://nextgencloudfabric.com?tmdb=238&type=movie' \
+            'https://streamdata.vaplayer.ru/api.php?tmdb=238&type=movie' \
+            'https://nextgencloudfabric.com?tmdb=1399&type=tv&season=1&episode=1' \
+            'https://streamdata.vaplayer.ru/api.php?tmdb=1399&type=tv&season=1&episode=1'; do
+            echo "===== $url ====="
+            curl -L -sS --max-time 15 -D /tmp/h \
+              -A "$UA" \
+              -H 'Origin: https://nextgencloudfabric.com' \
+              -H 'Referer: https://nextgencloudfabric.com/' \
+              "$url" -o /tmp/b || true
+            head -n 1 /tmp/h || true
+            grep -iE '^(content-type|location):' /tmp/h || true
+            python3 - <<'PY'
+import json
+raw=open('/tmp/b','rb').read()
+print('bytes=',len(raw))
+txt=raw.decode('utf-8','replace')
+try:
+    j=json.loads(txt)
+    print('json_keys=',list(j)[:20] if isinstance(j,dict) else type(j).__name__)
+    if isinstance(j,dict):
+        d=j.get('data')
+        print('data_type=',type(d).__name__)
+        if isinstance(d,dict):
+            print('data_keys=',list(d)[:30])
+            su=d.get('stream_urls')
+            print('stream_urls_type=',type(su).__name__,'count=',len(su) if isinstance(su,list) else None)
+            if isinstance(su,list) and su:
+                print('stream0_host=',__import__('urllib.parse').parse.urlparse(str(su[0])).hostname)
+except Exception:
+    print('prefix=',txt[:240].replace('\n',' '))
+PY
+          done
+
       - name: Map resolver functions to referenced strings
         run: |
           cat > /tmp/xrefs.py <<'PY'

@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.2.6",
-  "description": "CinemaCity V2 LEANHHU diagnostic build. Tests the production sitemap parameters used by existing providers plus a known movie detail page.",
+  "version": "0.2.7",
+  "description": "CinemaCity V2 session diagnostic build. Shows non-sensitive presence flags for cf_clearance, DLE login cookies and User-Agent before proxy probes.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity LEANHHU diagnostic. Tests perPage=500, raw sitemap, page=1 and a known movie page to determine whether the worker is still usable.",
-      "version": "0.2.6",
+      "description": "CinemaCity diagnostic. Test Provider first shows CF/DLE/UA presence flags without exposing cookie values, then runs LEANHHU probes.",
+      "version": "0.2.7",
       "supportedTypes": [
         "movie"
       ],

@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.25.0",
+  "version": "4.26.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1124,6 +1124,26 @@
       ],
       "filename": "providers/zstream-tokyo.js",
       "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-vidy",
+      "name": "NoctraTV · Vidy",
+      "description": "NoctraTV Vidy city-source family. Uses the verified Stellar city resolver, intersects the current availableSources with Vidy's Miami/Boise/Orlando/Atlanta/Tampa/Portland set, and returns only HLS streams that validate.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidy.js",
+      "enabled": false,
       "formats": [
         "m3u8"
       ],

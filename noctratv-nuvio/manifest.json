@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.14.0",
+  "version": "4.15.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -307,6 +307,27 @@
       "enabled": false,
       "formats": [
         "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-cinejoy",
+      "name": "NoctraTV · CineJoy",
+      "description": "noctratv.com CineJoy source. Current api.wing.st/cinejoy.pk headless flow via enc-cinejoy -> /g -> dec-cinejoy; returns validated direct media only, no iframe/WebView.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/cinejoy.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
       ],
       "contentLanguage": [
         "multi"

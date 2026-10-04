@@ -2,7 +2,7 @@
 // Current AniCine movie/TV flow: /v1/token -> Bearer -> per-title sources.
 // Returns direct media only; no iframe fallback.
 
-var BASES=["https://api.anicine-embed.workers.dev","https://aniwish.dekhovo.workers.dev"];
+var BASES=["https://aniwish.dekhovo.workers.dev","https://api.anicine-embed.workers.dev"];
 var BASE=BASES[0];
 var UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 var tokenCache="";

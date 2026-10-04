@@ -1,0 +1,49 @@
+name: Test NoctraTV ZStream
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'noctratv-nuvio/providers/zstream-*.js'
+      - 'noctratv-nuvio/manifest.json'
+      - '.github/workflows/test-noctra-zstream.yml'
+
+jobs:
+  zstream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: ZStream syntax
+        run: |
+          node --check noctratv-nuvio/providers/zstream-aphrodite.js
+          node --check noctratv-nuvio/providers/zstream-stellar.js
+      - name: ZStream focused live probe
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          async function timeout(p,ms,label){
+            return Promise.race([
+              Promise.resolve(p),
+              new Promise(r=>setTimeout(()=>{console.log(label+' timeout');r([])},ms))
+            ]).catch(e=>{console.log(label+' error '+(e&&e.message?e.message:e));return []});
+          }
+          async function run(file,label){
+            const p=require('./providers/'+file);
+            for(const [name,args] of [
+              ['movie',[238,'movie']],
+              ['tv',[1399,'tv',1,1]]
+            ]){
+              const rows=await timeout(p.getStreams(...args),45000,label+' '+name);
+              console.log(label+' '+name+': streams='+(rows||[]).length);
+              (rows||[]).slice(0,5).forEach((x,i)=>console.log('  '+(i+1)+'. '+x.name+' '+x.url));
+            }
+          }
+          (async()=>{
+            await run('zstream-aphrodite.js','Aphrodite');
+            await run('zstream-stellar.js','Stellar');
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

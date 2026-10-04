@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.18.0",
+  "version": "4.19.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -904,8 +904,8 @@
     {
       "id": "noctra-nesterov",
       "name": "NoctraTV · Nesterov",
-      "description": "noctratv.com Nesterov family: Moscow / Novo / Omsk. Uses the current Helios JSON endpoint, decrypts ns_ AES-256-GCM payloads with WebCrypto on the Nuvio device, and returns only verified HLS masters.",
-      "version": "1.0.0",
+      "description": "noctratv.com Nesterov family. Updated from the stale Helios/AES route to the current NextGenCloud/VaPlayer TMDB data API discovered from ZStream native code; resolves data.stream_urls locally and returns only verified HLS masters.",
+      "version": "2.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",

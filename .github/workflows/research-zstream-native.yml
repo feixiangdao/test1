@@ -11,27 +11,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe current Nesterov and VaPlayer endpoints
+      - name: Probe current VaPlayer data API
         shell: bash
         run: |
           set -euo pipefail
           UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36'
           urls=(
-            'https://nextgencloudfabric.com?tmdb=238&type=movie'
             'https://streamdata.vaplayer.ru/api.php?tmdb=238&type=movie'
-            'https://nextgencloudfabric.com?tmdb=1399&type=tv&season=1&episode=1'
             'https://streamdata.vaplayer.ru/api.php?tmdb=1399&type=tv&season=1&episode=1'
           )
           for url in "${urls[@]}"; do
             echo "===== $url ====="
-            : > /tmp/h
-            : > /tmp/b
-            curl -L -sS --max-time 15 -D /tmp/h \
+            code=$(curl -L -sS --max-time 15 -w '%{http_code}' \
               -A "$UA" \
               -H 'Origin: https://nextgencloudfabric.com' \
               -H 'Referer: https://nextgencloudfabric.com/' \
-              "$url" -o /tmp/b || true
-            head -n 1 /tmp/h || true
-            grep -iE '^(content-type|location):' /tmp/h || true
-            python3 -c 'import json,urllib.parse; raw=open("/tmp/b","rb").read(); print("bytes=",len(raw)); txt=raw.decode("utf-8","replace"); try:  j=json.loads(txt); print("json_keys=",list(j)[:20] if isinstance(j,dict) else type(j).__name__); d=j.get("data") if isinstance(j,dict) else None; print("data_type=",type(d).__name__); print("data_keys=",list(d)[:30] if isinstance(d,dict) else None); su=d.get("stream_urls") if isinstance(d,dict) else None; print("stream_urls_type=",type(su).__name__,"count=",len(su) if isinstance(su,list) else None); print("stream0_host=",urllib.parse.urlparse(str(su[0])).hostname if isinstance(su,list) and su else None) except Exception: print("prefix=",txt[:240].replace(chr(10)," "))'
+              "$url" -o /tmp/b || true)
+            echo "HTTP $code bytes=$(wc -c < /tmp/b)"
+            if jq -e . /tmp/b >/dev/null 2>&1; then
+              jq '{top_keys:(keys), data_type:(.data|type), data_keys:(.data|if type=="object" then keys else null end), stream_urls_type:(.data.stream_urls|type), stream_urls_count:(.data.stream_urls|if type=="array" then length else null end), stream0:(.data.stream_urls|if type=="array" and length>0 then .[0] else null end)}' /tmp/b
+            else
+              head -c 300 /tmp/b; echo
+            fi
           done

@@ -2,7 +2,8 @@
 // Current AniCine movie/TV flow: /v1/token -> Bearer -> per-title sources.
 // Returns direct media only; no iframe fallback.
 
-var BASE="https://aniwish.dekhovo.workers.dev";
+var BASES=["https://api.anicine-embed.workers.dev","https://aniwish.dekhovo.workers.dev"];
+var BASE=BASES[0];
 var UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 var tokenCache="";
 var tokenExp=0;
@@ -55,8 +56,21 @@ function subtitles(data){
   });
   return out;
 }
+function resolveOnBase(base,tmdbId,mediaType,season,episode){
+  BASE=base;tokenCache="";tokenExp=0;
+  return getJson(pathFor(tmdbId,mediaType,season,episode),0);
+}
 function getStreams(tmdbId,mediaType,season,episode){
-  return getJson(pathFor(tmdbId,mediaType,season,episode),0).then(function(data){
+  var bi=0;
+  function load(){
+    if(bi>=BASES.length)throw new Error("all workers failed");
+    var b=BASES[bi++];
+    return resolveOnBase(b,tmdbId,mediaType,season,episode).catch(function(e){
+      console.log("[Noctra/AniCine/VaPlayer] "+b+" "+(e&&e.message?e.message:e));
+      return load();
+    });
+  }
+  return load().then(function(data){
     var a=data&&Array.isArray(data.sources)?data.sources:[],subs=subtitles(data),seen={},out=[];
     a.forEach(function(row){
       var p=clean(row&&row.provider&&(row.provider.id||row.provider.name)).toLowerCase();

@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.6.0",
+  "version": "4.7.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -525,7 +525,7 @@
     {
       "id": "noctra-aether",
       "name": "NoctraTV · Aether",
-      "description": "noctratv.com Aether family. Live-verified direct JSON resolver for Link / Lul / Meridian / Tiki. Failing Nebula/Fast branches are excluded from the default request path to reduce search latency. No iframe fallback.",
+      "description": "noctratv.com Aether family. Current confirmed direct backends: Link, Lul, Meridian, Subtitulado (Spanish subtitles) and Gallic (French multi-provider). No iframe fallback; unverified Latino/Castellano/Vine/Yıldız remain excluded.",
       "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [

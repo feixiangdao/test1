@@ -2392,7 +2392,7 @@ function urlsetQualityVariants(raw, pageUrl) {
     if (!emittedVideo) chosen.unshift(video);
 
     var variantUrl = prefix + chosen.join(",") + ",.urlset/master.m3u8" + after;
-    var label = "CinemaCity Download Lab v1.1.2 · " + q + " · HLS";
+    var label = "CinemaCity Download Lab v1.2.0 · " + q + " · HLS";
     rows.push({
       name:label,
       title:label,
@@ -2422,7 +2422,7 @@ function fileSetStreams(fileData, pageUrl) {
   if (!raw) return [];
 
   if (/^https?:\/\//i.test(raw) && /\.urlset\/master\.m3u8(?:$|[?#])/i.test(raw)) {
-    var autoLabel = "CinemaCity Download Lab v1.1.2 · Auto · HLS";
+    var autoLabel = "CinemaCity Download Lab v1.2.0 · Auto · HLS";
     var rows = [{
       name:autoLabel,
       title:autoLabel,
@@ -2459,7 +2459,7 @@ function fileSetStreams(fileData, pageUrl) {
     var kind = watchCandidateKind(u);
     if (kind !== "hls" && kind !== "dash" && kind !== "mp4") return;
 
-    var label = "CinemaCity Download Lab v1.1.2 · " + (q || "Auto") + " · " + kind.toUpperCase();
+    var label = "CinemaCity Download Lab v1.2.0 · " + (q || "Auto") + " · " + kind.toUpperCase();
     out.push({
       name:label,
       title:label,
@@ -2538,7 +2538,7 @@ function expandHlsMasterVariants(autoStream, pageUrl) {
         var codecs = hlsAttr(line, "CODECS");
         var muxedAudio = !audioGroup && /mp4a|aac|ac-3|ec-3|opus/i.test(codecs);
 
-        var label = "CinemaCity Download Lab v1.1.2 · " + q + " · HLS";
+        var label = "CinemaCity Download Lab v1.2.0 · " + q + " · HLS";
         if (hasExternalAudio && audioGroup && !muxedAudio) label += " · TEST";
 
         rows.push({
@@ -2774,6 +2774,71 @@ function downloadMarkupProbe(html) {
   };
 }
 
+function ajaxCallShape(js, actionName) {
+  var text = clean(js);
+  var lower = text.toLowerCase();
+  var needles = [
+    "action=" + actionName.toLowerCase(),
+    "action:'" + actionName.toLowerCase() + "'",
+    'action:"' + actionName.toLowerCase() + '"',
+    "action : '" + actionName.toLowerCase() + "'",
+    'action : "' + actionName.toLowerCase() + '"'
+  ];
+  var idx = -1;
+  for (var i=0;i<needles.length;i++) {
+    idx = lower.indexOf(needles[i]);
+    if (idx >= 0) break;
+  }
+  if (idx < 0) {
+    var re = new RegExp("action\\s*[:=]\\s*['\\\"]" + actionName + "['\\\"]", "i");
+    var m0 = re.exec(text);
+    if (m0) idx = m0.index;
+  }
+  if (idx < 0) return null;
+
+  var frag = text.slice(Math.max(0,idx-1800), Math.min(text.length,idx+2600));
+  var before = text.slice(Math.max(0,idx-900), idx);
+  var fn = "?";
+  var fm, fre = /function\s+([A-Za-z_$][\w$]*)\s*\(/g;
+  while ((fm = fre.exec(before)) !== null) fn = fm[1];
+
+  var method = "?";
+  if (/(?:type|method)\s*:\s*["']POST["']/i.test(frag) || /\$\.post\s*\(/i.test(frag)) method = "POST";
+  else if (/(?:type|method)\s*:\s*["']GET["']/i.test(frag) || /\$\.get(?:JSON)?\s*\(/i.test(frag)) method = "GET";
+
+  var endpoint = "OTHER";
+  if (/controller\.php/i.test(frag)) endpoint = "CTRL";
+  if (/mod\s*[:=]\s*["']?dh["']?|mod=dh/i.test(frag)) endpoint += "+DH";
+
+  var params = [];
+  ["news_id","user_hash","video","audio","subtitle","name"].forEach(function(p){
+    var rr = new RegExp("\\b" + p + "\\b","i");
+    if (rr.test(frag)) params.push(p.replace("user_hash","hash").replace("news_id","nid").replace("subtitle","sub"));
+  });
+
+  var resp = [];
+  if (/window\.location|location\.href|location\.assign/i.test(frag)) resp.push("LOC");
+  if (/blob\s*\(|responseType\s*[:=]\s*["']blob/i.test(frag)) resp.push("BLOB");
+  if (/JSON\.parse|dataType\s*:\s*["']json/i.test(frag)) resp.push("JSON");
+  if (/success\s*:\s*function|\.then\s*\(/i.test(frag)) resp.push("CB");
+  if (/\.click\s*\(|createElement\s*\(\s*["']a["']/i.test(frag)) resp.push("A");
+
+  var gate = [];
+  if (/premium/i.test(frag)) gate.push("PREM");
+  if (/supporter/i.test(frag)) gate.push("SUP");
+  if (/user[_-]?group|group[_-]?id|member[_-]?group/i.test(frag)) gate.push("GROUP");
+  if (/subscription|membership|paid[_-]?status/i.test(frag)) gate.push("SUB");
+
+  return {
+    fn:fn,
+    method:method,
+    endpoint:endpoint,
+    params:params.join(",") || "none",
+    resp:resp.join("+") || "0",
+    gate:gate.join("+") || "0"
+  };
+}
+
 function downloadScriptProbe(html, pageUrl) {
   var srcs = [];
   var seen = {};
@@ -2785,7 +2850,7 @@ function downloadScriptProbe(html, pageUrl) {
     srcs.push(u);
     if (srcs.length >= 16) break;
   }
-  if (!srcs.length) return Promise.resolve("none");
+  if (!srcs.length) return Promise.resolve({summary:"none",deep:"none"});
 
   return Promise.all(srcs.map(function(u){
     var h = baseHeaders(pageUrl || (BASE + "/"), true);
@@ -2801,23 +2866,42 @@ function downloadScriptProbe(html, pageUrl) {
         if (/data-video|video\s*[:=]/i.test(js)) f.push("VID");
         if (/data-audio|audio\s*[:=]/i.test(js)) f.push("AUD");
         if (/download/i.test(js)) f.push("D");
-        return f.length ? basenameOfUrl(u)+":"+f.join("+") : "";
+
+        var sz = ajaxCallShape(js,"sizes");
+        var dl = ajaxCallShape(js,"download");
+        var deep = "";
+        if (sz || dl) {
+          var chunks = [basenameOfUrl(u)];
+          if (sz) chunks.push("SZ=" + sz.method + "/" + sz.endpoint + "/" + sz.params + "/G" + sz.gate);
+          if (dl) chunks.push("DL=" + dl.method + "/" + dl.endpoint + "/" + dl.params + "/R" + dl.resp + "/G" + dl.gate);
+          deep = chunks.join(" ");
+        }
+
+        return {
+          summary:f.length ? basenameOfUrl(u)+":"+f.join("+") : "",
+          deep:deep
+        };
       });
-    }).catch(function(){ return ""; });
+    }).catch(function(){ return {summary:"",deep:""}; });
   })).then(function(rows){
-    rows=(rows||[]).filter(Boolean);
-    return rows.slice(0,5).join("|") || "none";
+    rows=rows||[];
+    var summaries=rows.map(function(x){return x.summary;}).filter(Boolean);
+    var deeps=rows.map(function(x){return x.deep;}).filter(Boolean);
+    return {
+      summary:summaries.slice(0,5).join("|") || "none",
+      deep:deeps.slice(0,2).join("|") || "none"
+    };
   });
 }
-
 function officialDownloadDiagnostic(item, detailHtml, newsId) {
   var mp = downloadMarkupProbe(detailHtml || "");
   return downloadScriptProbe(detailHtml || "", item.url).then(function(js){
     return diagnosticRow(
-      "DUI H1080=" + String(mp.has1080) +
+      "DUI2 H1080=" + String(mp.has1080) +
       " M=" + mp.flags +
       " A=" + mp.attrs +
-      " JS=" + js +
+      " JS=" + js.summary +
+      " CORE=" + js.deep +
       " ID" + String(newsId)
     );
   });

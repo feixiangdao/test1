@@ -1,12 +1,12 @@
 {
   "name": "CinemaCity Local V2",
   "version": "0.6.5",
-  "description": "CinemaCity V2 PlayerJS HLS resolver. Preserves CinemaCity's comma-containing .urlset/master.m3u8 URL as one master playlist instead of incorrectly splitting it into MP4 component files.",
+  "description": "CinemaCity V2 PlayerJS resolver aligned with a working Nuvio CinemaCity implementation. Structured PlayerJS file arrays/objects are parsed first, then the actual movie file value is returned intact as HLS when it is a URLSET master.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "PlayerJS HLS resolver. The full URLSET master is returned intact with Cookie, User-Agent and Referer headers; MP4/M4A component files are no longer exposed as watch streams.",
+      "description": "PlayerJS resolver. Parses file arrays/objects exactly like a working Nuvio CinemaCity provider, preserves URLSET master URLs intact, and returns the real movie stream.",
       "version": "0.6.5",
       "supportedTypes": [
         "movie"

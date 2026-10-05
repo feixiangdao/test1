@@ -2,11 +2,12 @@
 // noctratv.com currently labels this family "Atlantic · Artemis".
 // Upstream Atlantic retired old stellar/Artemis and now serves the same menu slot
 // through Helios: stream.hls.lol/helios -> Moscow/Novo/Omsk.
-// ns_<hex> values are AES-256-GCM Nesterov payloads. No iframe fallback.
+// Current hl_<hex> values use Atlantic's live Helios AES-256-GCM key; legacy ns_ remains supported. No iframe fallback.
 
 var ORIGIN="https://atlantic.st";
 var HELIOS="https://stream.hls.lol/helios";
-var KEY_HEX="e4b8a1d6f2c9037b5a8e4d1c6f9b2085a7c3e9f6d1b4a8c2e5f7a0d3b6c9e2f5";
+var HELIOS_KEY_HEX="117c358bcfcaf8fe2cfca57c9d2238a300e1c4de2efb83a5012ba84d8a31f1dd";
+var LEGACY_NESTEROV_KEY_HEX="e4b8a1d6f2c9037b5a8e4d1c6f9b2085a7c3e9f6d1b4a8c2e5f7a0d3b6c9e2f5";
 var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36";
 
 function clean(v){return v==null?"":String(v).trim();}
@@ -30,15 +31,22 @@ function hexBytes(s){
   for(var i=0;i<a.length;i++)a[i]=parseInt(s.slice(i*2,i*2+2),16);
   return a;
 }
-function decryptNs(raw){
+function decryptPayload(raw){
   raw=clean(raw);
-  if(raw.indexOf("ns_")!==0)return Promise.resolve(raw);
-  var blob=hexBytes(raw.slice(3));
-  if(blob.length<29)return Promise.reject(new Error("nesterov payload too short"));
+  var keyHex="",hex="";
+  if(raw.indexOf("hl_")===0){
+    keyHex=HELIOS_KEY_HEX; hex=raw.slice(3);
+  }else if(raw.indexOf("ns_")===0){
+    keyHex=LEGACY_NESTEROV_KEY_HEX; hex=raw.slice(3);
+  }else{
+    return Promise.resolve(raw);
+  }
+  var blob=hexBytes(hex);
+  if(blob.length<29)return Promise.reject(new Error("encrypted payload too short"));
   var iv=blob.slice(0,12);
   var ctTag=blob.slice(12);
   return globalThis.crypto.subtle.importKey(
-    "raw",hexBytes(KEY_HEX),{name:"AES-GCM"},false,["decrypt"]
+    "raw",hexBytes(keyHex),{name:"AES-GCM"},false,["decrypt"]
   ).then(function(key){
     return globalThis.crypto.subtle.decrypt(
       {name:"AES-GCM",iv:iv,tagLength:128},key,ctTag
@@ -155,7 +163,7 @@ function candidates(tmdbId,type,season,episode){
       return Promise.all(order.map(function(name){
         var raw=clean(src[name]&&src[name].url);
         if(!raw)return null;
-        return decryptNs(raw).then(function(u){
+        return decryptPayload(raw).then(function(u){
           if(!/^https?:\/\//i.test(clean(u)))return null;
           try{if(new URL(u).hostname==="atlantic.st")return null;}catch(_){return null;}
           return{name:name,url:u};

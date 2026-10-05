@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.3.9",
-  "description": "CinemaCity V2 media-base diagnostic. Shows DH value types/previews and scans boot HTML for player/public_files/CDN hints.",
+  "version": "0.4.0",
+  "description": "CinemaCity V2 media-wiring diagnostic. Puts DH FILE/VAL output first and probes site JS for mod=dh, action=download, public_files and URLSET construction.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity media-base diagnostic. HINT rows scan boot HTML; FILE rows show media keys; VAL rows show non-sensitive DH value previews.",
-      "version": "0.3.9",
+      "description": "CinemaCity media-wiring diagnostic. DH/FILE/VAL are prioritized; JS rows show detected DH/SIZES/DOWNLOAD/FILES/URLSET wiring.",
+      "version": "0.4.0",
       "supportedTypes": [
         "movie"
       ],

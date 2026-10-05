@@ -111,6 +111,17 @@ jobs:
                 fu.searchParams.set('mz_lease',s.token);
                 first=fu.toString();
               }
+              // First test exactly how Nuvio would behave: child URL unchanged,
+              // but the stream's static playback lease header is inherited.
+              const rawChild=abs(media[0],url);
+              const hr=await fetch(rawChild,{headers:{
+                'User-Agent':UA,
+                'X-MZone-Playback-Lease':s.token,
+                ...(s.cookie?{Cookie:s.cookie}:{})
+              }});
+              const hb=await hr.text().catch(()=> '');
+              console.log('HEADER_CHILD status='+hr.status+' ct='+(hr.headers.get('content-type')||'')+' prefix='+hb.slice(0,80).replace(/\s+/g,' '));
+
               const vr=await fetch(first,{headers:{'User-Agent':UA,...(s.cookie?{Cookie:s.cookie}:{})}});
               const vb=await vr.text().catch(()=> '');
               console.log('FIRST_CHILD status='+vr.status+' ct='+(vr.headers.get('content-type')||'')+' prefix='+vb.slice(0,80).replace(/\s+/g,' '));
@@ -120,6 +131,15 @@ jobs:
                   let seg=abs(segLine,first);
                   const su=new URL(seg);
                   if(su.hostname.endsWith('m-zone.org')&&!su.searchParams.has('mz_lease')){su.searchParams.set('mz_lease',s.token);seg=su.toString();}
+                  const rawSeg=abs(segLine,first);
+                  const hsr=await fetch(rawSeg,{headers:{
+                    'User-Agent':UA,
+                    'X-MZone-Playback-Lease':s.token,
+                    Range:'bytes=0-1023',
+                    ...(s.cookie?{Cookie:s.cookie}:{})
+                  }});
+                  console.log('HEADER_SEGMENT status='+hsr.status+' ct='+(hsr.headers.get('content-type')||'')+' host='+new URL(rawSeg).hostname);
+
                   const sr=await fetch(seg,{headers:{'User-Agent':UA,Range:'bytes=0-1023',...(s.cookie?{Cookie:s.cookie}:{})}});
                   console.log('SEGMENT status='+sr.status+' ct='+(sr.headers.get('content-type')||'')+' host='+new URL(seg).hostname+' queryKeys='+[...new URL(seg).searchParams.keys()].join(','));
                 }

@@ -1,4 +1,4 @@
-name: Research Noctra Source Aliases
+name: Research NoctraTV aliases
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
       - '.github/workflows/research-noctra-aliases.yml'
 
 jobs:
-  scan:
+  aliases:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
@@ -16,6 +16,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Scan NoctraTV bundles
+      - name: Probe current NoctraTV frontend aliases
         working-directory: noctratv-nuvio
         run: node research-source-aliases.js

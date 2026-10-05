@@ -212,6 +212,14 @@ function resolveOne(src,tmdbId,mediaType,season,episode,sess){
       var x=j.result||{};
       var u=clean(x.url||x.playlist||x.file);
       if(!u)throw new Error("no media");
+      try{
+        var du=new URL(u);
+        console.log("[Noctra/StreamVault] "+src.label+
+          " resolved host="+du.hostname+
+          " path="+du.pathname+
+          " hasQuery="+(du.search?1:0)+
+          " resultHeaderKeys="+Object.keys(x.headers&&typeof x.headers==="object"?x.headers:{}).join(","));
+      }catch(_){}
       u=appendLease(u,sess.token);
       var typ=clean(x.type||x.format).toLowerCase();
       if(typ!=="mp4")typ="hls";

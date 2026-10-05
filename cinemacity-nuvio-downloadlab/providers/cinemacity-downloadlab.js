@@ -2392,7 +2392,7 @@ function urlsetQualityVariants(raw, pageUrl) {
     if (!emittedVideo) chosen.unshift(video);
 
     var variantUrl = prefix + chosen.join(",") + ",.urlset/master.m3u8" + after;
-    var label = "CinemaCity Download Lab v1.4.0 · " + q + " · HLS";
+    var label = "CinemaCity Download Lab v1.5.0 · " + q + " · HLS";
     rows.push({
       name:label,
       title:label,
@@ -2422,7 +2422,7 @@ function fileSetStreams(fileData, pageUrl) {
   if (!raw) return [];
 
   if (/^https?:\/\//i.test(raw) && /\.urlset\/master\.m3u8(?:$|[?#])/i.test(raw)) {
-    var autoLabel = "CinemaCity Download Lab v1.4.0 · Auto · HLS";
+    var autoLabel = "CinemaCity Download Lab v1.5.0 · Auto · HLS";
     var rows = [{
       name:autoLabel,
       title:autoLabel,
@@ -2459,7 +2459,7 @@ function fileSetStreams(fileData, pageUrl) {
     var kind = watchCandidateKind(u);
     if (kind !== "hls" && kind !== "dash" && kind !== "mp4") return;
 
-    var label = "CinemaCity Download Lab v1.4.0 · " + (q || "Auto") + " · " + kind.toUpperCase();
+    var label = "CinemaCity Download Lab v1.5.0 · " + (q || "Auto") + " · " + kind.toUpperCase();
     out.push({
       name:label,
       title:label,
@@ -2538,7 +2538,7 @@ function expandHlsMasterVariants(autoStream, pageUrl) {
         var codecs = hlsAttr(line, "CODECS");
         var muxedAudio = !audioGroup && /mp4a|aac|ac-3|ec-3|opus/i.test(codecs);
 
-        var label = "CinemaCity Download Lab v1.4.0 · " + q + " · HLS";
+        var label = "CinemaCity Download Lab v1.5.0 · " + q + " · HLS";
         if (hasExternalAudio && audioGroup && !muxedAudio) label += " · TEST";
 
         rows.push({
@@ -2989,16 +2989,152 @@ function downloadScriptProbe(html, pageUrl) {
     };
   });
 }
+function compactArgExpr(v) {
+  var s = clean(v).replace(/\s+/g," ");
+  if (!s) return "?";
+  // Do not emit raw URLs/tokens into diagnostics; keep variable/expression shape only.
+  s = s.replace(/https?:\/\/[^"' )]+/ig,"<URL>");
+  s = s.replace(/[A-Fa-f0-9]{24,}/g,"<HEX>");
+  s = s.replace(/["'][^"']{24,}["']/g,"<STR>");
+  return s.slice(0,90);
+}
+
+function htmlCallSites(html, fnName) {
+  var text = clean(html);
+  var re = new RegExp("\\b" + fnName + "\\s*\\(([^)]{0,900})\\)","ig");
+  var out=[],m;
+  while((m=re.exec(text))!==null) {
+    var args=compactArgExpr(m[1]);
+    if (out.indexOf(args)<0) out.push(args);
+    if (out.length>=3) break;
+  }
+  return out;
+}
+
+function inlineDownloadWiring(html) {
+  var text=clean(html);
+  var scripts=[];
+  var re=/<script\b([^>]*)>([\s\S]*?)<\/script>/ig,m;
+  while((m=re.exec(text))!==null) {
+    if (/\bsrc\s*=/i.test(m[1]||"")) continue;
+    var body=clean(m[2]||"");
+    if (!/loadSizeMap|makeDownloadHref|data-url|action=download|action=sizes|download/i.test(body)) continue;
+    var flags=[];
+    if (/loadSizeMap/i.test(body)) flags.push("LSM");
+    if (/makeDownloadHref/i.test(body)) flags.push("MDH");
+    if (/data-url/i.test(body)) flags.push("DATAURL");
+    if (/action=download/i.test(body)) flags.push("DL");
+    if (/action=sizes/i.test(body)) flags.push("SZ");
+    if (/Playerjs|PlayerJS/i.test(body)) flags.push("PJS");
+    if (/subtitleTracks/i.test(body)) flags.push("SUBS");
+    if (/originalLanguage/i.test(body)) flags.push("LANG");
+    if (/premium|supporter|subscription|user[_-]?group|group[_-]?id/i.test(body)) flags.push("GATE");
+
+    var calls=[];
+    htmlCallSites(body,"loadSizeMap").forEach(function(x){calls.push("LSM("+x+")");});
+    htmlCallSites(body,"makeDownloadHref").forEach(function(x){calls.push("MDH("+x+")");});
+
+    scripts.push((flags.join("+")||"0") + ":" + (calls.slice(0,2).join("~")||"nocall"));
+    if (scripts.length>=3) break;
+  }
+  return scripts.join("|") || "none";
+}
+
+function htmlDownloadAttrs(html) {
+  var text=clean(html);
+  var re=/<(?:a|button|div|span|form|input)\b[^>]*(?:data-url|onclick)[^>]*>/ig,m;
+  var out=[];
+  while((m=re.exec(text))!==null) {
+    var tag=m[0];
+    if (!/download|data-url|loadSizeMap|makeDownloadHref/i.test(tag)) continue;
+    var kind=(tag.match(/^<([a-z0-9]+)/i)||[])[1] || "?";
+    var attrs=[];
+    var ar=/\s([a-zA-Z_:][a-zA-Z0-9_:.-]*)\s*=\s*(["'])(.*?)\2/g,am;
+    while((am=ar.exec(tag))!==null) {
+      var k=am[1].toLowerCase();
+      if (k==="data-url" || k==="onclick" || k==="id" || k==="class" || k==="data-id" || k==="data-news-id") {
+        var v=compactArgExpr(am[3]);
+        if (k==="class") v=v.split(/\s+/).slice(0,4).join(".");
+        attrs.push(k+"="+v);
+      }
+    }
+    out.push(kind+"["+attrs.join(",")+"]");
+    if(out.length>=4) break;
+  }
+  return out.join("|") || "none";
+}
+
+function helperReturnShape(js, fnName) {
+  var body=functionSlice(js,fnName);
+  if(!body) return "none";
+  var ret=[];
+  var re=/return\s+([^;]{0,500})[;\n}]/ig,m;
+  while((m=re.exec(body))!==null){
+    var x=compactArgExpr(m[1]);
+    if(ret.indexOf(x)<0) ret.push(x);
+    if(ret.length>=3) break;
+  }
+  return ret.join("~") || "none";
+}
+
+function inlineAndHelperProbe(html, pageUrl) {
+  var srcs=[],seen={},re=/<script\b[^>]*src\s*=\s*["']([^"']+)["']/ig,m;
+  while((m=re.exec(clean(html)))!==null){
+    var u=resolveUrl(m[1],pageUrl||BASE+"/");
+    if(!u||seen[u]||!isCinemaCityHost(u)) continue;
+    seen[u]=1;
+    if(/libs\.js(?:$|[?#])/i.test(u)) srcs.push(u);
+  }
+
+  var htmlCalls=[];
+  htmlCallSites(html,"loadSizeMap").forEach(function(x){htmlCalls.push("LSM("+x+")");});
+  htmlCallSites(html,"makeDownloadHref").forEach(function(x){htmlCalls.push("MDH("+x+")");});
+
+  if(!srcs.length){
+    return Promise.resolve({
+      calls:htmlCalls.slice(0,4).join("~")||"none",
+      inline:inlineDownloadWiring(html),
+      attrs:htmlDownloadAttrs(html),
+      returns:"none"
+    });
+  }
+
+  var h=baseHeaders(pageUrl||BASE+"/",true); h["Accept"]="*/*";
+  return fetch(srcs[0],{headers:h}).then(function(r){
+    return r.text().then(function(js){
+      return {
+        calls:htmlCalls.slice(0,4).join("~")||"none",
+        inline:inlineDownloadWiring(html),
+        attrs:htmlDownloadAttrs(html),
+        returns:"LSM="+helperReturnShape(js,"loadSizeMap")+"|MDH="+helperReturnShape(js,"makeDownloadHref")
+      };
+    });
+  }).catch(function(){
+    return {
+      calls:htmlCalls.slice(0,4).join("~")||"none",
+      inline:inlineDownloadWiring(html),
+      attrs:htmlDownloadAttrs(html),
+      returns:"ERR"
+    };
+  });
+}
+
 function officialDownloadDiagnostic(item, detailHtml, newsId) {
   var mp = downloadMarkupProbe(detailHtml || "");
-  return downloadScriptProbe(detailHtml || "", item.url).then(function(js){
+  return Promise.all([
+    downloadScriptProbe(detailHtml || "", item.url),
+    inlineAndHelperProbe(detailHtml || "", item.url)
+  ]).then(function(all){
+    var js=all[0]||{summary:"none",deep:"none",semantic:"none"};
+    var w=all[1]||{calls:"none",inline:"none",attrs:"none",returns:"none"};
     return diagnosticRow(
-      "DUI4 H1080=" + String(mp.has1080) +
-      " M=" + mp.flags +
-      " A=" + mp.attrs +
-      " JS=" + js.summary +
+      "DUI5 H1080=" + String(mp.has1080) +
       " CORE=" + js.deep +
       " SEM=" + js.semantic +
+      " CALL=" + w.calls +
+      " INL=" + w.inline +
+      " ATTR=" + w.attrs +
+      " RET=" + w.returns +
       " ID" + String(newsId)
     );
   });

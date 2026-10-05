@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.4.6",
-  "description": "CinemaCity V2 corrected composite-HLS probe. Fixes an accidental duplicate insertion of every DH media key that doubled 23 entries into 46 and malformed the reconstructed .urlset/master.m3u8 URL.",
+  "version": "0.4.7",
+  "description": "CinemaCity V2 alternate-detail diagnostic. Tests DLE internal routes for the known news_id to see whether any bypass the protected pretty URL and expose atob/public_files data.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "Corrected HLS reconstruction. DH media keys are deduplicated while preserving server order before probing ORIGIN/APPBETA/LEAN/REALBESTIA.",
-      "version": "0.4.6",
+      "description": "CinemaCity alternate-detail diagnostic. PRETTY/NEWSID/ROOTID/FULL/SHOW/PRINT report CF/guest/atob/public_files/direct-media counts.",
+      "version": "0.4.7",
       "supportedTypes": [
         "movie"
       ],

@@ -1122,6 +1122,28 @@ function scanBootMediaHints(html) {
   return out.slice(0,12);
 }
 
+function scanInlineWiring(html) {
+  var text = clean(html);
+  var flags = [];
+  if (/mod=dh|mod['"]?\s*[:=]\s*['"]dh/i.test(text)) flags.push("DH");
+  if (/action=sizes/i.test(text)) flags.push("SIZES");
+  if (/action=download/i.test(text)) flags.push("DOWNLOAD");
+  if (/public_files/i.test(text)) flags.push("FILES");
+  if (/urlset\/master\.m3u8/i.test(text)) flags.push("URLSET");
+
+  var snippet = "";
+  var pats = ["action=download","action=sizes","mod=dh","public_files","urlset/master.m3u8"];
+  for (var i=0;i<pats.length && !snippet;i++) {
+    var pos = text.toLowerCase().indexOf(pats[i].toLowerCase());
+    if (pos >= 0) {
+      snippet = clean(text.slice(Math.max(0,pos-110), Math.min(text.length,pos+250)))
+        .replace(/\s+/g," ")
+        .slice(0,220);
+    }
+  }
+  return { flags:flags, snippet:snippet };
+}
+
 function extractInterestingScriptSources(html) {
   var out = [];
   var seen = {};
@@ -1133,7 +1155,7 @@ function extractInterestingScriptSources(html) {
     seen[src] = 1;
     if (/jquery(?:ui)?\d*\.js|fancybox(?:\.min)?\.js|bootstrap(?:\.min)?\.js/i.test(src)) continue;
     out.push(src);
-    if (out.length >= 8) break;
+    if (out.length >= 12) break;
   }
   return out;
 }
@@ -1278,11 +1300,19 @@ function searchAndCandidateProbe() {
       var boot = inspectSearchBody(html, "Spider-Man Brand New Day", "2026");
       var hash = boot.hash || "";
       var scriptSources = extractInterestingScriptSources(html);
+      var inline = scanInlineWiring(html);
       var rows = [{
         name:"BOOT "+String(r.status)+" CF"+(challengeHtml(html)?"1":"0")+" G"+(guestBlocked(html)?"1":"0")+" HASH"+(hash?"1":"0"),
         title:"BOOT "+String(r.status)+" CF"+(challengeHtml(html)?"1":"0")+" G"+(guestBlocked(html)?"1":"0")+" HASH"+(hash?"1":"0"),
         url:bootstrapUrl,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
       }];
+      if ((inline.flags || []).length || inline.snippet) {
+        var it = "INLINE [" + (inline.flags || []).join(",") + "]";
+        if (inline.snippet) it += " · " + inline.snippet.slice(0,160);
+        rows.push({name:it,title:it,url:bootstrapUrl+"#inline",quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+      } else {
+        rows.push({name:"INLINE [] · no-media-wiring",title:"INLINE [] · no-media-wiring",url:bootstrapUrl+"#inline",quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+      }
       if (!hash) return rows;
 
       return ajaxSearchProbe("SPIDER", "/engine/mods/dle_search/ajax.php", hash, "Spider-Man Brand New Day", "/")
@@ -1309,24 +1339,12 @@ function searchAndCandidateProbe() {
             var dht="DH "+String(dh.status)+" J"+dh.json+" L"+dh.len+" K"+dh.keys+" MEDIA"+dh.media;
             rows.push({name:dht,title:dht,url:dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
 
-            (dh.values || []).slice(0,3).forEach(function(v,idx) {
-              var t="VAL"+String(idx+1)+" · "+clean(v).slice(0,118);
-              rows.push({name:t,title:t,url:dh.url+"#val-"+String(idx+1),quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+            jsRows.slice(0,5).forEach(function(j,idx) {
+              var t="JS"+String(idx+1)+" "+String(j.status)+" ["+(j.flags||[]).join(",")+"] L"+String(j.len);
+              if (j.snippet) t += " · "+j.snippet.slice(0,150);
+              else t += " · no-media-wiring";
+              rows.push({name:t,title:t,url:j.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
             });
-
-            var interesting = jsRows.filter(function(j){ return (j.flags||[]).length > 0 || j.snippet; });
-            if (!interesting.length) {
-              jsRows.slice(0,2).forEach(function(j,idx) {
-                var t="JS"+String(idx+1)+" "+String(j.status)+" L"+String(j.len)+" · no-media-wiring";
-                rows.push({name:t,title:t,url:j.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
-              });
-            } else {
-              interesting.slice(0,3).forEach(function(j,idx) {
-                var t="JS"+String(idx+1)+" "+String(j.status)+" ["+(j.flags||[]).join(",")+"] L"+String(j.len);
-                if (j.snippet) t += " · "+j.snippet.slice(0,118);
-                rows.push({name:t,title:t,url:j.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
-              });
-            }
 
             dh.preview.slice(0,2).forEach(function(k,idx) {
               var t="FILE"+String(idx+1)+" · "+clean(k).slice(0,76);

@@ -1090,6 +1090,38 @@ function detailProbe(url, referer) {
   });
 }
 
+function scanBootMediaHints(html) {
+  var text = clean(html);
+  var out = [];
+  var seen = {};
+
+  function add(v) {
+    v = clean(v);
+    if (!v || seen[v]) return;
+    seen[v] = 1;
+    out.push(v);
+  }
+
+  var urlRe = /https?:\/\/[^"'<>\s)]+/ig;
+  var m;
+  while ((m = urlRe.exec(text)) !== null) {
+    var u = m[0];
+    if (/public_files|controller\.php\?mod=dh|\.m3u8|\.mp4|\.m4a|cdn|player/i.test(u)) {
+      add(u);
+      if (out.length >= 8) break;
+    }
+  }
+
+  var scriptRe = /<script\b[^>]*src\s*=\s*["']([^"']+)["']/ig;
+  while ((m = scriptRe.exec(text)) !== null) {
+    var src = resolveUrl(m[1], BASE + "/");
+    if (/player|download|dh|cinema|main|app|script/i.test(src)) add(src);
+    if (out.length >= 12) break;
+  }
+
+  return out.slice(0,12);
+}
+
 function controllerSearchProbe(query, hash) {
   var url = BASE + "/engine/ajax/controller.php?mod=search";
   var headers = baseHeaders(BASE + "/", true);
@@ -1132,7 +1164,7 @@ function dhSizesProbe(newsId, hash, referer) {
 
   return fetch(url, { headers:headers }).then(function(r) {
     return r.text().then(function(raw) {
-      var json = 0, keyCount = 0, mediaCount = 0, preview = [];
+      var json = 0, keyCount = 0, mediaCount = 0, preview = [], values = [];
       try {
         var obj = JSON.parse(raw);
         json = 1;
@@ -1143,6 +1175,17 @@ function dhSizesProbe(newsId, hash, referer) {
             if (/\.(?:mp4|m4a|m3u8)(?:$|[?#])/i.test(k)) {
               mediaCount++;
               if (preview.length < 3) preview.push(k);
+              if (values.length < 3) {
+                var v = obj[k];
+                var type = Array.isArray(v) ? "array" : (v === null ? "null" : typeof v);
+                var short = "";
+                try {
+                  short = typeof v === "string" ? v : JSON.stringify(v);
+                } catch (_) {
+                  short = String(v);
+                }
+                values.push(type + ":" + clean(short).slice(0,90));
+              }
             }
           });
         }
@@ -1155,11 +1198,12 @@ function dhSizesProbe(newsId, hash, referer) {
         keys:keyCount,
         media:mediaCount,
         preview:preview,
+        values:values,
         url:url
       };
     });
   }).catch(function(e) {
-    return {status:0,raw:"",len:0,json:0,keys:0,media:0,preview:[],url:url,error:e&&e.message?e.message:String(e||"error")};
+    return {status:0,raw:"",len:0,json:0,keys:0,media:0,preview:[],values:[],url:url,error:e&&e.message?e.message:String(e||"error")};
   });
 }
 
@@ -1179,11 +1223,16 @@ function searchAndCandidateProbe() {
     return r.text().then(function(html) {
       var boot = inspectSearchBody(html, "Spider-Man Brand New Day", "2026");
       var hash = boot.hash || "";
+      var hints = scanBootMediaHints(html);
       var rows = [{
         name:"BOOT "+String(r.status)+" CF"+(challengeHtml(html)?"1":"0")+" G"+(guestBlocked(html)?"1":"0")+" HASH"+(hash?"1":"0"),
         title:"BOOT "+String(r.status)+" CF"+(challengeHtml(html)?"1":"0")+" G"+(guestBlocked(html)?"1":"0")+" HASH"+(hash?"1":"0"),
         url:bootstrapUrl,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
       }];
+      hints.slice(0,4).forEach(function(h,idx) {
+        var t = "HINT" + String(idx+1) + " · " + clean(h).slice(0,92);
+        rows.push({name:t,title:t,url:h,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+      });
       if (!hash) return rows;
 
       return ajaxSearchProbe("SPIDER", "/engine/mods/dle_search/ajax.php", hash, "Spider-Man Brand New Day", "/")
@@ -1215,6 +1264,10 @@ function searchAndCandidateProbe() {
             dh.preview.slice(0,3).forEach(function(k,idx) {
               var t="FILE"+String(idx+1)+" · "+clean(k).slice(0,72);
               rows.push({name:t,title:t,url:dh.url+"#file-"+String(idx+1),quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+            });
+            (dh.values || []).slice(0,3).forEach(function(v,idx) {
+              var t="VAL"+String(idx+1)+" · "+clean(v).slice(0,92);
+              rows.push({name:t,title:t,url:dh.url+"#val-"+String(idx+1),quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
             });
 
             return rows;

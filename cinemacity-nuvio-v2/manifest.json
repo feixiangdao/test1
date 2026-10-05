@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.6.0",
-  "description": "CinemaCity V2 dynamic movie resolver. Maps the requested TMDB movie to CinemaCity, reads authenticated DH variants, and returns playable MP4 streams with the browser session.",
+  "version": "0.6.1",
+  "description": "CinemaCity V2 dynamic movie resolver with catalog fallback. Newly added titles can resolve through CinemaCity news_pages.xml when DLE search misses them.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "Dynamic movie resolver. Normal playback now uses CinemaCity search + authenticated DH variants; Test Provider remains available as a session/playback check.",
-      "version": "0.6.0",
+      "description": "Dynamic movie resolver. Uses DLE search first, then CinemaCity catalog fallback for newly added titles, then authenticated DH variants.",
+      "version": "0.6.1",
       "supportedTypes": [
         "movie"
       ],

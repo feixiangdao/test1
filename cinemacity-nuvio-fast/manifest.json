@@ -1,0 +1,28 @@
+{
+  "name": "CinemaCity Local Fast",
+  "version": "0.6.8",
+  "description": "CinemaCity cache-bypass fast build. Same working PlayerJS/HLS resolver as V2, but published under a new manifest path and scraper ID so Nuvio cannot reuse the stale cached V2 plugin.",
+  "scrapers": [
+    {
+      "id": "cinemacity-fast-068",
+      "name": "CinemaCity Fast · Login Session",
+      "description": "Cache-bypass fast PlayerJS resolver. Uses the same working CinemaCity stream logic under a fresh scraper ID and filename.",
+      "version": "0.6.8",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/cinemacity-fast.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true,
+      "hasSettings": true
+    }
+  ]
+}

@@ -1013,84 +1013,139 @@ function compactAjaxRow(x) {
   };
 }
 
+function parseNewsId(url) {
+  var m = clean(url).match(/\/(?:movies|tv-series)\/(\d+)-/i);
+  return m ? m[1] : "";
+}
+
+function unwrapPlaylistPayload(raw) {
+  var text = clean(raw);
+  var response = text;
+  var json = 0;
+  var success = -1;
+  try {
+    var obj = JSON.parse(text);
+    json = 1;
+    if (obj && typeof obj === "object") {
+      if (typeof obj.success === "boolean") success = obj.success ? 1 : 0;
+      else if (typeof obj.success === "number") success = obj.success ? 1 : 0;
+      if (typeof obj.response === "string") response = obj.response;
+      else if (typeof obj.content === "string") response = obj.content;
+      else if (typeof obj.html === "string") response = obj.html;
+    }
+  } catch (_) {}
+  return { json: json, success: success, response: response, raw: text };
+}
+
+function playlistProbe(newsId, hash, referer) {
+  var url = BASE + "/engine/ajax/playlists.php?news_id=" + encodeURIComponent(newsId) +
+    "&xfield=playlist&user_hash=" + encodeURIComponent(hash || "") + "&time=1";
+  var headers = baseHeaders(referer || (BASE + "/"), true);
+  headers["X-Requested-With"] = "XMLHttpRequest";
+  headers["Accept"] = "application/json, text/javascript, */*; q=0.01";
+
+  return fetch(url, { headers: headers }).then(function(r) {
+    return r.text().then(function(raw) {
+      var p = unwrapPlaylistPayload(raw);
+      var html = p.response || "";
+      var fileCount = (html.match(/data-file\s*=\s*["'][^"']+["']/ig) || []).length;
+      var atobCount = (html.match(/atob\s*\(/ig) || []).length;
+      var directCount = (html.match(/https?:\/\/[^"'<>\s]+\.(?:m3u8|mp4|mpd)(?:[?#][^"'<>\s]*)?/ig) || []).length;
+      return {
+        status:r.status,
+        json:p.json,
+        success:p.success,
+        len:html.length,
+        files:fileCount,
+        atob:atobCount,
+        direct:directCount,
+        url:url,
+        html:html
+      };
+    });
+  }).catch(function(e) {
+    return {
+      status:0,json:0,success:-1,len:0,files:0,atob:0,direct:0,url:url,
+      error:e&&e.message?e.message:String(e||"error"),html:""
+    };
+  });
+}
+
+function detailProbe(url, referer) {
+  return fetch(url, { headers: browserNavHeaders(referer || (BASE + "/")) }).then(function(r) {
+    return r.text().then(function(html) {
+      return {
+        status:r.status,
+        cf:challengeHtml(html)?1:0,
+        guest:guestBlocked(html)?1:0,
+        atob:(html.match(/atob\s*\(/ig)||[]).length,
+        direct:(html.match(/https?:\/\/[^"'<>\s]+\.(?:m3u8|mp4|mpd)(?:[?#][^"'<>\s]*)?/ig)||[]).length,
+        len:html.length,
+        html:html,
+        url:url
+      };
+    });
+  }).catch(function(e) {
+    return {status:0,cf:0,guest:0,atob:0,direct:0,len:0,html:"",url:url,error:e&&e.message?e.message:String(e||"error")};
+  });
+}
+
 function searchAndCandidateProbe() {
   var bootstrapUrl = BASE + "/index.php?do=search";
   var headers = baseHeaders(BASE + "/", true);
   headers["X-Requested-With"] = "XMLHttpRequest";
   headers["Origin"] = BASE;
   headers["Content-Type"] = "application/x-www-form-urlencoded";
-  var body = "do=search&subaction=search&story=" + encodeURIComponent("The Matrix");
+  var body = "do=search&subaction=search&story=" + encodeURIComponent("Spider-Man Brand New Day");
 
   return fetch(bootstrapUrl, {
-    method: "POST",
-    headers: headers,
-    body: body
+    method:"POST",
+    headers:headers,
+    body:body
   }).then(function(r) {
     return r.text().then(function(html) {
-      var bootstrapInfo = inspectSearchBody(html, "The Matrix", "1999");
-      var hash = bootstrapInfo.hash || "";
-      var bootTitle = "BOOT " + String(r.status) +
-        " CF" + (challengeHtml(html) ? "1" : "0") +
-        " G" + (guestBlocked(html) ? "1" : "0") +
-        " HASH" + (hash ? "1" : "0");
-
+      var boot = inspectSearchBody(html, "Spider-Man Brand New Day", "2026");
+      var hash = boot.hash || "";
       var rows = [{
-        name: bootTitle,
-        title: bootTitle,
-        url: bootstrapUrl,
-        quality: "DIAG",
-        type: "diagnostic",
-        provider: "cinemacity-v2-login"
+        name:"BOOT "+String(r.status)+" CF"+(challengeHtml(html)?"1":"0")+" G"+(guestBlocked(html)?"1":"0")+" HASH"+(hash?"1":"0"),
+        title:"BOOT "+String(r.status)+" CF"+(challengeHtml(html)?"1":"0")+" G"+(guestBlocked(html)?"1":"0")+" HASH"+(hash?"1":"0"),
+        url:bootstrapUrl,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
       }];
-
       if (!hash) return rows;
 
-      return Promise.all([
-        ajaxSearchProbe("MATRIX", "/engine/mods/dle_search/ajax.php", hash, "The Matrix", "/"),
-        ajaxSearchProbe("SPIDER", "/engine/mods/dle_search/ajax.php", hash, "Spider-Man Brand New Day", "/"),
-        ajaxSearchProbe("BACKROOMS", "/engine/mods/dle_search/ajax.php", hash, "Backrooms", "/"),
-        ajaxSearchProbe("OBSESSION", "/engine/mods/dle_search/ajax.php", hash, "Obsession", "/")
-      ]).then(function(results) {
-        results.forEach(function(x) {
-          var t = x.label +
-            " " + String(x.status) +
-            " J" + String(x.json || 0) +
-            " CF" + String(x.cf) +
-            " G" + String(x.guest) +
-            " L" + String((x.html || "").length) +
-            " N" + String((x.info.items || []).length);
+      return ajaxSearchProbe("SPIDER", "/engine/mods/dle_search/ajax.php", hash, "Spider-Man Brand New Day", "/")
+        .then(function(x) {
+          var item = (x.info.items || [])[0] || null;
+          var searchTitle = "SEARCH "+String(x.status)+" J"+String(x.json||0)+" CF"+String(x.cf)+" G"+String(x.guest)+
+            " L"+String((x.html||"").length)+" N"+String((x.info.items||[]).length);
+          rows.push({name:searchTitle,title:searchTitle,url:BASE+x.endpoint,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+          if (!item || !item.url) return rows;
 
-          var prefix = clean(x.html || "")
-            .replace(/<[^>]*>/g, " ")
-            .replace(/\s+/g, " ")
-            .trim()
-            .slice(0, 55);
-
-          if (prefix) t += " · " + prefix;
-
+          var newsId = parseNewsId(item.url);
           rows.push({
-            name: t,
-            title: t,
-            url: BASE + x.endpoint,
-            quality: "DIAG",
-            type: "diagnostic",
-            provider: "cinemacity-v2-login"
+            name:"ITEM ID="+(newsId||"?")+" · "+clean(item.slugTitle||item.title||"").slice(0,42),
+            title:"ITEM ID="+(newsId||"?")+" · "+clean(item.slugTitle||item.title||"").slice(0,42),
+            url:item.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
+          });
+          if (!newsId) return rows;
+
+          return Promise.all([
+            detailProbe(item.url, BASE + x.endpoint),
+            playlistProbe(newsId, hash, item.url)
+          ]).then(function(probes) {
+            var d=probes[0], p=probes[1];
+            var dt="DETAIL "+String(d.status)+" CF"+d.cf+" G"+d.guest+" A"+d.atob+" D"+d.direct+" L"+d.len;
+            rows.push({name:dt,title:dt,url:item.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+
+            var pt="PLAYLIST "+String(p.status)+" J"+p.json+" OK"+p.success+" L"+p.len+" F"+p.files+" A"+p.atob+" D"+p.direct;
+            rows.push({name:pt,title:pt,url:p.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+            return rows;
           });
         });
-
-        return rows;
-      });
     });
   }).catch(function(e) {
     var msg=e&&e.message?e.message:String(e||"error");
-    return [{
-      name:"0 · BOOT · "+msg.slice(0,100),
-      title:"0 · BOOT · "+msg.slice(0,100),
-      url:bootstrapUrl,
-      quality:"DIAG",
-      type:"diagnostic",
-      provider:"cinemacity-v2-login"
-    }];
+    return [{name:"0 · BOOT · "+msg.slice(0,100),title:"0 · BOOT · "+msg.slice(0,100),url:bootstrapUrl,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"}];
   });
 }
 

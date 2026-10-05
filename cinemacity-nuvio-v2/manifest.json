@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.6.3",
-  "description": "CinemaCity V2 Watch Online resolver. Uses the user's local authenticated session to inspect detail/playlist/player pages and returns actual HLS/DASH/MP4 media instead of the buffering download endpoint.",
+  "version": "0.6.4",
+  "description": "CinemaCity V2 PlayerJS resolver. Decodes the authenticated detail-page atob payload, extracts CinemaCity's file set, reconstructs the real HLS/DASH/MP4 URL, and avoids the buffering DH download endpoint.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "Watch Online resolver. Normal playback now inspects CinemaCity playlist/player wiring with the local session; DH download pseudo-streams are no longer returned.",
-      "version": "0.6.3",
+      "description": "PlayerJS Watch resolver. Reads the detail-page encoded player payload first, then falls back to direct/embed discovery. DH download pseudo-streams remain disabled.",
+      "version": "0.6.4",
       "supportedTypes": [
         "movie"
       ],

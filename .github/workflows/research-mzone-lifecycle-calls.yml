@@ -1,0 +1,50 @@
+name: Research MZone lifecycle calls
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-mzone-lifecycle-calls.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Extract lifecycle callsites
+        run: |
+          node - <<'NODE'
+          const urls=[
+            'https://noctratv.com/assets/index-BrYFkm8g.js',
+            'https://noctratv.com/assets/MPlayer-BlhKrFKV.js'
+          ];
+          (async()=>{
+            for(const url of urls){
+              const r=await fetch(url); const s=await r.text();
+              console.log('\nASSET '+url+' bytes='+s.length);
+              const patterns=[
+                /ZE\("([^"]+)"/g,
+                /ZE\('([^']+)'/g,
+                /tk\(/g,
+                /nativePrepare/g,
+                /prepareNative/g,
+                /previousLease/g,
+                /playbackLease/g,
+                /leaseId/g,
+                /grant/g
+              ];
+              for(const re of patterns){
+                let m,n=0;
+                while((m=re.exec(s))&&n<30){
+                  n++;
+                  const i=m.index,lo=Math.max(0,i-2800),hi=Math.min(s.length,i+5200);
+                  console.log('\nMATCH '+re+' #'+n+' @'+i+(m[1]?' arg='+m[1]:''));
+                  console.log(s.slice(lo,hi));
+                }
+              }
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

@@ -2392,7 +2392,7 @@ function urlsetQualityVariants(raw, pageUrl) {
     if (!emittedVideo) chosen.unshift(video);
 
     var variantUrl = prefix + chosen.join(",") + ",.urlset/master.m3u8" + after;
-    var label = "CinemaCity Download Lab v1.3.0 · " + q + " · HLS";
+    var label = "CinemaCity Download Lab v1.4.0 · " + q + " · HLS";
     rows.push({
       name:label,
       title:label,
@@ -2422,7 +2422,7 @@ function fileSetStreams(fileData, pageUrl) {
   if (!raw) return [];
 
   if (/^https?:\/\//i.test(raw) && /\.urlset\/master\.m3u8(?:$|[?#])/i.test(raw)) {
-    var autoLabel = "CinemaCity Download Lab v1.3.0 · Auto · HLS";
+    var autoLabel = "CinemaCity Download Lab v1.4.0 · Auto · HLS";
     var rows = [{
       name:autoLabel,
       title:autoLabel,
@@ -2459,7 +2459,7 @@ function fileSetStreams(fileData, pageUrl) {
     var kind = watchCandidateKind(u);
     if (kind !== "hls" && kind !== "dash" && kind !== "mp4") return;
 
-    var label = "CinemaCity Download Lab v1.3.0 · " + (q || "Auto") + " · " + kind.toUpperCase();
+    var label = "CinemaCity Download Lab v1.4.0 · " + (q || "Auto") + " · " + kind.toUpperCase();
     out.push({
       name:label,
       title:label,
@@ -2538,7 +2538,7 @@ function expandHlsMasterVariants(autoStream, pageUrl) {
         var codecs = hlsAttr(line, "CODECS");
         var muxedAudio = !audioGroup && /mp4a|aac|ac-3|ec-3|opus/i.test(codecs);
 
-        var label = "CinemaCity Download Lab v1.3.0 · " + q + " · HLS";
+        var label = "CinemaCity Download Lab v1.4.0 · " + q + " · HLS";
         if (hasExternalAudio && audioGroup && !muxedAudio) label += " · TEST";
 
         rows.push({
@@ -2849,6 +2849,89 @@ function ajaxCallShape(js, actionName) {
   };
 }
 
+function functionSlice(js, fnName) {
+  var text = clean(js);
+  if (!fnName || fnName === "?") return "";
+  var re = new RegExp("function\\s+" + fnName.replace(/[$]/g,"\\$&") + "\\s*\\(([^)]*)\\)\\s*\\{","i");
+  var m = re.exec(text);
+  if (!m) return "";
+  var start = m.index;
+  var brace = text.indexOf("{", m.index);
+  if (brace < 0) return "";
+  var depth = 0, quote = "", esc = false;
+  for (var i=brace;i<text.length;i++) {
+    var ch=text.charAt(i);
+    if (quote) {
+      if (esc) { esc=false; continue; }
+      if (ch === "\\") { esc=true; continue; }
+      if (ch === quote) quote="";
+      continue;
+    }
+    if (ch === "'" || ch === '"') { quote=ch; continue; }
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start,i+1);
+    }
+  }
+  return text.slice(start, Math.min(text.length,start+5000));
+}
+
+function callSites(js, fnName) {
+  var text=clean(js);
+  if (!fnName || fnName === "?") return [];
+  var re=new RegExp("\\b" + fnName.replace(/[$]/g,"\\$&") + "\\s*\\(([^)]]{0,600})\\)","ig");
+  var out=[],m;
+  while((m=re.exec(text))!==null) {
+    var args=clean(m[1]).replace(/\s+/g," ");
+    if (out.indexOf(args)<0) out.push(args);
+    if(out.length>=4) break;
+  }
+  return out;
+}
+
+function extractFnArgs(fnSrc) {
+  var m=clean(fnSrc).match(/function\s+[A-Za-z_$][\w$]*\s*\(([^)]*)\)/i);
+  return m ? clean(m[1]).replace(/\s+/g,"") : "";
+}
+
+function semanticShape(fnSrc) {
+  var s=clean(fnSrc);
+  var f=[];
+  if (/split\s*\(\s*["'],["']\s*\)/i.test(s)) f.push("SPLIT");
+  if (/join\s*\(\s*["'],["']\s*\)/i.test(s)) f.push("JOIN");
+  if (/encodeURIComponent|encodeURI/i.test(s)) f.push("ENC");
+  if (/action=download/i.test(s)) f.push("QDL");
+  if (/action=sizes/i.test(s)) f.push("QSZ");
+  if (/controller\.php/i.test(s)) f.push("CTRL");
+  if (/JSON\.parse|response\.json/i.test(s)) f.push("JSON");
+  if (/Object\.keys/i.test(s)) f.push("KEYS");
+  if (/1080|720|360/i.test(s)) f.push("QTXT");
+  if (/premium|supporter|subscription|user[_-]?group|group[_-]?id/i.test(s)) f.push("GATE");
+  if (/data-url/i.test(s)) f.push("DATAURL");
+  if (/onclick|addEventListener\s*\(\s*["']click|\.on\s*\(\s*["']click/i.test(s)) f.push("CLICK");
+  return f.join("+") || "0";
+}
+
+function downloadDeepShape(js) {
+  var sz = ajaxCallShape(js,"sizes");
+  var dl = ajaxCallShape(js,"download");
+  var chunks=[];
+  if (sz) {
+    var ssrc=functionSlice(js,sz.fn);
+    chunks.push("SZF=" + sz.fn + "(" + (extractFnArgs(ssrc)||"?") + ")" +
+      "/SH=" + semanticShape(ssrc) +
+      "/CALL=" + (callSites(js,sz.fn).slice(0,2).join("~") || "none"));
+  }
+  if (dl) {
+    var dsrc=functionSlice(js,dl.fn);
+    chunks.push("DLF=" + dl.fn + "(" + (extractFnArgs(dsrc)||"?") + ")" +
+      "/SH=" + semanticShape(dsrc) +
+      "/CALL=" + (callSites(js,dl.fn).slice(0,2).join("~") || "none"));
+  }
+  return chunks.join("|") || "none";
+}
+
 function downloadScriptProbe(html, pageUrl) {
   var srcs = [];
   var seen = {};
@@ -2889,7 +2972,8 @@ function downloadScriptProbe(html, pageUrl) {
 
         return {
           summary:f.length ? basenameOfUrl(u)+":"+f.join("+") : "",
-          deep:deep
+          deep:deep,
+          semantic:/libs\.js(?:$|[?#])/i.test(u) ? downloadDeepShape(js) : ""
         };
       });
     }).catch(function(){ return {summary:"",deep:""}; });
@@ -2897,9 +2981,11 @@ function downloadScriptProbe(html, pageUrl) {
     rows=rows||[];
     var summaries=rows.map(function(x){return x.summary;}).filter(Boolean);
     var deeps=rows.map(function(x){return x.deep;}).filter(Boolean);
+    var semantics=rows.map(function(x){return x.semantic;}).filter(Boolean);
     return {
       summary:summaries.slice(0,5).join("|") || "none",
-      deep:deeps.slice(0,2).join("|") || "none"
+      deep:deeps.slice(0,2).join("|") || "none",
+      semantic:semantics.slice(0,1).join("|") || "none"
     };
   });
 }
@@ -2907,11 +2993,12 @@ function officialDownloadDiagnostic(item, detailHtml, newsId) {
   var mp = downloadMarkupProbe(detailHtml || "");
   return downloadScriptProbe(detailHtml || "", item.url).then(function(js){
     return diagnosticRow(
-      "DUI3 H1080=" + String(mp.has1080) +
+      "DUI4 H1080=" + String(mp.has1080) +
       " M=" + mp.flags +
       " A=" + mp.attrs +
       " JS=" + js.summary +
       " CORE=" + js.deep +
+      " SEM=" + js.semantic +
       " ID" + String(newsId)
     );
   });

@@ -1,0 +1,55 @@
+name: Research MZone lifecycle symbols
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-mzone-lifecycle-symbols.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve lifecycle symbols
+        run: |
+          node - <<'NODE'
+          (async()=>{
+            const mainUrl='https://noctratv.com/assets/index-BrYFkm8g.js';
+            const playerUrl='https://noctratv.com/assets/MPlayer-BlhKrFKV.js';
+            const main=await (await fetch(mainUrl)).text();
+            const player=await (await fetch(playerUrl)).text();
+
+            console.log('MAIN bytes='+main.length+' PLAYER bytes='+player.length);
+
+            for(const re of [
+              /ZE as ([A-Za-z_$][\w$]*)/g,
+              /tk as ([A-Za-z_$][\w$]*)/g,
+              /XE as ([A-Za-z_$][\w$]*)/g,
+              /Ff as ([A-Za-z_$][\w$]*)/g,
+              /Os as ([A-Za-z_$][\w$]*)/g
+            ]){
+              let m;while((m=re.exec(main)))console.log('EXPORT '+re+' => '+m[1]);
+            }
+
+            const importLines=player.slice(0,20000).split(';').filter(x=>x.includes('index-BrYFkm8g.js'));
+            importLines.forEach(x=>console.log('PLAYER_IMPORT '+x.slice(0,12000)));
+
+            const lits=[...player.matchAll(/["'`]([^"'`]{0,120}(?:acquire|release|activate|lease|native|playback)[^"'`]{0,120})["'`]/ig)]
+              .map(m=>m[1]);
+            [...new Set(lits)].slice(0,300).forEach(x=>console.log('LITERAL '+x));
+
+            for(const needle of ['acquire','release','activate','previousLease','prepareNative','nativePlayback','native-playback']){
+              let pos=0,n=0;
+              while((pos=player.indexOf(needle,pos))>=0&&n<20){
+                n++;
+                console.log('\nNEAR '+needle+' #'+n+' @'+pos);
+                console.log(player.slice(Math.max(0,pos-1600),Math.min(player.length,pos+3000)));
+                pos+=needle.length;
+              }
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

@@ -1,0 +1,51 @@
+name: Research MZone main session
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-mzone-main-session.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Extract main app playback auth
+        run: |
+          node - <<'NODE'
+          const url='https://noctratv.com/assets/index-BrYFkm8g.js';
+          const needles=[
+            'mzone-playback-v3:',
+            '/api/player/v4/native',
+            '/api/player/v4/ca',
+            '/api/player/v2/session',
+            'X-MZone-Playback-Lease',
+            'X-MZone',
+            'playbackSessionId',
+            'runtimeSessionId',
+            'sessionId',
+            'X-Token'
+          ];
+          (async()=>{
+            const r=await fetch(url);
+            const s=await r.text();
+            console.log('ASSET '+url+' bytes='+s.length);
+            for(const needle of needles){
+              let pos=0,n=0;
+              while((pos=s.indexOf(needle,pos))>=0 && n<12){
+                n++;
+                const lo=Math.max(0,pos-3500),hi=Math.min(s.length,pos+6500);
+                console.log('\n=== '+needle+' #'+n+' @'+pos+' ===');
+                console.log(s.slice(lo,hi));
+                pos+=needle.length;
+              }
+            }
+            // export tail to identify v/M mappings
+            console.log('\n=== EXPORT TAIL ===');
+            console.log(s.slice(Math.max(0,s.length-12000)));
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

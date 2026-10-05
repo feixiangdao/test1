@@ -174,7 +174,7 @@ function qualityFromManifest(text){
 function appendLease(u,token){
   try{
     var x=new URL(u);
-    if(x.pathname.indexOf("/p/v4/")===0&&!x.searchParams.has("mz_lease")){
+    if(/(^|\.)m-zone\.org$/i.test(x.hostname)&&!x.searchParams.has("mz_lease")){
       x.searchParams.set("mz_lease",token);
       return x.toString();
     }
@@ -239,14 +239,6 @@ function resolveOne(src,tmdbId,mediaType,season,episode,sess){
       var x=j.result||{};
       var u=clean(x.url||x.playlist||x.file);
       if(!u)throw new Error("no media");
-      try{
-        var du=new URL(u);
-        console.log("[Noctra/StreamVault] "+src.label+
-          " resolved host="+du.hostname+
-          " path="+du.pathname+
-          " queryKeys="+Array.from(du.searchParams.keys()).join(",")+
-          " resultHeaderKeys="+Object.keys(x.headers&&typeof x.headers==="object"?x.headers:{}).join(","));
-      }catch(_){}
       u=appendLease(u,sess.token);
       var typ=clean(x.type||x.format).toLowerCase();
       if(typ!=="mp4")typ="hls";
@@ -258,7 +250,8 @@ function resolveOne(src,tmdbId,mediaType,season,episode,sess){
       }
       return validate(u,typ,mediaHeaders).then(function(v){
         if(!v)return null;
-        var q=clean(x.maxHeight)?(Number(x.maxHeight)>=2160?"4K":String(x.maxHeight)+"p"):v.quality;
+        var rq=clean(x.quality||x.label);
+        var q=clean(x.maxHeight)?(Number(x.maxHeight)>=2160?"4K":String(x.maxHeight)+"p"):(rq||v.quality);
         var name="NoctraTV · StreamVault · "+src.label+" · "+q;
         return{
           name:name,title:name,url:v.url,quality:q,type:v.type,

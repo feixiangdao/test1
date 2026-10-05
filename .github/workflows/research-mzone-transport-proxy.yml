@@ -1,0 +1,197 @@
+name: Research MZone transport proxy
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-mzone-transport-proxy.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe enhanced transport proxy
+        run: |
+          node - <<'NODE'
+          const BASE='https://api.m-zone.org';
+          const ORIGIN='https://noctratv.com';
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
+          const enc=new TextEncoder();
+
+          function b64url(bytes){
+            return Buffer.from(new Uint8Array(bytes)).toString('base64')
+              .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+          }
+          function fromB64url(s){
+            s=String(s||'').replace(/-/g,'+').replace(/_/g,'/');
+            while(s.length%4)s+='=';
+            return new Uint8Array(Buffer.from(s,'base64'));
+          }
+          function cookieFrom(res){
+            const sc=res.headers.get('set-cookie')||'';
+            return sc.split(',').map(x=>x.split(';')[0].trim()).filter(Boolean).join('; ');
+          }
+          async function enhancedSession(){
+            const cr=await fetch(BASE+'/api/player/v2/challenge',{
+              headers:{'User-Agent':UA,Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/'}
+            });
+            const ch=await cr.json();
+            const c1=cookieFrom(cr);
+
+            const signKey=await crypto.subtle.generateKey(
+              {name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']
+            );
+            const signPub=await crypto.subtle.exportKey('jwk',signKey.publicKey);
+            const signature=await crypto.subtle.sign(
+              {name:'ECDSA',hash:'SHA-256'},signKey.privateKey,
+              enc.encode(ch.challengeId+'.'+ch.nonce+'.'+ch.issuedAt)
+            );
+
+            const ecdhKey=await crypto.subtle.generateKey(
+              {name:'ECDH',namedCurve:'P-256'},false,['deriveBits']
+            );
+            const transportPub=await crypto.subtle.exportKey('jwk',ecdhKey.publicKey);
+
+            const payload={
+              challengeId:ch.challengeId,
+              nonce:ch.nonce,
+              publicKey:signPub,
+              signature:b64url(signature),
+              fingerprint:{
+                webdriver:false,languages:['en-US','en'],plugins:5,
+                hardwareConcurrency:8,deviceMemory:8,maxTouchPoints:5,
+                platform:'Android',
+                brands:[{brand:'Chromium',version:'140'},{brand:'Google Chrome',version:'140'}],
+                mobile:true,timezone:'Asia/Shanghai',
+                screen:{width:1080,height:2400,colorDepth:24,pixelRatio:2.75},
+                visibilityState:'visible'
+              },
+              embedded:false,embedOrigin:'',sandboxed:false,turnstileToken:'',
+              supportsEncryptedTransport:true,
+              supportsEncryptedCapabilities:true,
+              transportPublicKey:transportPub,
+              playerVersion:'mplayer-web-v2',
+              playbackSessionVersion:2,
+              capabilities:['hls','dash','codec-avc']
+            };
+
+            const sr=await fetch(BASE+'/api/player/v2/session',{
+              method:'POST',
+              headers:{
+                'User-Agent':UA,'Content-Type':'application/json',Accept:'application/json',
+                Origin:ORIGIN,Referer:ORIGIN+'/',...(c1?{Cookie:c1}:{})
+              },
+              body:JSON.stringify(payload)
+            });
+            const sj=await sr.json().catch(()=>({}));
+            const c2=cookieFrom(sr);
+            const cookie=[c1,c2].filter(Boolean).join('; ');
+            console.log('SESSION status='+sr.status+
+              ' success='+!!sj.success+
+              ' mode='+(sj.mode||'')+
+              ' transportVersion='+(sj.transport&&sj.transport.version||'')+
+              ' capabilityVersion='+(sj.capabilities&&sj.capabilities.version||'')+
+              ' cookie='+(cookie?1:0));
+
+            if(!sr.ok||!sj.token)throw new Error(sj.error||'enhanced session failed');
+
+            let sharedKey=null;
+            if(sj.transport&&sj.transport.version===3&&sj.transport.serverPublicKey&&sj.transport.salt){
+              const serverPub=await crypto.subtle.importKey(
+                'jwk',sj.transport.serverPublicKey,{name:'ECDH',namedCurve:'P-256'},false,[]
+              );
+              const bits=await crypto.subtle.deriveBits(
+                {name:'ECDH',public:serverPub},ecdhKey.privateKey,256
+              );
+              const hkdfKey=await crypto.subtle.importKey('raw',bits,'HKDF',false,['deriveKey']);
+              sharedKey=await crypto.subtle.deriveKey(
+                {
+                  name:'HKDF',hash:'SHA-256',
+                  salt:fromB64url(sj.transport.salt),
+                  info:enc.encode('mzone-playback-v3:'+sj.sessionId)
+                },
+                hkdfKey,
+                {name:'AES-GCM',length:256},
+                false,
+                ['encrypt','decrypt']
+              );
+            }
+
+            return {
+              token:sj.token,
+              sessionId:sj.sessionId,
+              cookie,
+              transportVersion:sj.transport&&sj.transport.version||0,
+              capabilityVersion:sj.capabilities&&sj.capabilities.version||0,
+              sharedKey
+            };
+          }
+
+          async function resolveSilver(sess){
+            const rr=await fetch(BASE+'/mplayer/site-streamvault-silver/resolve',{
+              method:'POST',
+              headers:{
+                'User-Agent':UA,'Content-Type':'application/json',Accept:'application/json',
+                Origin:ORIGIN,Referer:ORIGIN+'/',
+                'X-MZone-Playback-Lease':sess.token,
+                ...(sess.transportVersion===3?{'X-MZone-Transport':'3'}:{}),
+                ...(sess.cookie?{Cookie:sess.cookie}:{})
+              },
+              body:JSON.stringify({codecCapabilities:{},type:'movie',tmdbId:'238'})
+            });
+            const j=await rr.json().catch(()=>({}));
+            const r=j.result||{};
+            const url=r.url||r.playlist||r.file||'';
+            console.log('RESOLVE status='+rr.status+
+              ' success='+!!j.success+
+              ' error='+(j.error||'')+
+              ' resultKeys='+Object.keys(r).join(','));
+            if(!url)throw new Error('no Silver URL');
+            const u=new URL(url);
+            console.log('PROXY host='+u.hostname+' path='+u.pathname+' queryKeys='+[...u.searchParams.keys()].join(','));
+            return url;
+          }
+
+          async function testProxy(url,sess,label,extraHeaders={}){
+            const r=await fetch(url,{
+              headers:{
+                'User-Agent':UA,
+                'X-MZone-Playback-Lease':sess.token,
+                ...(sess.transportVersion===3?{'X-MZone-Transport':'3'}:{}),
+                ...(sess.cookie?{Cookie:sess.cookie}:{}),
+                ...extraHeaders
+              }
+            });
+            const ct=r.headers.get('content-type')||'';
+            const body=await r.text().catch(()=> '');
+            console.log(label+' status='+r.status+
+              ' contentType='+ct+
+              ' xTransport='+(r.headers.get('x-mzone-transport')||'')+
+              ' prefix='+body.slice(0,80).replace(/\s+/g,' '));
+            return {status:r.status,body,headers:r.headers};
+          }
+
+          (async()=>{
+            const s=await enhancedSession();
+            const url=await resolveSilver(s);
+
+            // Main hypothesis: enhanced lease + transport header is enough for GET.
+            await testProxy(url,s,'ENHANCED_GET');
+
+            // Control: same enhanced session but omit transport header.
+            const r2=await fetch(url,{
+              headers:{
+                'User-Agent':UA,
+                'X-MZone-Playback-Lease':s.token,
+                ...(s.cookie?{Cookie:s.cookie}:{})
+              }
+            });
+            const b2=await r2.text().catch(()=> '');
+            console.log('NO_TRANSPORT_HEADER status='+r2.status+
+              ' prefix='+b2.slice(0,80).replace(/\s+/g,' '));
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

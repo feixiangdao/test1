@@ -1,0 +1,36 @@
+name: Research MPlayer native callsite
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-mplayer-native-callsite.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect exact native callsite
+        run: |
+          node - <<'NODE'
+          (async()=>{
+            const url='https://noctratv.com/assets/MPlayer-BlhKrFKV.js';
+            const s=await (await fetch(url)).text();
+            console.log('bytes='+s.length);
+            const phrase='could not authorize native media playback';
+            const i=s.indexOf(phrase);
+            console.log('PHRASE @'+i);
+            console.log(s.slice(Math.max(0,i-12000),Math.min(s.length,i+9000)));
+
+            const imports=[...s.matchAll(/import\s*\{([^}]+)\}\s*from\s*["']\.\/index-BrYFkm8g\.js["']/g)];
+            for(const m of imports)console.log('\nIMPORTS '+m[1]);
+
+            // Also show every direct import from the main bundle.
+            const any=[...s.matchAll(/import[^;]{0,20000}index-BrYFkm8g\.js["'];?/g)];
+            for(const m of any)console.log('\nIMPORT_STMT '+m[0].slice(0,20000));
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

@@ -2,8 +2,8 @@
 // Maps the current noctratv.com labels with publicly verified Bingr server ids:
 //   Bingr · Aphelion -> s40
 //   Bingr · Bastion  -> s62
+//   Bingr · Corvus   -> s61
 //   Bingr · Edmunds  -> s3
-// Corvus is intentionally omitted until its current server id is verified.
 //
 // No iframe fallback. The provider asks Bingr's JSON API for direct sources and
 // returns only URLs that can be preflighted as HLS or MP4.
@@ -14,6 +14,7 @@ var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/143 Mobile Saf
 var SERVERS=[
   {key:"aphelion",srv:"s40",name:"Aphelion"},
   {key:"bastion",srv:"s62",name:"Bastion"},
+  {key:"corvus",srv:"s61",name:"Corvus"},
   {key:"edmunds",srv:"s3",name:"Edmunds"}
 ];
 

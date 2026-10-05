@@ -1681,7 +1681,7 @@ function searchAndCandidateProbe() {
   headers["X-Requested-With"] = "XMLHttpRequest";
   headers["Origin"] = BASE;
   headers["Content-Type"] = "application/x-www-form-urlencoded";
-  var body = "do=search&subaction=search&story=" + encodeURIComponent("Spider-Man Brand New Day");
+  var body = "do=search&subaction=search&story=" + encodeURIComponent("Obsession");
 
   return fetch(bootstrapUrl, {
     method:"POST",
@@ -1689,11 +1689,11 @@ function searchAndCandidateProbe() {
     body:body
   }).then(function(r) {
     return r.text().then(function(html) {
-      var boot = inspectSearchBody(html, "Spider-Man Brand New Day", "2026");
+      var boot = inspectSearchBody(html, "Obsession", "2025");
       var hash = boot.hash || "";
 
       if (!hash) {
-        var fail = "CCDIAG v0.5.1 K0 NEXT=COOKIE_OR_HASH";
+        var fail = "CCDIAG v0.5.2 K0 NEXT=COOKIE_OR_HASH";
         return [{
           name:fail,title:fail,
           url:BASE+"/#"+encodeURIComponent(fail),
@@ -1701,11 +1701,11 @@ function searchAndCandidateProbe() {
         }];
       }
 
-      return ajaxSearchProbe("SPIDER", "/engine/mods/dle_search/ajax.php", hash, "Spider-Man Brand New Day", "/")
+      return ajaxSearchProbe("SPIDER", "/engine/mods/dle_search/ajax.php", hash, "Obsession", "/")
         .then(function(x) {
           var item = (x.info.items || [])[0] || null;
           if (!item || !item.url) {
-            var fail = "CCDIAG v0.5.1 K1 Q0 NEXT=SEARCH";
+            var fail = "CCDIAG v0.5.2 K1 Q0 NEXT=SEARCH";
             return [{
               name:fail,title:fail,
               url:BASE+"/#"+encodeURIComponent(fail),
@@ -1715,7 +1715,7 @@ function searchAndCandidateProbe() {
 
           var newsId = parseNewsId(item.url);
           if (!newsId) {
-            var fail = "CCDIAG v0.5.1 K1 Q1 ID0 NEXT=NEWSID";
+            var fail = "CCDIAG v0.5.2 K1 Q1 ID0 NEXT=NEWSID";
             return [{
               name:fail,title:fail,
               url:BASE+"/#"+encodeURIComponent(fail),
@@ -1770,7 +1770,7 @@ function searchAndCandidateProbe() {
               }
               if (goodHls) {
                 var hs = hlsProbeStream(goodHls, item.url);
-                var hr = "CC51 USE_HLS " + goodHls.label + compactCode(goodHls) +
+                var hr = "CC52 USE_HLS " + goodHls.label + compactCode(goodHls) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return hs ? [diagnosticRow(hr), hs] : [diagnosticRow(hr)];
               }
@@ -1779,7 +1779,7 @@ function searchAndCandidateProbe() {
               // return those direct streams.
               var directRows = directStreamsFromRoutes(alts);
               if (directRows.length) {
-                var dr = "CC51 USE_DIRECT N" + String(directRows.length) +
+                var dr = "CC52 USE_DIRECT N" + String(directRows.length) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return [diagnosticRow(dr)].concat(directRows);
               }
@@ -1802,14 +1802,19 @@ function searchAndCandidateProbe() {
                   "/R" + compactCode(hlsMap.R);
 
                 if (ds) {
-                  var ok = "CC51 USE_DL " + String(f.status || 0) +
+                  var ok = "CC52 USE_DL " + String(f.status || 0) +
                     " ID" + String(newsId) + " DH" + String(dh.media || 0);
                   return [diagnosticRow(ok), ds];
                 }
 
-                var fail = "CC51 NO_STREAM H=" + hcodes +
-                  " D" + String(f.status || 0) +
-                  " ID" + String(newsId) + " DH" + String(dh.media || 0);
+                var m = dp && dp.manual ? dp.manual : {};
+                var fail = "CC52 O" + compactCode(hlsMap.O) +
+                  " L" + compactCode(hlsMap.L) +
+                  " R" + compactCode(hlsMap.R) +
+                  " M" + String(m.status || 0) +
+                  " F" + String(f.status || 0) +
+                  " DH" + String(dh.media || 0) +
+                  " ID" + String(newsId);
                 return [diagnosticRow(fail)];
               });
             });
@@ -1818,7 +1823,7 @@ function searchAndCandidateProbe() {
     });
   }).catch(function(e) {
     var msg=e&&e.message?e.message:String(e||"error");
-    var report="CCDIAG v0.5.1 ERR="+msg.slice(0,60);
+    var report="CCDIAG v0.5.2 ERR="+msg.slice(0,60);
     return [{
       name:report,title:report,
       url:BASE+"/#"+encodeURIComponent(report),

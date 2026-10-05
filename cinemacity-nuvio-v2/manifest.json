@@ -1,12 +1,12 @@
 {
   "name": "CinemaCity Local V2",
   "version": "0.4.3",
-  "description": "CinemaCity V2 DLE article-route diagnostic. Uses the known news_id to probe index.php?newsid=... and newsid+seourl for PlayerJS/public_files without relying on the broken pretty URL.",
+  "description": "CinemaCity V2 public_files diagnostic. Uses DH media keys to probe direct /public_files files and .urlset/master.m3u8 construction, reporting redirects and final host.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity DLE route diagnostic. ID/SEOID rows report CF, guest, atob, public_files, direct-media and body length.",
+      "description": "CinemaCity public_files probe. PF_FILE/PF_SET/PF_ONESET report status, redirect, final host and whether an HLS master playlist is returned.",
       "version": "0.4.3",
       "supportedTypes": [
         "movie"

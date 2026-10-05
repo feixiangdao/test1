@@ -1251,6 +1251,7 @@ function dhSizesProbe(newsId, hash, referer) {
             if (/\.(?:mp4|m4a|m3u8)(?:$|[?#])/i.test(k)) {
               mediaCount++;
               mediaKeys.push(k);
+              mediaKeys.push(k);
               if (preview.length < 3) preview.push(k);
               if (values.length < 3) {
                 var v = obj[k];
@@ -1274,6 +1275,7 @@ function dhSizesProbe(newsId, hash, referer) {
         json:json,
         keys:keyCount,
         media:mediaCount,
+        mediaKeys:mediaKeys,
         preview:preview,
         values:values,
         mediaKeys:mediaKeys,
@@ -1402,6 +1404,62 @@ function publicFilesProbe(mediaKeys, referer) {
   return Promise.all(tasks);
 }
 
+function dhDownloadProbe(videoPath, audioPath, hash, referer) {
+  if (!videoPath) {
+    return Promise.resolve({
+      status:0, ct:"", cr:"", len:"", finalUrl:"", host:"", ok:0, label:"NO_VIDEO"
+    });
+  }
+
+  var url = BASE + "/engine/ajax/controller.php?mod=dh&action=download" +
+    "&video=" + encodeURIComponent(videoPath) +
+    (audioPath ? "&audio=" + encodeURIComponent(audioPath) : "") +
+    "&name=" + encodeURIComponent("cinemacity-probe.mp4") +
+    "&user_hash=" + encodeURIComponent(hash || "");
+
+  var headers = baseHeaders(referer || (BASE + "/"), true);
+  headers["Range"] = "bytes=0-1";
+  headers["Accept"] = "*/*";
+  headers["X-Requested-With"] = "XMLHttpRequest";
+
+  return fetch(url, { method:"GET", headers:headers }).then(function(r) {
+    var ct = "", cr = "", cl = "";
+    try { ct = r.headers && r.headers.get ? (r.headers.get("content-type") || "") : ""; } catch (_) {}
+    try { cr = r.headers && r.headers.get ? (r.headers.get("content-range") || "") : ""; } catch (_) {}
+    try { cl = r.headers && r.headers.get ? (r.headers.get("content-length") || "") : ""; } catch (_) {}
+    var finalUrl = "";
+    try { finalUrl = r.url || ""; } catch (_) {}
+    var host = "";
+    try { host = finalUrl ? new URL(finalUrl).host : ""; } catch (_) {}
+
+    return r.arrayBuffer ? r.arrayBuffer().then(function(buf) {
+      return {
+        status:r.status,
+        ct:ct,
+        cr:cr,
+        len:cl || String(buf ? buf.byteLength : 0),
+        finalUrl:finalUrl,
+        host:host,
+        ok:(r.status === 200 || r.status === 206) ? 1 : 0,
+        url:url
+      };
+    }).catch(function() {
+      return {
+        status:r.status, ct:ct, cr:cr, len:cl, finalUrl:finalUrl, host:host,
+        ok:(r.status === 200 || r.status === 206) ? 1 : 0, url:url
+      };
+    }) : Promise.resolve({
+      status:r.status, ct:ct, cr:cr, len:cl, finalUrl:finalUrl, host:host,
+      ok:(r.status === 200 || r.status === 206) ? 1 : 0, url:url
+    });
+  }).catch(function(e) {
+    return {
+      status:0, ct:"", cr:"", len:"", finalUrl:"", host:"", ok:0, url:url,
+      error:e&&e.message?e.message:String(e||"error")
+    };
+  });
+}
+
 function searchAndCandidateProbe() {
   var bootstrapUrl = BASE + "/index.php?do=search";
   var headers = baseHeaders(BASE + "/", true);
@@ -1441,28 +1499,31 @@ function searchAndCandidateProbe() {
           if (!newsId) return rows;
 
           return dhSizesProbe(newsId, hash, item.url).then(function(dh) {
-            var dht="DH "+String(dh.status)+" J"+dh.json+" K"+dh.keys+" MEDIA"+dh.media;
+            var dht="DH "+String(dh.status)+" J"+dh.json+" L"+dh.len+" K"+dh.keys+" MEDIA"+dh.media;
             rows.push({name:dht,title:dht,url:dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
 
-            return publicFilesProbe(dh.mediaKeys || [], item.url).then(function(ps) {
-              ps.forEach(function(p) {
-                var t=p.label+" "+String(p.status)+
-                  " REDIR"+String(p.changed)+
-                  " HOST="+(p.host||"?")+
-                  " M3U"+String(p.m3u)+
-                  " L"+String(p.len||0);
-                if (p.ctype) t += " CT="+p.ctype.slice(0,28);
-                if (p.error) t += " · "+p.error.slice(0,65);
-                rows.push({
-                  name:t,title:t,url:p.finalUrl||p.url,
-                  quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
-                });
-              });
+            var keys = dh.mediaKeys || [];
+            var videos = keys.filter(function(k){ return /\.mp4(?:$|[?#])/i.test(k); });
+            var audios = keys.filter(function(k){ return /\.m4a(?:$|[?#])/i.test(k); });
 
-              (dh.mediaKeys || []).slice(0,4).forEach(function(k,idx) {
-                var t="KEY"+String(idx+1)+" · "+clean(k).slice(0,88);
-                rows.push({name:t,title:t,url:dh.url+"#key-"+String(idx+1),quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
-              });
+            var video = videos.filter(function(k){ return /1080/i.test(k); })[0] ||
+                        videos.filter(function(k){ return /720/i.test(k); })[0] ||
+                        videos[0] || "";
+            var audio = audios[0] || "";
+
+            var pick = "PICK V=" + (video ? clean(video).slice(-58) : "NONE") +
+              " A=" + (audio ? clean(audio).slice(-44) : "NONE");
+            rows.push({name:pick,title:pick,url:dh.url+"#pick",quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+
+            return dhDownloadProbe(video, audio, hash, item.url).then(function(dp) {
+              var finalShort = dp.finalUrl ? clean(dp.finalUrl).slice(0,90) : "";
+              var t = "DOWNLOAD "+String(dp.status)+" OK"+String(dp.ok)+
+                " CT="+(dp.ct||"-")+
+                " CR="+(dp.cr||"-")+
+                " LEN="+(dp.len||"-")+
+                " HOST="+(dp.host||"-");
+              if (finalShort) t += " · " + finalShort;
+              rows.push({name:t,title:t,url:dp.url||dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
               return rows;
             });
           });

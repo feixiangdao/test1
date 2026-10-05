@@ -1786,7 +1786,7 @@ function searchAndCandidateProbe() {
               }
               if (goodHls) {
                 var hs = hlsProbeStream(goodHls, item.url);
-                var hr = "CC70 USE_HLS " + goodHls.label + compactCode(goodHls) +
+                var hr = "CC71 USE_HLS " + goodHls.label + compactCode(goodHls) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return hs ? [diagnosticRow(hr), hs] : [diagnosticRow(hr)];
               }
@@ -1795,7 +1795,7 @@ function searchAndCandidateProbe() {
               // return those direct streams.
               var directRows = directStreamsFromRoutes(alts);
               if (directRows.length) {
-                var dr = "CC70 USE_DIRECT N" + String(directRows.length) +
+                var dr = "CC71 USE_DIRECT N" + String(directRows.length) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return [diagnosticRow(dr)].concat(directRows);
               }
@@ -1818,7 +1818,7 @@ function searchAndCandidateProbe() {
                   "/R" + compactCode(hlsMap.R);
 
                 if (ds) {
-                  var ok = "CC70 USE_DL " + String(f.status || 0) +
+                  var ok = "CC71 USE_DL " + String(f.status || 0) +
                     " R" + String(f.rangeOk || 0) +
                     " T" + String(f.ftyp || 0) +
                     " ID" + String(newsId) + " DH" + String(dh.media || 0);
@@ -1826,7 +1826,7 @@ function searchAndCandidateProbe() {
                 }
 
                 var m = dp && dp.manual ? dp.manual : {};
-                var fail = "CC70 O" + compactCode(hlsMap.O) +
+                var fail = "CC71 O" + compactCode(hlsMap.O) +
                   " L" + compactCode(hlsMap.L) +
                   " R" + compactCode(hlsMap.R) +
                   " M" + String(m.status || 0) +
@@ -2475,6 +2475,103 @@ function fileSetStreams(fileData, pageUrl) {
   return out;
 }
 
+function hlsAttr(line, key) {
+  var s = clean(line);
+  var q = new RegExp(key + '\\s*=\\s*"([^"]*)"', "i").exec(s);
+  if (q) return clean(q[1]);
+  var b = new RegExp(key + "\\s*=\\s*([^,\\s]+)", "i").exec(s);
+  return b ? clean(b[1]) : "";
+}
+
+function hlsQualityFromInf(line) {
+  var r = /\bRESOLUTION\s*=\s*\d{2,5}\s*[xX]\s*(\d{2,5})/i.exec(line);
+  if (r) {
+    var h = Number(r[1] || 0);
+    if (h >= 2160) return "4K";
+    if (h >= 1440) return "1440p";
+    if (h >= 1080) return "1080p";
+    if (h >= 720) return "720p";
+    if (h >= 480) return "480p";
+    if (h >= 360) return "360p";
+    if (h > 0) return String(h) + "p";
+  }
+  return "Auto";
+}
+
+function expandHlsMasterVariants(autoStream, pageUrl) {
+  if (!autoStream || !autoStream.url || autoStream.type !== "hls") {
+    return Promise.resolve([]);
+  }
+
+  var h = watchPlaybackHeaders(pageUrl);
+  h["Accept"] = "application/vnd.apple.mpegurl,application/x-mpegURL,*/*";
+
+  return fetch(autoStream.url, {headers:h}).then(function(r) {
+    if (!r.ok) return [];
+    return r.text().then(function(body) {
+      if (!/#EXTM3U/i.test(body) || !/#EXT-X-STREAM-INF/i.test(body)) return [];
+
+      var lines = String(body || "").split(/\r?\n/);
+      var rows = [], seen = {};
+      var hasExternalAudio = /#EXT-X-MEDIA:[^\n]*TYPE\s*=\s*AUDIO/i.test(body);
+
+      for (var i=0;i<lines.length;i++) {
+        var line = clean(lines[i]);
+        if (!/^#EXT-X-STREAM-INF\s*:/i.test(line)) continue;
+
+        var uri = "";
+        for (var j=i+1;j<lines.length;j++) {
+          var next = clean(lines[j]);
+          if (!next) continue;
+          if (next.charAt(0) === "#") continue;
+          uri = next;
+          break;
+        }
+        if (!uri) continue;
+
+        var u = resolveUrl(uri, autoStream.url);
+        if (!/^https?:\/\//i.test(u) || seen[u]) continue;
+        seen[u] = 1;
+
+        var q = hlsQualityFromInf(line);
+        var audioGroup = hlsAttr(line, "AUDIO");
+        var codecs = hlsAttr(line, "CODECS");
+        var muxedAudio = !audioGroup && /mp4a|aac|ac-3|ec-3|opus/i.test(codecs);
+
+        var label = "CinemaCity Quality · " + q + " · HLS";
+        if (hasExternalAudio && audioGroup && !muxedAudio) label += " · TEST";
+
+        rows.push({
+          name:label,
+          title:label,
+          url:u,
+          quality:q,
+          type:"hls",
+          provider:"cinemacity-quality-070",
+          headers:watchPlaybackHeaders(pageUrl),
+          subtitles:[]
+        });
+      }
+
+      rows.sort(function(a,b) {
+        function rank(q) {
+          if (q === "4K") return 2160;
+          var m = String(q || "").match(/(\d{3,4})p/i);
+          return m ? Number(m[1]) : 0;
+        }
+        return rank(b.quality) - rank(a.quality);
+      });
+
+      console.log("[CinemaCity] master variants=" + rows.length + " extAudio=" + (hasExternalAudio ? 1 : 0));
+      return rows.slice(0,8);
+    });
+  }).catch(function(e) {
+    console.log("[CinemaCity] master inspect failed " + (e && e.message ? e.message : e));
+    return [];
+  });
+}
+
+
 function watchPlaybackHeaders(referer) {
   var h = {
     "User-Agent": userAgent(),
@@ -2491,7 +2588,7 @@ function playerScriptDiagnostic(html, newsId) {
   var fileLen = clean(payload.rawFile).length;
   var typ = Array.isArray(payload.fileData) ? "A" : (typeof payload.fileData === "object" && payload.fileData ? "O" : "S");
   var us = /\.urlset\/master\.m3u8/i.test(clean(pickMovieFileValue(payload.fileData))) ? 1 : 0;
-  return "CC70 PLAYER A" + String(atobCount) +
+  return "CC71 PLAYER A" + String(atobCount) +
     " F" + String(fileLen) +
     " T" + typ +
     " U" + String(us) +
@@ -2516,6 +2613,23 @@ function watchStreamsForMeta(meta) {
       var fromPlayer = fileSetStreams(payload.fileData, item.url);
       if (fromPlayer.length) {
         console.log("[CinemaCity] PlayerJS streams=" + fromPlayer.length + " news_id=" + newsId);
+
+        var autoOnly = fromPlayer.length === 1 &&
+          fromPlayer[0] &&
+          fromPlayer[0].type === "hls" &&
+          String(fromPlayer[0].quality || "").toLowerCase() === "auto";
+
+        if (autoOnly) {
+          return expandHlsMasterVariants(fromPlayer[0], item.url).then(function(masterRows) {
+            var rows = dedupeStreams(fromPlayer.concat(masterRows || []));
+            FAST_CACHE.streams[streamKey] = {
+              expires: Date.now() + 5 * 60 * 1000,
+              rows: rows
+            };
+            return rows;
+          });
+        }
+
         FAST_CACHE.streams[streamKey] = {
           expires: Date.now() + 5 * 60 * 1000,
           rows: fromPlayer

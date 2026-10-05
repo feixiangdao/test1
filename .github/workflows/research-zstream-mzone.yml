@@ -1,0 +1,115 @@
+name: Research ZStream MZone aliases
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-mzone.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe current ZStream aliases
+        run: |
+          node - <<'NODE'
+          const BASE='https://api.m-zone.org';
+          const ORIGIN='https://noctratv.com';
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
+          const enc=new TextEncoder();
+
+          function b64url(bytes){
+            let s=''; for(const b of new Uint8Array(bytes))s+=String.fromCharCode(b);
+            return Buffer.from(s,'binary').toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+          }
+          function cookieFrom(res){
+            const sc=res.headers.get('set-cookie')||'';
+            return sc.split(',').map(x=>x.split(';')[0].trim()).filter(Boolean).join('; ');
+          }
+          async function session(){
+            const chRes=await fetch(BASE+'/api/player/v2/challenge',{
+              headers:{'User-Agent':UA,'Accept':'application/json','Origin':ORIGIN,'Referer':ORIGIN+'/'}
+            });
+            const ch=await chRes.json();
+            const cookie=cookieFrom(chRes);
+            const key=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);
+            const pub=await crypto.subtle.exportKey('jwk',key.publicKey);
+            const sig=await crypto.subtle.sign(
+              {name:'ECDSA',hash:'SHA-256'},key.privateKey,
+              enc.encode(ch.challengeId+'.'+ch.nonce+'.'+ch.issuedAt)
+            );
+            const payload={
+              challengeId:ch.challengeId,nonce:ch.nonce,publicKey:pub,signature:b64url(sig),
+              fingerprint:{
+                webdriver:false,languages:['en-US','en'],plugins:5,hardwareConcurrency:8,deviceMemory:8,
+                maxTouchPoints:5,platform:'Android',
+                brands:[{brand:'Chromium',version:'140'},{brand:'Google Chrome',version:'140'}],
+                mobile:true,timezone:'Asia/Shanghai',
+                screen:{width:1080,height:2400,colorDepth:24,pixelRatio:2.75},visibilityState:'visible'
+              },
+              embedded:false,embedOrigin:'',sandboxed:false,turnstileToken:'',
+              supportsEncryptedTransport:false,supportsEncryptedCapabilities:false,transportPublicKey:null,
+              playerVersion:'mplayer-web-v2',playbackSessionVersion:2,
+              capabilities:['hls','dash','codec-avc']
+            };
+            const sRes=await fetch(BASE+'/api/player/v2/session',{
+              method:'POST',
+              headers:{
+                'User-Agent':UA,'Content-Type':'application/json','Accept':'application/json',
+                'Origin':ORIGIN,'Referer':ORIGIN+'/',...(cookie?{'Cookie':cookie}:{})
+              },
+              body:JSON.stringify(payload)
+            });
+            const j=await sRes.json().catch(()=>({}));
+            const sc2=cookieFrom(sRes);
+            const allCookie=[cookie,sc2].filter(Boolean).join('; ');
+            console.log('SESSION status='+sRes.status+' success='+!!j.success+' mode='+(j.mode||'')+' keys='+Object.keys(j).join(',')+' cookie='+(allCookie?1:0));
+            if(!sRes.ok||!j.token)throw new Error(j.error||'no session');
+            return {token:j.token,sessionId:j.sessionId,cookie:allCookie};
+          }
+          function shortResult(j){
+            const r=j&&j.result||{};
+            const u=r.url||r.playlist||r.file||'';
+            let host='',path='';
+            try{const x=new URL(u);host=x.hostname;path=x.pathname;}catch{}
+            return {
+              success:j&&j.success,
+              error:j&&j.error,
+              code:j&&j.code,
+              resultKeys:Object.keys(r||{}),
+              host,path,
+              type:r.type||r.format||'',
+              maxHeight:r.maxHeight||'',
+              server:j&&j.server||r.server||'',
+              source:j&&j.source||r.source||''
+            };
+          }
+          async function resolve(id,sess,type='movie'){
+            const body={codecCapabilities:{},type,tmdbId:type==='movie'?'238':'1399'};
+            if(type==='tv'){body.season='1';body.episode='1';}
+            const r=await fetch(BASE+'/mplayer/'+id+'/resolve',{
+              method:'POST',
+              headers:{
+                'User-Agent':UA,'Content-Type':'application/json','Accept':'application/json',
+                'Origin':ORIGIN,'Referer':ORIGIN+'/',
+                'X-MZone-Playback-Lease':sess.token,
+                ...(sess.cookie?{'Cookie':sess.cookie}:{})
+              },
+              body:JSON.stringify(body)
+            });
+            const j=await r.json().catch(()=>({}));
+            console.log(id+' '+type+' HTTP='+r.status+' '+JSON.stringify(shortResult(j)));
+          }
+          (async()=>{
+            const s=await session();
+            for(const id of ['zstream-apollo','zstream-vienna','zstream-chase','zstream-stellar','zstream-aphrodite','zstream-tokyo']){
+              await resolve(id,s,'movie');
+              if(id!=='zstream-chase')await resolve(id,s,'tv');
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

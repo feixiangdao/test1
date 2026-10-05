@@ -1517,6 +1517,43 @@ function dhDownloadProbe(videoPath, audioPath, hash, referer) {
   });
 }
 
+function probeCandidateStream(label, url, referer) {
+  var headers = baseHeaders(referer || (BASE + "/"), true);
+  headers["Range"] = "bytes=0-255";
+  headers["Accept"] = "*/*";
+
+  return fetch(url, { method:"GET", headers:headers }).then(function(r) {
+    var ct="", cr="", cl="";
+    try { ct = r.headers && r.headers.get ? (r.headers.get("content-type") || "") : ""; } catch (_) {}
+    try { cr = r.headers && r.headers.get ? (r.headers.get("content-range") || "") : ""; } catch (_) {}
+    try { cl = r.headers && r.headers.get ? (r.headers.get("content-length") || "") : ""; } catch (_) {}
+    var finalUrl="";
+    try { finalUrl = r.url || ""; } catch (_) {}
+    var host="";
+    try { host = finalUrl ? new URL(finalUrl).host : ""; } catch (_) {}
+
+    return r.text().then(function(body) {
+      var hls = /#EXTM3U/i.test(body) ? 1 : 0;
+      var html = /<html|<!doctype/i.test(body) ? 1 : 0;
+      return {
+        label:label,status:r.status,ct:ct,cr:cr,len:cl||String(body.length),
+        finalUrl:finalUrl,host:host,hls:hls,html:html,
+        body:clean(body).replace(/\s+/g," ").slice(0,90),url:url
+      };
+    }).catch(function() {
+      return {
+        label:label,status:r.status,ct:ct,cr:cr,len:cl,
+        finalUrl:finalUrl,host:host,hls:0,html:0,body:"",url:url
+      };
+    });
+  }).catch(function(e) {
+    return {
+      label:label,status:0,ct:"",cr:"",len:"",finalUrl:"",host:"",hls:0,html:0,body:"",url:url,
+      error:e&&e.message?e.message:String(e||"error")
+    };
+  });
+}
+
 function searchAndCandidateProbe() {
   var bootstrapUrl = BASE + "/index.php?do=search";
   var headers = baseHeaders(BASE + "/", true);
@@ -1556,43 +1593,45 @@ function searchAndCandidateProbe() {
           if (!newsId) return rows;
 
           return dhSizesProbe(newsId, hash, item.url).then(function(dh) {
-            var dht="DH "+String(dh.status)+" J"+dh.json+" L"+dh.len+" K"+dh.keys+" MEDIA"+dh.media;
-            rows.push({name:dht,title:dht,url:dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
-
             var keys = dh.mediaKeys || [];
-            var videos = keys.filter(function(k){ return /\.mp4(?:$|[?#])/i.test(k); });
-            var audios = keys.filter(function(k){ return /\.m4a(?:$|[?#])/i.test(k); });
+            var dht="DH "+String(dh.status)+" J"+dh.json+" K"+dh.keys+" MEDIA"+dh.media;
+            rows.push({name:dht,title:dht,url:dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+            if (!keys.length) return rows;
 
+            // Historical CinemaCity providers reconstruct HLS as:
+            // <cdnBase>/public_files/<comma-separated file set>.urlset/master.m3u8
+            // Probe same-origin as the first concrete base candidate, plus a video-only form.
+            var allRest = keys.join(",");
+            var allUrl = BASE + "/public_files/" + allRest + ".urlset/master.m3u8";
+
+            var videos = keys.filter(function(k){ return /\.mp4(?:$|[?#])/i.test(k); });
             var video = videos.filter(function(k){ return /1080/i.test(k); })[0] ||
                         videos.filter(function(k){ return /720/i.test(k); })[0] ||
                         videos[0] || "";
-            var audio = audios[0] || "";
+            var oneUrl = video ? (BASE + "/public_files/" + video + ".urlset/master.m3u8") : "";
 
-            var pick = "PICK V=" + (video ? clean(video).slice(-58) : "NONE") +
-              " A=" + (audio ? clean(audio).slice(-44) : "NONE");
-            rows.push({name:pick,title:pick,url:dh.url+"#pick",quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+            var info = "SET "+String(keys.length)+" V="+(video ? clean(video).slice(-62) : "NONE");
+            rows.push({name:info,title:info,url:dh.url+"#set",quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
 
-            return dhDownloadProbe(video, audio, hash, item.url).then(function(dp) {
-              var m = dp.manual || {};
-              var f = dp.follow || {};
+            var probes = [
+              probeCandidateStream("ALL", allUrl, item.url)
+            ];
+            if (oneUrl) probes.push(probeCandidateStream("ONE", oneUrl, item.url));
 
-              var mt = "MANUAL "+String(m.status)+
-                " LOC="+(m.loc ? clean(m.loc).slice(0,80) : "-")+
-                " CT="+(m.ct||"-")+
-                " CD="+(m.cd ? clean(m.cd).slice(0,60) : "-");
-              rows.push({name:mt,title:mt,url:dp.url||dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
-
-              var ft = "FOLLOW "+String(f.status)+" OK"+String(f.ok)+
-                " CT="+(f.ct||"-")+
-                " CR="+(f.cr||"-")+
-                " LEN="+(f.len||"-")+
-                " HOST="+(f.host||"-");
-              rows.push({name:ft,title:ft,url:dp.url||dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
-
-              if (f.ascii || f.hex) {
-                var bt = "BODY ASCII="+(f.ascii||"-").slice(0,48)+" HEX="+(f.hex||"-").slice(0,120);
-                rows.push({name:bt,title:bt,url:dp.url||dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
-              }
+            return Promise.all(probes).then(function(ps) {
+              ps.forEach(function(p) {
+                var t=p.label+" "+String(p.status)+
+                  " HLS"+String(p.hls)+
+                  " HTML"+String(p.html)+
+                  " CT="+(p.ct||"-")+
+                  " HOST="+(p.host||"-")+
+                  " LEN="+(p.len||"-");
+                rows.push({name:t,title:t,url:p.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+                if (p.body) {
+                  var bt=p.label+"BODY · "+p.body.slice(0,90);
+                  rows.push({name:bt,title:bt,url:p.url+"#body",quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+                }
+              });
               return rows;
             });
           });

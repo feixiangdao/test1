@@ -8,6 +8,9 @@ on:
     paths:
       - '.github/workflows/analyze-cinemacity-orch.yml'
 
+permissions:
+  contents: write
+
 jobs:
   analyze:
     runs-on: ubuntu-latest
@@ -15,54 +18,146 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Fetch detail page and locate libs.js
+      - name: Capture detail page, libs.js and orchestration source
         shell: bash
         run: |
-          mkdir -p /tmp/cc
+          mkdir -p research/cinemacity-orch
+          OUT=research/cinemacity-orch
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-          curl -sSL -A "$UA" \
-            -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' \
-            -H 'Accept-Language: en-US,en;q=0.9' \
-            -o /tmp/cc/detail.html \
-            -w "DETAIL http=%{http_code} size=%{size_download}\n" \
-            "https://cinemacity.cc/movies/3290-unabomber.html" || true
+          HDR1='Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          HDR2='Accept-Language: en-US,en;q=0.9'
+          PAGE="https://cinemacity.cc/movies/3290-unabomber.html"
 
-          echo "=== head ==="
-          head -c 400 /tmp/cc/detail.html || true
-
-          echo "=== script srcs ==="
-          grep -oiE '<script[^>]*src=["'"'"'][^"'"'"']+["'"'"']' /tmp/cc/detail.html 2>/dev/null | sed -E 's/.*src=["'"'"']([^"'"'"']+).*/\1/' | sort -u || echo "NONE"
-
-          echo "=== libs.js mentions ==="
-          grep -oiE '[^"'"'"' >]*libs\.js[^"'"'"' >]*' /tmp/cc/detail.html 2>/dev/null | sort -u || echo "NONE"
-
-          echo "=== download markup hints ==="
-          grep -oiE 'class="[^"]*(download|modal)[^"]*"' /tmp/cc/detail.html 2>/dev/null | sort -u | head -20 || echo "NONE"
-          grep -oiE 'data-tr_[a-zA-Z0-9_-]+' /tmp/cc/detail.html 2>/dev/null | sort -u | head -20 || echo "NONE"
-
-      - name: Probe likely libs.js paths
-        shell: bash
-        run: |
-          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-          for p in \
-            "templates/cinemacity/js/libs.js" \
-            "templates/CinemaCity/js/libs.js" \
-            "templates/cinemacity/libs.js" \
-            "js/libs.js" ; do
-            out="/tmp/cc/$(echo "$p" | tr '/' '_')"
-            code=$(curl -sSL -A "$UA" -o "$out" -w "%{http_code}" "https://cinemacity.cc/$p" || echo "000")
-            sz=$(wc -c < "$out" 2>/dev/null || echo 0)
-            echo "$code  $sz  $p"
-          done
-
-      - name: Dump any captured libs.js
-        shell: bash
-        run: |
-          echo "=== files ==="
-          ls -la /tmp/cc/ || true
-          for f in /tmp/cc/*libs*; do
-            [ -f "$f" ] || continue
-            echo "=== $f ($(wc -c < "$f") bytes) ==="
-            head -c 300 "$f"
+          {
+            echo "# CinemaCity orchestration capture"
             echo
-          done
+            echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Page: $PAGE"
+            echo
+          } > "$OUT/REPORT.md"
+
+          curl -sSL -A "$UA" -H "$HDR1" -H "$HDR2" -o "$OUT/detail.html" \
+            -w "detail_http=%{http_code} detail_size=%{size_download}\n" "$PAGE" \
+            >> "$OUT/REPORT.md" 2>&1 || true
+
+          echo
+          echo "## script src inventory" >> "$OUT/REPORT.md"
+          echo '```' >> "$OUT/REPORT.md"
+          grep -oiE '<script[^>]*src=["'"'"'][^"'"'"']+["'"'"']' "$OUT/detail.html" 2>/dev/null \
+            | sed -E 's/.*src=["'"'"']([^"'"'"']+).*/\1/' | sort -u >> "$OUT/REPORT.md" || echo NONE >> "$OUT/REPORT.md"
+          echo '```' >> "$OUT/REPORT.md"
+
+          echo
+          echo "## libs.js references in HTML" >> "$OUT/REPORT.md"
+          echo '```' >> "$OUT/REPORT.md"
+          grep -oiE '[^"'"'"' >]*libs\.js[^"'"'"' >]*' "$OUT/detail.html" 2>/dev/null | sort -u >> "$OUT/REPORT.md" || echo NONE >> "$OUT/REPORT.md"
+          echo '```' >> "$OUT/REPORT.md"
+
+          # Build candidate libs.js URLs from what we saw in the HTML, plus fallbacks.
+          : > /tmp/libs_candidates.txt
+          grep -oiE '([A-Za-z0-9_./-]*libs\.js)' "$OUT/detail.html" 2>/dev/null | sort -u >> /tmp/libs_candidates.txt || true
+          cat >> /tmp/libs_candidates.txt <<'CAND'
+/templates/cinemacity/js/libs.js
+/templates/CinemaCity/js/libs.js
+/js/libs.js
+CAND
+
+          echo
+          echo "## libs.js fetch attempts" >> "$OUT/REPORT.md"
+          echo '```' >> "$OUT/REPORT.md"
+          n=0
+          while read -r cand; do
+            [ -n "$cand" ] || continue
+            case "$cand" in
+              http*) url="$cand" ;;
+              /*)    url="https://cinemacity.cc$cand" ;;
+              *)     url="https://cinemacity.cc/$cand" ;;
+            esac
+            n=$((n+1))
+            code=$(curl -sSL -A "$UA" -o "/tmp/libs_$n.js" -w "%{http_code}" "$url" || echo 000)
+            sz=$(wc -c < "/tmp/libs_$n.js" 2>/dev/null || echo 0)
+            echo "$code  $sz  $url" >> "$OUT/REPORT.md"
+            if [ "$code" = "200" ] && [ "$sz" -gt 5000 ]; then
+              cp "/tmp/libs_$n.js" "$OUT/libs.js"
+              echo "CAPTURED $url -> $OUT/libs.js" >> "$OUT/REPORT.md"
+            fi
+          done < /tmp/libs_candidates.txt
+          echo '```' >> "$OUT/REPORT.md"
+
+      - name: Extract orchestration function bodies
+        shell: bash
+        run: |
+          OUT=research/cinemacity-orch
+          if [ ! -f "$OUT/libs.js" ]; then
+            echo "## no libs.js captured — cannot extract" >> "$OUT/REPORT.md"
+            exit 0
+          fi
+          echo >> "$OUT/REPORT.md"
+          echo "## libs.js size: $(wc -c < "$OUT/libs.js") bytes" >> "$OUT/REPORT.md"
+
+          python3 - <<'PY' >> "$OUT/REPORT.md"
+          import re, json
+          src = open('research/cinemacity-orch/libs.js', encoding='utf-8', errors='replace').read()
+          names = ["getProtectedDownloadTarget","parseFileSet","startDownload",
+                   "getSelectedQualityIndex","currentFileSet","makeDownloadHref",
+                   "getTotalSize","normalizeLanguage","buildName","renderItems",
+                   "loadSizeMap","diVideoInit"]
+
+          def slice_fn(text, name):
+              # find "function name(" or "name(...) {"
+              for m in re.finditer(r'function\s+' + re.escape(name) + r'\s*\(', text):
+                  start = m.start()
+                  i = text.find('{', m.end())
+                  if i < 0: continue
+                  depth = 0; j = i
+                  while j < len(text):
+                      c = text[j]
+                      if c == '{': depth += 1
+                      elif c == '}':
+                          depth -= 1
+                          if depth == 0:
+                              return text[start:j+1]
+                      j += 1
+              # arrow / assignment form
+              for m in re.finditer(re.escape(name) + r'\s*=\s*(?:async\s*)?(?:function\s*)?\(', text):
+                  start = m.start()
+                  i = text.find('{', m.end())
+                  if i < 0: continue
+                  depth = 0; j = i
+                  while j < len(text):
+                      c = text[j]
+                      if c == '{': depth += 1
+                      elif c == '}':
+                          depth -= 1
+                          if depth == 0:
+                              return text[start:j+1]
+                      j += 1
+              return None
+
+          print("### function bodies")
+          for n in names:
+              body = slice_fn(src, n)
+              if body:
+                  print(f"\n#### {n}  ({len(body)} chars)\n```javascript\n{body[:6000]}\n```")
+              else:
+                  print(f"\n#### {n}\n```\n<not found as named function>\n```")
+
+          print("\n### makeDownloadHref / getProtectedDownloadTarget call sites")
+          for n in ["makeDownloadHref","getProtectedDownloadTarget","startDownload"]:
+              print(f"\n#### call sites of {n}")
+              hits = [m.start() for m in re.finditer(re.escape(n), src)]
+              print(f"total occurrences: {len(hits)}")
+              for h in hits[:12]:
+                  frag = src[max(0,h-260):h+260].replace('\n',' ')
+                  print(f"- ...{frag}...")
+          PY
+
+      - name: Commit findings
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f research/cinemacity-orch/detail.html
+          git add research/cinemacity-orch
+          git commit -m "Capture CinemaCity libs.js orchestration analysis" || echo "nothing to commit"
+          git push

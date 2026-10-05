@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.34.0",
+  "version": "4.35.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1206,6 +1206,45 @@
       ],
       "filename": "providers/atlantic-artemis.js",
       "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-cinema-army-cookiebakers",
+      "name": "NoctraTV · Cinema.army · Cookiebakers",
+      "description": "Current noctratv.com Cinema.army Cookiebakers source. Uses the MZone compatibility playback session locally, appends mz_lease to the root proxy URL, and returns direct HLS with a static playback-lease header for child and segment requests.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/cinema-army-cookiebakers.js",
+      "enabled": false,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-oneshows-ethan",
+      "name": "NoctraTV · 1Shows · Ethan",
+      "description": "Current noctratv.com 1Shows Ethan movie source. Uses the MZone compatibility playback session locally, appends mz_lease to the root proxy URL, and returns direct HLS with a static playback-lease header for child and segment requests.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/oneshows-ethan.js",
+      "enabled": false,
       "formats": [
         "m3u8"
       ],

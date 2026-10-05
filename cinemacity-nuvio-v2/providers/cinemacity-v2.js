@@ -794,7 +794,7 @@ function searchVariant(label, url, method, body) {
 
   return fetch(url, opts).then(function(r) {
     return r.text().then(function(html) {
-      var info = inspectSearchBody(html, "The Matrix", "1999");
+      var info = inspectSearchBody(html, query, expectedYear || "");
       return {
         label: label,
         status: r.status,
@@ -944,7 +944,7 @@ function unwrapDleSearchPayload(raw) {
   };
 }
 
-function ajaxSearchProbe(label, endpoint, hash, query, thisUrl) {
+function ajaxSearchProbe(label, endpoint, hash, query, thisUrl, expectedYear) {
   var headers = baseHeaders(BASE + "/", true);
   headers["Origin"] = BASE;
   headers["Referer"] = BASE + "/";
@@ -1698,7 +1698,7 @@ function searchAndCandidateProbe() {
       var hash = boot.hash || "";
 
       if (!hash) {
-        var fail = "CCDIAG v0.5.3 K0 NEXT=COOKIE_OR_HASH";
+        var fail = "CCDIAG v0.6.0 K0 NEXT=COOKIE_OR_HASH";
         return [{
           name:fail,title:fail,
           url:BASE+"/#"+encodeURIComponent(fail),
@@ -1710,7 +1710,7 @@ function searchAndCandidateProbe() {
         .then(function(x) {
           var item = (x.info.items || [])[0] || null;
           if (!item || !item.url) {
-            var fail = "CCDIAG v0.5.3 K1 Q0 NEXT=SEARCH";
+            var fail = "CCDIAG v0.6.0 K1 Q0 NEXT=SEARCH";
             return [{
               name:fail,title:fail,
               url:BASE+"/#"+encodeURIComponent(fail),
@@ -1720,7 +1720,7 @@ function searchAndCandidateProbe() {
 
           var newsId = parseNewsId(item.url);
           if (!newsId) {
-            var fail = "CCDIAG v0.5.3 K1 Q1 ID0 NEXT=NEWSID";
+            var fail = "CCDIAG v0.6.0 K1 Q1 ID0 NEXT=NEWSID";
             return [{
               name:fail,title:fail,
               url:BASE+"/#"+encodeURIComponent(fail),
@@ -1775,7 +1775,7 @@ function searchAndCandidateProbe() {
               }
               if (goodHls) {
                 var hs = hlsProbeStream(goodHls, item.url);
-                var hr = "CC53 USE_HLS " + goodHls.label + compactCode(goodHls) +
+                var hr = "CC60 USE_HLS " + goodHls.label + compactCode(goodHls) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return hs ? [diagnosticRow(hr), hs] : [diagnosticRow(hr)];
               }
@@ -1784,7 +1784,7 @@ function searchAndCandidateProbe() {
               // return those direct streams.
               var directRows = directStreamsFromRoutes(alts);
               if (directRows.length) {
-                var dr = "CC53 USE_DIRECT N" + String(directRows.length) +
+                var dr = "CC60 USE_DIRECT N" + String(directRows.length) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return [diagnosticRow(dr)].concat(directRows);
               }
@@ -1807,7 +1807,7 @@ function searchAndCandidateProbe() {
                   "/R" + compactCode(hlsMap.R);
 
                 if (ds) {
-                  var ok = "CC53 USE_DL " + String(f.status || 0) +
+                  var ok = "CC60 USE_DL " + String(f.status || 0) +
                     " R" + String(f.rangeOk || 0) +
                     " T" + String(f.ftyp || 0) +
                     " ID" + String(newsId) + " DH" + String(dh.media || 0);
@@ -1815,7 +1815,7 @@ function searchAndCandidateProbe() {
                 }
 
                 var m = dp && dp.manual ? dp.manual : {};
-                var fail = "CC53 O" + compactCode(hlsMap.O) +
+                var fail = "CC60 O" + compactCode(hlsMap.O) +
                   " L" + compactCode(hlsMap.L) +
                   " R" + compactCode(hlsMap.R) +
                   " M" + String(m.status || 0) +
@@ -1830,12 +1830,188 @@ function searchAndCandidateProbe() {
     });
   }).catch(function(e) {
     var msg=e&&e.message?e.message:String(e||"error");
-    var report="CCDIAG v0.5.3 ERR="+msg.slice(0,60);
+    var report="CCDIAG v0.6.0 ERR="+msg.slice(0,60);
     return [{
       name:report,title:report,
       url:BASE+"/#"+encodeURIComponent(report),
       quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
     }];
+  });
+}
+
+
+function safeFileName(s) {
+  return clean(s).replace(/[^a-z0-9._ -]+/gi, " ").replace(/\s+/g, " ").trim().slice(0,80) || "cinemacity";
+}
+
+function buildDhDownloadUrl(videoPath, audioPath, hash, name) {
+  return BASE + "/engine/ajax/controller.php?mod=dh&action=download" +
+    "&video=" + encodeURIComponent(videoPath || "") +
+    (audioPath ? "&audio=" + encodeURIComponent(audioPath) : "") +
+    "&name=" + encodeURIComponent(safeFileName(name) + ".mp4") +
+    "&user_hash=" + encodeURIComponent(hash || "");
+}
+
+function mediaQualityRank(path) {
+  var s = clean(path).toLowerCase();
+  if (/2160|4k|uhd/.test(s)) return 600;
+  if (/1440/.test(s)) return 500;
+  if (/1080/.test(s)) return 400;
+  if (/720/.test(s)) return 300;
+  if (/480/.test(s)) return 200;
+  if (/360/.test(s)) return 100;
+  return 10;
+}
+
+function pickBestSearchItem(info, meta) {
+  if (!info) return null;
+  if (info.match && info.match.url) return info.match;
+
+  var want = normalizeTitle(meta && meta.title);
+  var alt = normalizeTitle(meta && meta.originalTitle);
+  var year = clean(meta && meta.year);
+  var best = null, bestScore = -999;
+
+  (info.items || []).forEach(function(item) {
+    var gotA = normalizeTitle(item.title);
+    var gotS = normalizeTitle(item.slugTitle);
+    var score = 0;
+
+    [want, alt].forEach(function(w) {
+      if (!w) return;
+      if (gotA === w || gotS === w) score += 12;
+      else if ((gotA && (gotA.indexOf(w) >= 0 || w.indexOf(gotA) >= 0)) ||
+               (gotS && (gotS.indexOf(w) >= 0 || w.indexOf(gotS) >= 0))) score += 6;
+    });
+
+    if (year) {
+      if (item.slugYear === year) score += 5;
+      else if ((clean(item.title) + " " + clean(item.url)).indexOf(year) >= 0) score += 3;
+      else if (item.slugYear) score -= 4;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = item;
+    }
+  });
+
+  return bestScore >= 8 ? best : null;
+}
+
+function searchCinemaCityItem(meta) {
+  var queries = [];
+  [meta && meta.title, meta && meta.originalTitle].forEach(function(q) {
+    q = clean(q);
+    if (q && queries.indexOf(q) < 0) queries.push(q);
+  });
+  if (!queries.length) return Promise.reject(new Error("CinemaCity search title missing"));
+
+  function one(query) {
+    var bootstrapUrl = BASE + "/index.php?do=search";
+    var headers = baseHeaders(BASE + "/", true);
+    headers["X-Requested-With"] = "XMLHttpRequest";
+    headers["Origin"] = BASE;
+    headers["Content-Type"] = "application/x-www-form-urlencoded";
+    var body = "do=search&subaction=search&story=" + encodeURIComponent(query);
+
+    return fetch(bootstrapUrl, {
+      method:"POST",
+      headers:headers,
+      body:body
+    }).then(function(r) {
+      return r.text().then(function(html) {
+        if (challengeHtml(html)) throw new Error("CinemaCity Cloudflare challenge");
+        var boot = inspectSearchBody(html, query, meta.year || "");
+        var hash = boot.hash || "";
+        if (!hash) throw new Error("CinemaCity search hash missing");
+
+        var fromBoot = pickBestSearchItem(boot, meta);
+        if (fromBoot && fromBoot.url) {
+          return { item:fromBoot, hash:hash };
+        }
+
+        return ajaxSearchProbe(
+          "DYNAMIC",
+          "/engine/mods/dle_search/ajax.php",
+          hash,
+          query,
+          "/",
+          meta.year || ""
+        ).then(function(x) {
+          var item = pickBestSearchItem(x.info, meta);
+          if (!item || !item.url) throw new Error("CinemaCity search no strict match");
+          return { item:item, hash:hash };
+        });
+      });
+    });
+  }
+
+  var chain = Promise.reject(new Error("CinemaCity search failed"));
+  queries.forEach(function(q) {
+    chain = chain.catch(function() { return one(q); });
+  });
+  return chain;
+}
+
+function dhStreamsForMeta(meta) {
+  return searchCinemaCityItem(meta).then(function(found) {
+    var item = found.item;
+    var hash = found.hash;
+    var newsId = parseNewsId(item.url);
+    if (!newsId) throw new Error("CinemaCity news_id missing");
+
+    return dhSizesProbe(newsId, hash, item.url).then(function(dh) {
+      var keys = [], seen = {};
+      (dh.mediaKeys || []).forEach(function(k) {
+        if (!k || seen[k]) return;
+        seen[k] = 1;
+        keys.push(k);
+      });
+
+      var videos = keys.filter(function(k){ return /\.mp4(?:$|[?#])/i.test(k); });
+      var audios = keys.filter(function(k){ return /\.m4a(?:$|[?#])/i.test(k); });
+      if (!videos.length) throw new Error("CinemaCity DH returned no video variants");
+
+      videos.sort(function(a,b) {
+        return mediaQualityRank(b) - mediaQualityRank(a);
+      });
+
+      var audio = audios.length ? audios[0] : "";
+      var rows = [];
+      var seenQ = {};
+
+      videos.forEach(function(video, idx) {
+        if (rows.length >= 6) return;
+        var q = qualityOf(video, video);
+        // Keep one stream per recognized quality; retain up to two Auto variants.
+        var qKey = q === "Auto" ? ("Auto" + String(idx < 2 ? idx : 2)) : q;
+        if (seenQ[qKey]) return;
+        seenQ[qKey] = 1;
+
+        var url = buildDhDownloadUrl(
+          video,
+          audio,
+          hash,
+          (meta.title || meta.originalTitle || "CinemaCity") + " " + q
+        );
+
+        var label = "CinemaCity · " + q + " · MP4";
+        rows.push({
+          name:label,
+          title:label,
+          url:url,
+          quality:q,
+          type:"mp4",
+          provider:"cinemacity-v2-login",
+          headers:playbackHeaders(url, item.url, true),
+          subtitles:[]
+        });
+      });
+
+      console.log("[CinemaCity] DH news_id=" + newsId + " variants=" + rows.length);
+      return rows;
+    });
   });
 }
 
@@ -1863,20 +2039,25 @@ function getStreams(tmdbId, mediaType, season, episode) {
   console.log("[CinemaCity] movie tmdb=" + tmdbId);
 
   var stage = "TMDB";
+  var resolvedMeta = null;
   return tmdbMeta(tmdbId, mediaType)
     .then(function(meta) {
-      stage = "SEARCH";
-      return locateDetail(meta, mediaType);
-    })
-    .then(function(detail) {
-      stage = "PLAYER";
-      return resolveFromDetail(detail);
+      resolvedMeta = meta;
+      stage = "DH";
+      return dhStreamsForMeta(meta).catch(function(e) {
+        console.log("[CinemaCity] DH fallback: " + (e && e.message ? e.message : e));
+        stage = "SEARCH";
+        return locateDetail(meta, mediaType).then(function(detail) {
+          stage = "PLAYER";
+          return resolveFromDetail(detail);
+        });
+      });
     })
     .then(function(streams) {
       streams = dedupeStreams(streams);
       console.log("[CinemaCity] streams=" + streams.length);
       if (!streams.length) {
-        return diagnosticResult("NO_MEDIA", "Authenticated page matched, but no direct HLS/MP4/DASH was exposed");
+        return diagnosticResult("NO_MEDIA", "Matched CinemaCity title but no playable DH/direct stream was found");
       }
       return streams;
     })

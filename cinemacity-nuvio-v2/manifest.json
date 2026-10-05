@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "description": "CinemaCity V2 PlayerJS HLS resolver. Preserves CinemaCity's comma-containing .urlset/master.m3u8 URL as one master playlist instead of incorrectly splitting it into MP4 component files.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
       "description": "PlayerJS HLS resolver. The full URLSET master is returned intact with Cookie, User-Agent and Referer headers; MP4/M4A component files are no longer exposed as watch streams.",
-      "version": "0.6.4",
+      "version": "0.6.5",
       "supportedTypes": [
         "movie"
       ],

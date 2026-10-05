@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Quality Lab",
-  "version": "0.7.4",
-  "description": "CinemaCity Quality Lab with tiny-response classification for the official DH download endpoint. HDPROBE3 distinguishes real media-range behavior from small text/status payloads such as premium/denied/invalid responses.",
+  "version": "0.7.5",
+  "description": "CinemaCity Quality Lab with more reliable movie matching. It now searches CinemaCity by TMDB-derived IMDb id first, then title/original title, and uses a less brittle catalog fallback before running HDPROBE3.",
   "scrapers": [
     {
       "id": "cinemacity-quality-070",
       "name": "CinemaCity Quality · Login Session",
-      "description": "Quality resolver + HDPROBE3. Classifies tiny official DH responses (PREMIUM/DENIED/INVALID/etc.) before attempting a second range request; no premium entitlement bypass is attempted.",
-      "version": "0.7.4",
+      "description": "Quality resolver + HDPROBE3 with IMDb-first CinemaCity lookup to reduce catalog no-match failures on alternate titles.",
+      "version": "0.7.5",
       "supportedTypes": [
         "movie"
       ],

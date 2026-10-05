@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.5.3",
-  "description": "CinemaCity V2 DH playback build. Accepts CinemaCity partial-content responses when HTTP 206 plus Content-Range or MP4 signature confirms the media stream.",
+  "version": "0.6.0",
+  "description": "CinemaCity V2 dynamic movie resolver. Maps the requested TMDB movie to CinemaCity, reads authenticated DH variants, and returns playable MP4 streams with the browser session.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "DH playback probe. Test Provider accepts HTTP 206 partial-content as playable when Content-Range or MP4 signature confirms the stream.",
-      "version": "0.5.3",
+      "description": "Dynamic movie resolver. Normal playback now uses CinemaCity search + authenticated DH variants; Test Provider remains available as a session/playback check.",
+      "version": "0.6.0",
       "supportedTypes": [
         "movie"
       ],

@@ -1,0 +1,28 @@
+{
+  "name": "CinemaCity Quality 0.7.3 Restore",
+  "version": "0.7.8",
+  "description": "Cache-bypass restore build using the exact user-confirmed working v0.7.3 provider logic under a brand-new manifest path, scraper ID and provider filename.",
+  "scrapers": [
+    {
+      "id": "cinemacity-quality-073-restore",
+      "name": "CinemaCity Quality 0.7.3 Restore",
+      "description": "Exact v0.7.3 CinemaCity Quality logic, republished under a fresh scraper identity to bypass Nuvio provider-code caching.",
+      "version": "0.7.8",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/cinemacity-quality-073.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true,
+      "hasSettings": true
+    }
+  ]
+}

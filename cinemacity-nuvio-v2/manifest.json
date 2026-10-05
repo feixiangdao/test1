@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.4.7",
-  "description": "CinemaCity V2 alternate-detail diagnostic. Tests DLE internal routes for the known news_id to see whether any bypass the protected pretty URL and expose atob/public_files data.",
+  "version": "0.5.0",
+  "description": "CinemaCity V2 one-shot diagnostic. Test Provider now runs all key probes automatically and returns one compact CCDIAG summary instead of many rows/screenshots.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity alternate-detail diagnostic. PRETTY/NEWSID/ROOTID/FULL/SHOW/PRINT report CF/guest/atob/public_files/direct-media counts.",
-      "version": "0.4.7",
+      "description": "One-shot diagnostic. Run Test Provider once and share only the single CCDIAG row.",
+      "version": "0.5.0",
       "supportedTypes": [
         "movie"
       ],

@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.4.4",
-  "description": "CinemaCity V2 DH response inspector. Separates manual redirect vs followed response and shows Location, Content-Disposition, MIME, Content-Range and the first 64 response bytes.",
+  "version": "0.4.5",
+  "description": "CinemaCity V2 reconstructed-HLS probe. Uses the working DH media-key list to test same-origin /public_files/<files>.urlset/master.m3u8 candidates instead of the incorrect controller action=download route.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "DH response inspector. MANUAL shows redirect headers; FOLLOW shows actual response; BODY shows first bytes without downloading the full file.",
-      "version": "0.4.4",
+      "description": "Reconstructed HLS diagnostic. ALL tests the full comma-separated media set; ONE tests a selected video path. HLS1 means a real #EXTM3U response.",
+      "version": "0.4.5",
       "supportedTypes": [
         "movie"
       ],

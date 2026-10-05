@@ -1481,6 +1481,8 @@ function dhDownloadProbe(videoPath, audioPath, hash, referer) {
     return r.arrayBuffer().then(function(buf) {
       var pv = bytesPreview(buf);
       var mediaCt = /^(video\/|audio\/|application\/(?:vnd\.apple\.mpegurl|x-mpegURL|octet-stream))/i.test(h.ct || "");
+      var hasRange = /bytes\s+\d+-\d+\/\d+/i.test(h.cr || "");
+      var hasFtyp = /ftyp/i.test(pv.ascii || "");
       return {
         status:r.status,
         ct:h.ct,
@@ -1489,18 +1491,21 @@ function dhDownloadProbe(videoPath, audioPath, hash, referer) {
         cd:h.cd,
         finalUrl:finalUrl,
         host:host,
-        ok:((r.status === 200 || r.status === 206) && mediaCt) ? 1 : 0,
+        ok:((r.status === 200 || r.status === 206) && (mediaCt || hasRange || hasFtyp)) ? 1 : 0,
         hex:pv.hex,
         ascii:pv.ascii,
+        rangeOk:hasRange ? 1 : 0,
+        ftyp:hasFtyp ? 1 : 0,
         url:url
       };
     }).catch(function() {
       var mediaCt = /^(video\/|audio\/|application\/(?:vnd\.apple\.mpegurl|x-mpegURL|octet-stream))/i.test(h.ct || "");
+      var hasRange = /bytes\s+\d+-\d+\/\d+/i.test(h.cr || "");
       return {
         status:r.status, ct:h.ct, cr:h.cr, len:h.cl, cd:h.cd,
         finalUrl:finalUrl, host:host,
-        ok:((r.status === 200 || r.status === 206) && mediaCt) ? 1 : 0,
-        hex:"", ascii:"", url:url
+        ok:((r.status === 200 || r.status === 206) && (mediaCt || hasRange)) ? 1 : 0,
+        hex:"", ascii:"", rangeOk:hasRange ? 1 : 0, ftyp:0, url:url
       };
     });
   }).catch(function(e) {
@@ -1693,7 +1698,7 @@ function searchAndCandidateProbe() {
       var hash = boot.hash || "";
 
       if (!hash) {
-        var fail = "CCDIAG v0.5.2 K0 NEXT=COOKIE_OR_HASH";
+        var fail = "CCDIAG v0.5.3 K0 NEXT=COOKIE_OR_HASH";
         return [{
           name:fail,title:fail,
           url:BASE+"/#"+encodeURIComponent(fail),
@@ -1705,7 +1710,7 @@ function searchAndCandidateProbe() {
         .then(function(x) {
           var item = (x.info.items || [])[0] || null;
           if (!item || !item.url) {
-            var fail = "CCDIAG v0.5.2 K1 Q0 NEXT=SEARCH";
+            var fail = "CCDIAG v0.5.3 K1 Q0 NEXT=SEARCH";
             return [{
               name:fail,title:fail,
               url:BASE+"/#"+encodeURIComponent(fail),
@@ -1715,7 +1720,7 @@ function searchAndCandidateProbe() {
 
           var newsId = parseNewsId(item.url);
           if (!newsId) {
-            var fail = "CCDIAG v0.5.2 K1 Q1 ID0 NEXT=NEWSID";
+            var fail = "CCDIAG v0.5.3 K1 Q1 ID0 NEXT=NEWSID";
             return [{
               name:fail,title:fail,
               url:BASE+"/#"+encodeURIComponent(fail),
@@ -1770,7 +1775,7 @@ function searchAndCandidateProbe() {
               }
               if (goodHls) {
                 var hs = hlsProbeStream(goodHls, item.url);
-                var hr = "CC52 USE_HLS " + goodHls.label + compactCode(goodHls) +
+                var hr = "CC53 USE_HLS " + goodHls.label + compactCode(goodHls) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return hs ? [diagnosticRow(hr), hs] : [diagnosticRow(hr)];
               }
@@ -1779,7 +1784,7 @@ function searchAndCandidateProbe() {
               // return those direct streams.
               var directRows = directStreamsFromRoutes(alts);
               if (directRows.length) {
-                var dr = "CC52 USE_DIRECT N" + String(directRows.length) +
+                var dr = "CC53 USE_DIRECT N" + String(directRows.length) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return [diagnosticRow(dr)].concat(directRows);
               }
@@ -1802,13 +1807,15 @@ function searchAndCandidateProbe() {
                   "/R" + compactCode(hlsMap.R);
 
                 if (ds) {
-                  var ok = "CC52 USE_DL " + String(f.status || 0) +
+                  var ok = "CC53 USE_DL " + String(f.status || 0) +
+                    " R" + String(f.rangeOk || 0) +
+                    " T" + String(f.ftyp || 0) +
                     " ID" + String(newsId) + " DH" + String(dh.media || 0);
                   return [diagnosticRow(ok), ds];
                 }
 
                 var m = dp && dp.manual ? dp.manual : {};
-                var fail = "CC52 O" + compactCode(hlsMap.O) +
+                var fail = "CC53 O" + compactCode(hlsMap.O) +
                   " L" + compactCode(hlsMap.L) +
                   " R" + compactCode(hlsMap.R) +
                   " M" + String(m.status || 0) +
@@ -1823,7 +1830,7 @@ function searchAndCandidateProbe() {
     });
   }).catch(function(e) {
     var msg=e&&e.message?e.message:String(e||"error");
-    var report="CCDIAG v0.5.2 ERR="+msg.slice(0,60);
+    var report="CCDIAG v0.5.3 ERR="+msg.slice(0,60);
     return [{
       name:report,title:report,
       url:BASE+"/#"+encodeURIComponent(report),

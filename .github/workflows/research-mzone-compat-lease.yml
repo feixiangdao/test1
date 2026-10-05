@@ -1,0 +1,140 @@
+name: Research MZone compatibility lease
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-mzone-compat-lease.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe basic session with mz_lease
+        run: |
+          node - <<'NODE'
+          const BASE='https://api.m-zone.org';
+          const ORIGIN='https://noctratv.com';
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
+          const enc=new TextEncoder();
+
+          function b64url(bytes){
+            return Buffer.from(new Uint8Array(bytes)).toString('base64')
+              .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+          }
+          function cookieFrom(res){
+            const sc=res.headers.get('set-cookie')||'';
+            return sc.split(',').map(x=>x.split(';')[0].trim()).filter(Boolean).join('; ');
+          }
+          function abs(u,b){try{return new URL(u,b).toString()}catch{return u}}
+
+          async function basicSession(){
+            const cr=await fetch(BASE+'/api/player/v2/challenge',{
+              headers:{'User-Agent':UA,Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/'}
+            });
+            const ch=await cr.json(),c1=cookieFrom(cr);
+            const signKey=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);
+            const pub=await crypto.subtle.exportKey('jwk',signKey.publicKey);
+            const sig=await crypto.subtle.sign(
+              {name:'ECDSA',hash:'SHA-256'},signKey.privateKey,
+              enc.encode(ch.challengeId+'.'+ch.nonce+'.'+ch.issuedAt)
+            );
+            const payload={
+              challengeId:ch.challengeId,nonce:ch.nonce,publicKey:pub,signature:b64url(sig),
+              fingerprint:{
+                webdriver:false,languages:['en-US','en'],plugins:5,hardwareConcurrency:8,deviceMemory:8,
+                maxTouchPoints:5,platform:'Android',
+                brands:[{brand:'Chromium',version:'140'},{brand:'Google Chrome',version:'140'}],
+                mobile:true,timezone:'Asia/Shanghai',
+                screen:{width:1080,height:2400,colorDepth:24,pixelRatio:2.75},visibilityState:'visible'
+              },
+              embedded:false,embedOrigin:'',sandboxed:false,turnstileToken:'',
+              supportsEncryptedTransport:false,
+              supportsEncryptedCapabilities:false,
+              transportPublicKey:null,
+              playerVersion:'mplayer-web-v2',playbackSessionVersion:2,
+              capabilities:['hls','dash','codec-avc']
+            };
+            const sr=await fetch(BASE+'/api/player/v2/session',{
+              method:'POST',
+              headers:{'User-Agent':UA,'Content-Type':'application/json',Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/',...(c1?{Cookie:c1}:{})},
+              body:JSON.stringify(payload)
+            });
+            const sj=await sr.json().catch(()=>({}));
+            const cookie=[c1,cookieFrom(sr)].filter(Boolean).join('; ');
+            console.log('SESSION status='+sr.status+' success='+!!sj.success+' mode='+(sj.mode||'')+' transport='+(sj.transport&&sj.transport.version||0));
+            if(!sr.ok||!sj.token)throw new Error(sj.error||'session failed');
+            return {token:sj.token,cookie};
+          }
+
+          async function resolve(id,s,type='movie'){
+            const body={codecCapabilities:{},type,tmdbId:type==='movie'?'238':'1399'};
+            if(type==='tv'){body.season='1';body.episode='1';}
+            const rr=await fetch(BASE+'/mplayer/'+id+'/resolve',{
+              method:'POST',
+              headers:{
+                'User-Agent':UA,'Content-Type':'application/json',Accept:'application/json',
+                Origin:ORIGIN,Referer:ORIGIN+'/','X-MZone-Playback-Lease':s.token,
+                ...(s.cookie?{Cookie:s.cookie}:{})
+              },
+              body:JSON.stringify(body)
+            });
+            const j=await rr.json().catch(()=>({}));
+            const r=j.result||{},raw=r.url||r.playlist||r.file||'';
+            console.log('RESOLVE '+id+' status='+rr.status+' success='+!!j.success+' rawPath='+(raw?new URL(raw).pathname:''));
+            if(!raw)throw new Error(j.error||'no url');
+            const u=new URL(raw);
+            u.searchParams.set('mz_lease',s.token);
+            return u.toString();
+          }
+
+          async function probeMaster(url,s){
+            const r=await fetch(url,{headers:{'User-Agent':UA,...(s.cookie?{Cookie:s.cookie}:{})}});
+            const body=await r.text().catch(()=> '');
+            console.log('MASTER status='+r.status+' ct='+(r.headers.get('content-type')||'')+' prefix='+body.slice(0,80).replace(/\s+/g,' '));
+            if(r.status!==200||!body.startsWith('#EXTM3U'))return;
+            const lines=body.split(/\r?\n/);
+            const media=lines.map(x=>x.trim()).filter(x=>x&&x[0]!=='#');
+            console.log('URL_COUNT '+media.length);
+            media.slice(0,8).forEach((m,i)=>{
+              const u=new URL(abs(m,url));
+              console.log('  URL '+i+' host='+u.hostname+' path='+u.pathname+' queryKeys='+[...u.searchParams.keys()].join(','));
+            });
+            if(media[0]){
+              let first=abs(media[0],url);
+              const fu=new URL(first);
+              if(fu.hostname.endsWith('m-zone.org')&&!fu.searchParams.has('mz_lease')){
+                fu.searchParams.set('mz_lease',s.token);
+                first=fu.toString();
+              }
+              const vr=await fetch(first,{headers:{'User-Agent':UA,...(s.cookie?{Cookie:s.cookie}:{})}});
+              const vb=await vr.text().catch(()=> '');
+              console.log('FIRST_CHILD status='+vr.status+' ct='+(vr.headers.get('content-type')||'')+' prefix='+vb.slice(0,80).replace(/\s+/g,' '));
+              if(vr.status===200&&vb.startsWith('#EXTM3U')){
+                const segLine=vb.split(/\r?\n/).map(x=>x.trim()).find(x=>x&&x[0]!=='#');
+                if(segLine){
+                  let seg=abs(segLine,first);
+                  const su=new URL(seg);
+                  if(su.hostname.endsWith('m-zone.org')&&!su.searchParams.has('mz_lease')){su.searchParams.set('mz_lease',s.token);seg=su.toString();}
+                  const sr=await fetch(seg,{headers:{'User-Agent':UA,Range:'bytes=0-1023',...(s.cookie?{Cookie:s.cookie}:{})}});
+                  console.log('SEGMENT status='+sr.status+' ct='+(sr.headers.get('content-type')||'')+' host='+new URL(seg).hostname+' queryKeys='+[...new URL(seg).searchParams.keys()].join(','));
+                }
+              }
+            }
+          }
+
+          (async()=>{
+            const s=await basicSession();
+            for(const id of ['site-streamvault-silver','site-cinema-army-cookiebakers','site-oneshows-ethan']){
+              try{
+                const u=await resolve(id,s,'movie');
+                console.log('LEASED '+id+' path='+new URL(u).pathname+' queryKeys='+[...new URL(u).searchParams.keys()].join(','));
+                await probeMaster(u,s);
+              }catch(e){console.log(id+' ERROR '+e.message)}
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

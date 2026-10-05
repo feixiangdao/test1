@@ -1786,7 +1786,7 @@ function searchAndCandidateProbe() {
               }
               if (goodHls) {
                 var hs = hlsProbeStream(goodHls, item.url);
-                var hr = "CC71 USE_HLS " + goodHls.label + compactCode(goodHls) +
+                var hr = "CC72 USE_HLS " + goodHls.label + compactCode(goodHls) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return hs ? [diagnosticRow(hr), hs] : [diagnosticRow(hr)];
               }
@@ -1795,7 +1795,7 @@ function searchAndCandidateProbe() {
               // return those direct streams.
               var directRows = directStreamsFromRoutes(alts);
               if (directRows.length) {
-                var dr = "CC71 USE_DIRECT N" + String(directRows.length) +
+                var dr = "CC72 USE_DIRECT N" + String(directRows.length) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return [diagnosticRow(dr)].concat(directRows);
               }
@@ -1818,7 +1818,7 @@ function searchAndCandidateProbe() {
                   "/R" + compactCode(hlsMap.R);
 
                 if (ds) {
-                  var ok = "CC71 USE_DL " + String(f.status || 0) +
+                  var ok = "CC72 USE_DL " + String(f.status || 0) +
                     " R" + String(f.rangeOk || 0) +
                     " T" + String(f.ftyp || 0) +
                     " ID" + String(newsId) + " DH" + String(dh.media || 0);
@@ -1826,7 +1826,7 @@ function searchAndCandidateProbe() {
                 }
 
                 var m = dp && dp.manual ? dp.manual : {};
-                var fail = "CC71 O" + compactCode(hlsMap.O) +
+                var fail = "CC72 O" + compactCode(hlsMap.O) +
                   " L" + compactCode(hlsMap.L) +
                   " R" + compactCode(hlsMap.R) +
                   " M" + String(m.status || 0) +
@@ -2588,12 +2588,115 @@ function playerScriptDiagnostic(html, newsId) {
   var fileLen = clean(payload.rawFile).length;
   var typ = Array.isArray(payload.fileData) ? "A" : (typeof payload.fileData === "object" && payload.fileData ? "O" : "S");
   var us = /\.urlset\/master\.m3u8/i.test(clean(pickMovieFileValue(payload.fileData))) ? 1 : 0;
-  return "CC71 PLAYER A" + String(atobCount) +
+  return "CC72 PLAYER A" + String(atobCount) +
     " F" + String(fileLen) +
     " T" + typ +
     " U" + String(us) +
     " ID" + String(newsId);
 }
+
+function extractLoginHashFromHtml(html) {
+  var m = clean(html).match(/(?:dle_login_hash|dle_hash)\s*[:=]\s*["']([^"']+)["']/i);
+  return m ? clean(m[1]) : "";
+}
+
+function compactQualities(paths) {
+  var seen = {}, out = [];
+  (paths || []).forEach(function(p) {
+    var q = qualityOf(p, p);
+    if (!q || q === "Auto" || seen[q]) return;
+    seen[q] = 1;
+    out.push(q);
+  });
+  out.sort(function(a,b){ return mediaQualityRank(b) - mediaQualityRank(a); });
+  return out.join(",");
+}
+
+function rangeHeaderProbe(url, referer, start) {
+  var end = start + 63;
+  var h = playbackHeaders(url, referer, true);
+  h["Range"] = "bytes=" + String(start) + "-" + String(end);
+  h["Accept"] = "*/*";
+
+  return fetch(url, {method:"GET", headers:h}).then(function(r) {
+    var cr="", cl="", ct="";
+    try { cr = clean(r.headers.get("content-range") || ""); } catch (_) {}
+    try { cl = clean(r.headers.get("content-length") || ""); } catch (_) {}
+    try { ct = clean(r.headers.get("content-type") || ""); } catch (_) {}
+    var okRange = (r.status === 206 && new RegExp("bytes\\s+" + start + "-", "i").test(cr)) ? 1 : 0;
+    return {
+      status:r.status,
+      range:okRange,
+      cr:cr,
+      cl:cl,
+      ct:ct
+    };
+  }).catch(function(e) {
+    return {status:0,range:0,cr:"",cl:"",ct:"",error:e&&e.message?e.message:String(e||"error")};
+  });
+}
+
+function hdDownloadEntitlementProbe(item, detailHtml, newsId) {
+  var hash = extractLoginHashFromHtml(detailHtml || "");
+  if (!hash) {
+    return Promise.resolve(diagnosticRow("HDPROBE HASH0 ID" + String(newsId)));
+  }
+
+  return dhSizesProbe(newsId, hash, item.url).then(function(dh) {
+    var keys = dh.mediaKeys || [];
+    var videos = keys.filter(function(k){ return /\.mp4(?:$|[?#])/i.test(k); });
+    var audios = keys.filter(function(k){ return /\.m4a(?:$|[?#])/i.test(k); });
+    videos.sort(function(a,b){ return mediaQualityRank(b) - mediaQualityRank(a); });
+
+    var qs = compactQualities(videos);
+    var hdVideo = "";
+    for (var i=0;i<videos.length;i++) {
+      if (mediaQualityRank(videos[i]) >= 300) {
+        hdVideo = videos[i];
+        break;
+      }
+    }
+
+    if (!hdVideo) {
+      return diagnosticRow(
+        "HDPROBE S" + String(dh.status || 0) +
+        " V" + String(videos.length) +
+        " HD0 Q=" + (qs || "none") +
+        " ID" + String(newsId)
+      );
+    }
+
+    var audio = audios.length ? audios[0] : "";
+    var q = qualityOf(hdVideo, hdVideo);
+    var dl = buildDhDownloadUrl(
+      hdVideo,
+      audio,
+      hash,
+      "CinemaCity HD entitlement probe " + q
+    );
+
+    return Promise.all([
+      rangeHeaderProbe(dl, item.url, 0),
+      rangeHeaderProbe(dl, item.url, 1048576)
+    ]).then(function(rr) {
+      var a = rr[0] || {}, b = rr[1] || {};
+      var fullRange = (a.range === 1 && b.range === 1) ? 1 : 0;
+      return diagnosticRow(
+        "HDPROBE " + q +
+        " Q=" + (qs || q) +
+        " S" + String(a.status || 0) + "/" + String(b.status || 0) +
+        " R" + String(a.range || 0) + String(b.range || 0) +
+        " ARB" + String(fullRange) +
+        " ID" + String(newsId)
+      );
+    });
+  }).catch(function(e) {
+    return diagnosticRow(
+      "HDPROBE ERR " + clean(e&&e.message?e.message:String(e||"error")).slice(0,80)
+    );
+  });
+}
+
 
 function watchStreamsForMeta(meta) {
   var streamKey = normalizeTitle((meta && (meta.title || meta.originalTitle)) || "") + "|" + clean(meta && meta.year);
@@ -2622,19 +2725,25 @@ function watchStreamsForMeta(meta) {
         if (autoOnly) {
           return expandHlsMasterVariants(fromPlayer[0], item.url).then(function(masterRows) {
             var rows = dedupeStreams(fromPlayer.concat(masterRows || []));
-            FAST_CACHE.streams[streamKey] = {
-              expires: Date.now() + 5 * 60 * 1000,
-              rows: rows
-            };
-            return rows;
+            return hdDownloadEntitlementProbe(item, detail.html || "", newsId).then(function(diag) {
+              var finalRows = rows.concat(diag ? [diag] : []);
+              FAST_CACHE.streams[streamKey] = {
+                expires: Date.now() + 5 * 60 * 1000,
+                rows: finalRows
+              };
+              return finalRows;
+            });
           });
         }
 
-        FAST_CACHE.streams[streamKey] = {
-          expires: Date.now() + 5 * 60 * 1000,
-          rows: fromPlayer
-        };
-        return fromPlayer;
+        return hdDownloadEntitlementProbe(item, detail.html || "", newsId).then(function(diag) {
+          var finalRows = fromPlayer.concat(diag ? [diag] : []);
+          FAST_CACHE.streams[streamKey] = {
+            expires: Date.now() + 5 * 60 * 1000,
+            rows: finalRows
+          };
+          return finalRows;
+        });
       }
 
       var uniq = extractWatchCandidates(detail.html || "", item.url);

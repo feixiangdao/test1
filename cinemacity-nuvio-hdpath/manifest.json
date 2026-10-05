@@ -1,0 +1,28 @@
+{
+  "name": "CinemaCity HD Path Lab",
+  "version": "0.8.0",
+  "description": "Experimental HD-path diagnostic based on the exact working v0.7.3 provider. Compares the old controller.php DH download route with the URLSET-base action=download pattern used by multiple public CinemaCity CloudStream implementations.",
+  "scrapers": [
+    {
+      "id": "cinemacity-hdpath-080",
+      "name": "CinemaCity HD Path Lab",
+      "description": "Keeps the working v0.7.3 search/playback path intact and adds one HDPATH diagnostic. It probes only the configured account's own official CinemaCity session.",
+      "version": "0.8.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/cinemacity-hdpath.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true,
+      "hasSettings": true
+    }
+  ]
+}

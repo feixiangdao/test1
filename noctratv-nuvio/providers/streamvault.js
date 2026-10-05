@@ -251,8 +251,10 @@ function resolveOne(src,tmdbId,mediaType,season,episode,sess){
       }
       return validate(u,typ,mediaHeaders).then(function(v){
         if(!v)return null;
+        var mh=Number(x.maxHeight)||0;
         var rq=clean(x.quality||x.label);
-        var q=clean(x.maxHeight)?(Number(x.maxHeight)>=2160?"4K":String(x.maxHeight)+"p"):(rq||v.quality);
+        if(!/(?:2160|1440|1080|720|576|540|480|360|4k)/i.test(rq))rq="";
+        var q=mh>0?(mh>=2160?"4K":String(mh)+"p"):(rq||v.quality||"Auto");
         var name="NoctraTV · StreamVault · "+src.label+" · "+q;
         return{
           name:name,title:name,url:v.url,quality:q,type:v.type,

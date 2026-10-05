@@ -16,12 +16,18 @@ function abs(x,b){try{return new URL(x,b).href}catch{return''}}
   srcs.push('https://noctratv.com/assets/vortexApiSource-B-QupYve.js');
   for(const u of [...new Set(srcs)]){
     let s;try{s=await txt(u)}catch(e){console.log('ERR '+u+' '+e.message);continue}
-    if(!/corazon|kickassanime|anikai/i.test(s))continue;
+    var isVortex=/vortexApiSource/i.test(u);
+    if(!isVortex && !/corazon|kickassanime|anikai|zstream-tokyo/i.test(s))continue;
     console.log('ASSET '+u+' bytes='+s.length);
     const domains=[...new Set((s.match(/https?:\\?\/\\?\/[^"'\x60\\s)]+/g)||[])
       .map(x=>x.replace(/\\\//g,'/')).map(x=>{try{return new URL(x).hostname}catch{return''}}).filter(Boolean))];
     console.log('DOMAINS '+domains.join(' | '));
-    for(const key of ['corazon','kickassanime','anikai','/mplayer/','zstream-tokyo-barcelona-sub','sourceId','family===','family==','case"tokyo"',"case'tokyo'",'zstream-tokyo-']){
+    for(const key of [
+      'corazon','kickassanime','anikai','zstream-tokyo-',
+      'withVortexApiSource','runSourceScraper','sourceId','sourceOrder',
+      '/api/','/resolve','m-zone','api.m-zone.org','X-Token','vortex',
+      'playbackSession','sessionId','site-streamvault'
+    ]){
       let p=0,n=0;
       while((p=s.toLowerCase().indexOf(key,p))>=0 && n<30){
         n++;

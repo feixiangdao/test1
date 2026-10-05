@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.4.1",
-  "description": "CinemaCity V2 media-wiring diagnostic. DH values and JS wiring are shown before file-name previews so the useful rows fit on screen.",
+  "version": "0.4.2",
+  "description": "CinemaCity V2 media-wiring probe. Scans inline HTML and up to five non-library scripts for DH/SIZES/DOWNLOAD/FILES/URLSET logic; hides numeric size values.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity media-wiring diagnostic. Output order: DH → VAL → JS → FILE.",
-      "version": "0.4.1",
+      "description": "CinemaCity wiring probe. Output prioritizes INLINE and JS rows; numeric DH size values are omitted.",
+      "version": "0.4.2",
       "supportedTypes": [
         "movie"
       ],

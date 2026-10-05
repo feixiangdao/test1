@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.37.0",
+  "version": "4.38.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1237,7 +1237,7 @@
     {
       "id": "noctra-oneshows-ethan",
       "name": "NoctraTV · 1Shows · Ethan",
-      "description": "Current noctratv.com 1Shows Ethan movie source. Uses the MZone compatibility playback session locally, appends mz_lease to the root proxy URL, and returns direct HLS with a static playback-lease header for child and segment requests.",
+      "description": "Current noctratv.com 1Shows Ethan movie source. A prior resolver probe returned a 720p MZone stream, but isolated re-test now returns 424 standalone dependency failed; kept disabled until upstream recovers.",
       "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
@@ -1256,15 +1256,15 @@
     {
       "id": "noctra-nextbox-vaplayer",
       "name": "NoctraTV · Nextbox · VaPlayer",
-      "description": "Current noctratv.com Nextbox VaPlayer source. NoctraTV source catalog maps this family to the same source:vaplayer module already verified under Cinevaro/AniCine. Uses the direct VaPlayer HLS API locally; no iframe fallback.",
-      "version": "1.0.0",
+      "description": "Current noctratv.com Nextbox VaPlayer source. NoctraTV source catalog maps it to source:vaplayer, the same verified module used by Cinevaro/AniCine. Uses the direct VaPlayer HLS API locally; focused CI verified 3 movie streams up to 1080p and 3 TV streams up to 720p.",
+      "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
       "filename": "providers/nextbox-vaplayer.js",
-      "enabled": false,
+      "enabled": true,
       "formats": [
         "m3u8"
       ],
@@ -1276,7 +1276,7 @@
     {
       "id": "noctra-popwatch-fsharetv",
       "name": "NoctraTV · PopWatch · FshareTV",
-      "description": "Current noctratv.com PopWatch FshareTV source. NoctraTV source catalog maps it to the same source:fsharetv module already verified under Overlook. Uses the direct FshareTV movie resolver locally; no iframe fallback.",
+      "description": "Current noctratv.com PopWatch FshareTV source maps to source:fsharetv. The legacy direct FshareTV route currently returns HTTP 403 during live verification, so this entry remains disabled pending the current upstream flow.",
       "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [

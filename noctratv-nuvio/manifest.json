@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.35.0",
+  "version": "4.36.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1155,8 +1155,8 @@
     {
       "id": "noctra-streamvault",
       "name": "NoctraTV · StreamVault",
-      "description": "noctratv.com StreamVault family. Uses the current MZone compatibility playback session locally; Silver is verified for movie playback through /m3u8-proxy with mz_lease on the root URL and a static playback-lease header inherited by HLS child/segment requests. Zoisite/Iron/Sunstone remain upstream dependency failures and are skipped.",
-      "version": "1.0.0",
+      "description": "noctratv.com StreamVault family. Uses a Nuvio-compatible imported P-256 PKCS#8 signing key with the current MZone compatibility playback session; Silver is verified for movie playback through /m3u8-proxy with mz_lease on the root URL and a static playback-lease header inherited by HLS child/segment requests. Zoisite/Iron/Sunstone remain upstream dependency failures and are skipped.",
+      "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie"
@@ -1217,15 +1217,15 @@
     {
       "id": "noctra-cinema-army-cookiebakers",
       "name": "NoctraTV · Cinema.army · Cookiebakers",
-      "description": "Current noctratv.com Cinema.army Cookiebakers source. Uses the MZone compatibility playback session locally, appends mz_lease to the root proxy URL, and returns direct HLS with a static playback-lease header for child and segment requests.",
-      "version": "1.0.0",
+      "description": "Current noctratv.com Cinema.army Cookiebakers source. Uses a Nuvio-compatible imported P-256 PKCS#8 signing key for the MZone compatibility playback session, appends mz_lease to the root proxy URL, and returns direct HLS with a static playback-lease header for child and segment requests. Focused CI verified 1080p for both movie and TV.",
+      "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
       "filename": "providers/cinema-army-cookiebakers.js",
-      "enabled": false,
+      "enabled": true,
       "formats": [
         "m3u8"
       ],

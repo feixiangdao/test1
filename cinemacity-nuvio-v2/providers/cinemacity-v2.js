@@ -964,7 +964,7 @@ function ajaxSearchProbe(label, endpoint, hash, query, thisUrl, expectedYear) {
     return r.text().then(function(raw) {
       var payload = unwrapDleSearchPayload(raw);
       var html = payload.content;
-      var info = inspectSearchBody(html, "The Matrix", "1999");
+      var info = inspectSearchBody(html, query, expectedYear || "");
       return {
         label: label,
         status: r.status,
@@ -1698,7 +1698,7 @@ function searchAndCandidateProbe() {
       var hash = boot.hash || "";
 
       if (!hash) {
-        var fail = "CCDIAG v0.6.0 K0 NEXT=COOKIE_OR_HASH";
+        var fail = "CCDIAG v0.6.1 K0 NEXT=COOKIE_OR_HASH";
         return [{
           name:fail,title:fail,
           url:BASE+"/#"+encodeURIComponent(fail),
@@ -1710,7 +1710,7 @@ function searchAndCandidateProbe() {
         .then(function(x) {
           var item = (x.info.items || [])[0] || null;
           if (!item || !item.url) {
-            var fail = "CCDIAG v0.6.0 K1 Q0 NEXT=SEARCH";
+            var fail = "CCDIAG v0.6.1 K1 Q0 NEXT=SEARCH";
             return [{
               name:fail,title:fail,
               url:BASE+"/#"+encodeURIComponent(fail),
@@ -1720,7 +1720,7 @@ function searchAndCandidateProbe() {
 
           var newsId = parseNewsId(item.url);
           if (!newsId) {
-            var fail = "CCDIAG v0.6.0 K1 Q1 ID0 NEXT=NEWSID";
+            var fail = "CCDIAG v0.6.1 K1 Q1 ID0 NEXT=NEWSID";
             return [{
               name:fail,title:fail,
               url:BASE+"/#"+encodeURIComponent(fail),
@@ -1775,7 +1775,7 @@ function searchAndCandidateProbe() {
               }
               if (goodHls) {
                 var hs = hlsProbeStream(goodHls, item.url);
-                var hr = "CC60 USE_HLS " + goodHls.label + compactCode(goodHls) +
+                var hr = "CC61 USE_HLS " + goodHls.label + compactCode(goodHls) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return hs ? [diagnosticRow(hr), hs] : [diagnosticRow(hr)];
               }
@@ -1784,7 +1784,7 @@ function searchAndCandidateProbe() {
               // return those direct streams.
               var directRows = directStreamsFromRoutes(alts);
               if (directRows.length) {
-                var dr = "CC60 USE_DIRECT N" + String(directRows.length) +
+                var dr = "CC61 USE_DIRECT N" + String(directRows.length) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return [diagnosticRow(dr)].concat(directRows);
               }
@@ -1807,7 +1807,7 @@ function searchAndCandidateProbe() {
                   "/R" + compactCode(hlsMap.R);
 
                 if (ds) {
-                  var ok = "CC60 USE_DL " + String(f.status || 0) +
+                  var ok = "CC61 USE_DL " + String(f.status || 0) +
                     " R" + String(f.rangeOk || 0) +
                     " T" + String(f.ftyp || 0) +
                     " ID" + String(newsId) + " DH" + String(dh.media || 0);
@@ -1815,7 +1815,7 @@ function searchAndCandidateProbe() {
                 }
 
                 var m = dp && dp.manual ? dp.manual : {};
-                var fail = "CC60 O" + compactCode(hlsMap.O) +
+                var fail = "CC61 O" + compactCode(hlsMap.O) +
                   " L" + compactCode(hlsMap.L) +
                   " R" + compactCode(hlsMap.R) +
                   " M" + String(m.status || 0) +
@@ -1830,7 +1830,7 @@ function searchAndCandidateProbe() {
     });
   }).catch(function(e) {
     var msg=e&&e.message?e.message:String(e||"error");
-    var report="CCDIAG v0.6.0 ERR="+msg.slice(0,60);
+    var report="CCDIAG v0.6.1 ERR="+msg.slice(0,60);
     return [{
       name:report,title:report,
       url:BASE+"/#"+encodeURIComponent(report),
@@ -1899,6 +1899,111 @@ function pickBestSearchItem(info, meta) {
   return bestScore >= 8 ? best : null;
 }
 
+
+function catalogUrlIdentity(url) {
+  var path = clean(url).replace(/[?#].*$/, "");
+  var last = path.slice(path.lastIndexOf("/") + 1).replace(/\.html$/i, "");
+  last = last.replace(/^\d+-/, "");
+  var ym = last.match(/-(19\d{2}|20\d{2})$/);
+  var year = ym ? ym[1] : "";
+  if (ym) last = last.slice(0, -(year.length + 1));
+  return { title:last.replace(/-/g, " "), year:year };
+}
+
+function scoreCatalogUrl(url, meta) {
+  var id = catalogUrlIdentity(url);
+  var got = normalizeTitle(id.title);
+  var want = normalizeTitle(meta && meta.title);
+  var alt = normalizeTitle(meta && meta.originalTitle);
+  var year = clean(meta && meta.year);
+  var score = 0;
+
+  [want, alt].forEach(function(w) {
+    if (!w) return;
+    if (got === w) score += 14;
+    else if (got && (got.indexOf(w) >= 0 || w.indexOf(got) >= 0)) score += 7;
+  });
+
+  if (year) {
+    if (id.year === year) score += 5;
+    else if (clean(url).indexOf("-" + year + ".html") >= 0) score += 4;
+    else if (id.year) score -= 4;
+  }
+  return score;
+}
+
+function extractCatalogUrls(xml) {
+  var out = [], seen = {};
+  var text = decodeEntities(clean(xml));
+  var re = /<loc>\s*(https?:\/\/[^<]+\/movies\/[^<]+\.html(?:\?[^<]*)?)\s*<\/loc>/ig;
+  var m;
+  while ((m = re.exec(text)) !== null) {
+    var u = decodeEntities(m[1]);
+    if (!u || seen[u]) continue;
+    seen[u] = 1;
+    out.push(u);
+  }
+  return out;
+}
+
+function catalogSearchItem(meta) {
+  var page = 1;
+  var maxPages = 8;
+  var bases = [
+    BASE,
+    "https://cc.leanhhu061206.workers.dev"
+  ];
+
+  function fetchPage(base, p) {
+    var url = base.replace(/\/$/, "") + "/news_pages.xml?page=" + p + "&perPage=500";
+    var headers = baseHeaders(BASE + "/", base === BASE);
+    headers["Accept"] = "application/xml,text/xml,text/plain,*/*";
+    return fetch(url, {headers:headers}).then(function(r) {
+      return r.text().then(function(body) {
+        if (r.status < 200 || r.status >= 300) return [];
+        return extractCatalogUrls(body);
+      });
+    }).catch(function() { return []; });
+  }
+
+  function pick(urls) {
+    var best = null, bestScore = -999;
+    (urls || []).forEach(function(u) {
+      var s = scoreCatalogUrl(u, meta);
+      if (s > bestScore) {
+        bestScore = s;
+        best = u;
+      }
+    });
+    if (!best || bestScore < 12) return null;
+    var ident = catalogUrlIdentity(best);
+    return {
+      url:best,
+      title:ident.title,
+      slugTitle:ident.title,
+      slugYear:ident.year
+    };
+  }
+
+  function next() {
+    if (page > maxPages) {
+      return Promise.reject(new Error("CinemaCity catalog no strict match"));
+    }
+    var p = page++;
+    return fetchPage(bases[0], p).then(function(originUrls) {
+      var hit = pick(originUrls);
+      if (hit) return hit;
+      return fetchPage(bases[1], p).then(function(workerUrls) {
+        var hit2 = pick(workerUrls);
+        if (hit2) return hit2;
+        return next();
+      });
+    });
+  }
+
+  return next();
+}
+
 function searchCinemaCityItem(meta) {
   var queries = [];
   [meta && meta.title, meta && meta.originalTitle].forEach(function(q) {
@@ -1940,8 +2045,11 @@ function searchCinemaCityItem(meta) {
           meta.year || ""
         ).then(function(x) {
           var item = pickBestSearchItem(x.info, meta);
-          if (!item || !item.url) throw new Error("CinemaCity search no strict match");
-          return { item:item, hash:hash };
+          if (item && item.url) return { item:item, hash:hash };
+          return catalogSearchItem(meta).then(function(catItem) {
+            console.log("[CinemaCity] catalog fallback matched " + catItem.url);
+            return { item:catItem, hash:hash };
+          });
         });
       });
     });

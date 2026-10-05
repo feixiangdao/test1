@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.5.0",
-  "description": "CinemaCity V2 one-shot diagnostic. Test Provider now runs all key probes automatically and returns one compact CCDIAG summary instead of many rows/screenshots.",
+  "version": "0.5.1",
+  "description": "CinemaCity V2 auto-play diagnostic. Test Provider now returns a real HLS/direct/DH stream when a probe proves it is playable; otherwise it returns one short decisive status row.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "One-shot diagnostic. Run Test Provider once and share only the single CCDIAG row.",
-      "version": "0.5.0",
+      "description": "Auto-play diagnostic. Run Test Provider once; a verified HLS/direct/DH candidate is returned as a real stream, otherwise one short status row explains the failure.",
+      "version": "0.5.1",
       "supportedTypes": [
         "movie"
       ],

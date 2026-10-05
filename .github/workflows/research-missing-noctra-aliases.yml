@@ -1,0 +1,99 @@
+name: Research missing Noctra aliases
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-missing-noctra-aliases.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe missing current aliases
+        run: |
+          node - <<'NODE'
+          const BASE='https://api.m-zone.org';
+          const ORIGIN='https://noctratv.com';
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
+          const enc=new TextEncoder();
+          const aliases=[
+            ['site-dulo-auto',true,true],
+            ['site-cinema-army-cookiebakers',true,true],
+            ['site-cinema-army-dcloud',true,true],
+            ['site-fstream-latino',true,true],
+            ['site-fstream-castellano',true,true],
+            ['site-fstream-subbed',true,true],
+            ['site-popwatch-cinextream-hable',true,false],
+            ['site-popwatch-cinextream-nest',true,true],
+            ['site-popwatch-cinextream-orion',true,true],
+            ['site-popwatch-cinextream-light',true,true],
+            ['site-popwatch-cinextream-space',true,true],
+            ['site-popwatch-cinextream-luna',true,true],
+            ['site-popwatch-cinextream-kuro',true,false],
+            ['site-popwatch-videasy-hdmovie',false,true],
+            ['site-popwatch-fsharetv',true,false],
+            ['site-nextbox-vaplayer',true,true],
+            ['site-oneshows-jill',true,false],
+            ['site-oneshows-ethan',true,true]
+          ];
+
+          function b64url(bytes){
+            let s=''; for(const b of new Uint8Array(bytes))s+=String.fromCharCode(b);
+            return Buffer.from(s,'binary').toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+          }
+          function cookieFrom(res){
+            const sc=res.headers.get('set-cookie')||'';
+            return sc.split(',').map(x=>x.split(';')[0].trim()).filter(Boolean).join('; ');
+          }
+          async function createSession(){
+            const cr=await fetch(BASE+'/api/player/v2/challenge',{headers:{'User-Agent':UA,Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/'}});
+            const ch=await cr.json();
+            const c1=cookieFrom(cr);
+            const key=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);
+            const pub=await crypto.subtle.exportKey('jwk',key.publicKey);
+            const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key.privateKey,enc.encode(ch.challengeId+'.'+ch.nonce+'.'+ch.issuedAt));
+            const payload={
+              challengeId:ch.challengeId,nonce:ch.nonce,publicKey:pub,signature:b64url(sig),
+              fingerprint:{webdriver:false,languages:['en-US','en'],plugins:5,hardwareConcurrency:8,deviceMemory:8,maxTouchPoints:5,platform:'Android',brands:[{brand:'Chromium',version:'140'},{brand:'Google Chrome',version:'140'}],mobile:true,timezone:'Asia/Shanghai',screen:{width:1080,height:2400,colorDepth:24,pixelRatio:2.75},visibilityState:'visible'},
+              embedded:false,embedOrigin:'',sandboxed:false,turnstileToken:'',
+              supportsEncryptedTransport:false,supportsEncryptedCapabilities:false,transportPublicKey:null,
+              playerVersion:'mplayer-web-v2',playbackSessionVersion:2,capabilities:['hls','dash','codec-avc']
+            };
+            const sr=await fetch(BASE+'/api/player/v2/session',{method:'POST',headers:{'User-Agent':UA,'Content-Type':'application/json',Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/',...(c1?{Cookie:c1}:{})},body:JSON.stringify(payload)});
+            const sj=await sr.json().catch(()=>({}));
+            const c2=cookieFrom(sr);
+            const cookie=[c1,c2].filter(Boolean).join('; ');
+            console.log('SESSION '+sr.status+' success='+!!sj.success+' mode='+(sj.mode||'')+' cookie='+(cookie?1:0));
+            if(!sr.ok||!sj.token)throw new Error(sj.error||'session failed');
+            return {token:sj.token,cookie};
+          }
+          function summarize(j){
+            const r=j&&j.result||{};
+            let u=r.url||r.playlist||r.file||'';
+            if(!u&&Array.isArray(r.sources)&&r.sources[0])u=r.sources[0].url||r.sources[0].file||'';
+            let host='',path='',queryKeys=[];
+            try{
+              const x=new URL(u);host=x.hostname;path=x.pathname;queryKeys=[...x.searchParams.keys()];
+            }catch{}
+            return {success:j&&j.success,error:j&&j.error,code:j&&j.code,resultKeys:Object.keys(r||{}),host,path,queryKeys,type:r.type||r.format||'',maxHeight:r.maxHeight||'',headers:Object.keys(r.headers&&typeof r.headers==='object'?r.headers:{})};
+          }
+          async function resolve(id,s,type){
+            const body={codecCapabilities:{},type,tmdbId:type==='movie'?'238':'1399'};
+            if(type==='tv'){body.season='1';body.episode='1';}
+            const rr=await fetch(BASE+'/mplayer/'+id+'/resolve',{method:'POST',headers:{'User-Agent':UA,'Content-Type':'application/json',Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/','X-MZone-Playback-Lease':s.token,...(s.cookie?{Cookie:s.cookie}:{})},body:JSON.stringify(body)});
+            const j=await rr.json().catch(()=>({}));
+            console.log(id+' '+type+' HTTP='+rr.status+' '+JSON.stringify(summarize(j)));
+          }
+          (async()=>{
+            const s=await createSession();
+            for(const [id,movie,tv] of aliases){
+              if(movie)await resolve(id,s,'movie');
+              if(tv)await resolve(id,s,'tv');
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

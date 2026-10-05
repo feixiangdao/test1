@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Quality Lab",
-  "version": "0.7.1",
-  "description": "CinemaCity Quality Lab now inspects the real Auto HLS master and exposes #EXT-X-STREAM-INF renditions by resolution in addition to Auto.",
+  "version": "0.7.2",
+  "description": "CinemaCity Quality Lab with HD entitlement probe. Besides Auto/HLS variant inspection, it checks the user's own session against the official DH sizes endpoint and two byte ranges to determine whether an HD download channel is actually authorized.",
   "scrapers": [
     {
       "id": "cinemacity-quality-070",
       "name": "CinemaCity Quality · Login Session",
-      "description": "Experimental Auto + parsed HLS master renditions. If PlayerJS exposes only Auto, the provider fetches the master and returns 1080p/720p/etc child playlists when present.",
-      "version": "0.7.1",
+      "description": "Experimental quality resolver + HDPROBE diagnostic. HDPROBE reports whether the current configured CinemaCity session exposes HD file metadata and supports arbitrary byte ranges; it does not use shared/leaked credentials.",
+      "version": "0.7.2",
       "supportedTypes": [
         "movie"
       ],

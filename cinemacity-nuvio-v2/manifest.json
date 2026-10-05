@@ -1,12 +1,12 @@
 {
   "name": "CinemaCity Local V2",
   "version": "0.6.5",
-  "description": "CinemaCity V2 PlayerJS resolver aligned with a working Nuvio CinemaCity implementation. Structured PlayerJS file arrays/objects are parsed first, then the actual movie file value is returned intact as HLS when it is a URLSET master.",
+  "description": "CinemaCity V2 fast PlayerJS resolver. Normal playback skips the session-hash bootstrap, uses one direct title search before fallback, parallelizes catalog fallback, and caches TMDB/title/stream results in memory.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "PlayerJS resolver. Parses file arrays/objects exactly like a working Nuvio CinemaCity provider, preserves URLSET master URLs intact, and returns the real movie stream.",
+      "description": "Fast PlayerJS resolver. Uses direct CinemaCity search plus short in-memory caches; session-hash probing is reserved for diagnostics only.",
       "version": "0.6.5",
       "supportedTypes": [
         "movie"

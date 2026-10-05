@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.28.0",
+  "version": "4.29.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1116,8 +1116,8 @@
     {
       "id": "noctra-zstream-tokyo",
       "name": "NoctraTV · ZStream · Tokyo",
-      "description": "ZStream Tokyo anime TV source. Exact-matches TMDB anime titles to ani.pm, tries the current Settlar session locally, and automatically falls back to ani.pm's MegaPlay encrypted backup when Settlar is Cloudflare-blocked. Returns only verified direct HLS with SUB/DUB. Season 1 only until multi-season episode mapping is verified.",
-      "version": "1.1.0",
+      "description": "ZStream Tokyo anime TV source. Exact-matches TMDB anime titles to ani.pm, requests the current backup-enabled playback bootstrap, resolves MegaPlay AES-256-CBC/HMAC-signed HLS locally, and falls back to Settlar only when usable. Live CI verified Frieren S01E01 SUB and DUB at 1080p. Season 1 only until multi-season episode mapping is verified.",
+      "version": "1.2.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "tv"

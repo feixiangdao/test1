@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.6.5",
+  "version": "0.6.7",
   "description": "CinemaCity V2 fast PlayerJS resolver. Normal playback skips the session-hash bootstrap, uses one direct title search before fallback, parallelizes catalog fallback, and caches TMDB/title/stream results in memory.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
       "description": "Fast PlayerJS resolver. Uses direct CinemaCity search plus short in-memory caches; session-hash probing is reserved for diagnostics only.",
-      "version": "0.6.5",
+      "version": "0.6.7",
       "supportedTypes": [
         "movie"
       ],

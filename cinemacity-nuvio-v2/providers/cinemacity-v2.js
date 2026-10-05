@@ -1775,7 +1775,7 @@ function searchAndCandidateProbe() {
               }
               if (goodHls) {
                 var hs = hlsProbeStream(goodHls, item.url);
-                var hr = "CC64 USE_HLS " + goodHls.label + compactCode(goodHls) +
+                var hr = "CC65 USE_HLS " + goodHls.label + compactCode(goodHls) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return hs ? [diagnosticRow(hr), hs] : [diagnosticRow(hr)];
               }
@@ -1784,7 +1784,7 @@ function searchAndCandidateProbe() {
               // return those direct streams.
               var directRows = directStreamsFromRoutes(alts);
               if (directRows.length) {
-                var dr = "CC64 USE_DIRECT N" + String(directRows.length) +
+                var dr = "CC65 USE_DIRECT N" + String(directRows.length) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return [diagnosticRow(dr)].concat(directRows);
               }
@@ -1807,7 +1807,7 @@ function searchAndCandidateProbe() {
                   "/R" + compactCode(hlsMap.R);
 
                 if (ds) {
-                  var ok = "CC64 USE_DL " + String(f.status || 0) +
+                  var ok = "CC65 USE_DL " + String(f.status || 0) +
                     " R" + String(f.rangeOk || 0) +
                     " T" + String(f.ftyp || 0) +
                     " ID" + String(newsId) + " DH" + String(dh.media || 0);
@@ -1815,7 +1815,7 @@ function searchAndCandidateProbe() {
                 }
 
                 var m = dp && dp.manual ? dp.manual : {};
-                var fail = "CC64 O" + compactCode(hlsMap.O) +
+                var fail = "CC65 O" + compactCode(hlsMap.O) +
                   " L" + compactCode(hlsMap.L) +
                   " R" + compactCode(hlsMap.R) +
                   " M" + String(m.status || 0) +
@@ -2284,6 +2284,25 @@ function fileSetStreams(rawFile, pageUrl) {
   var raw = decodeEscapedUrl(clean(rawFile));
   if (!raw) return [];
 
+  // IMPORTANT: CinemaCity/PlayerJS may store the real HLS master as one URL whose
+  // path intentionally contains commas. Never split this form.
+  if (/^https?:\/\//i.test(raw) &&
+      (/\.urlset\/master\.m3u8(?:$|[?#])/i.test(raw) ||
+       /\.m3u8(?:$|[?#])/i.test(raw))) {
+    var q0 = qualityOf(raw, raw);
+    var label0 = "CinemaCity Watch · " + q0 + " · HLS";
+    return [{
+      name:label0,
+      title:label0,
+      url:raw,
+      quality:q0,
+      type:"hls",
+      provider:"cinemacity-v2-login",
+      headers:watchPlaybackHeaders(pageUrl),
+      subtitles:[]
+    }];
+  }
+
   var parts = raw.split(",").map(function(x){ return clean(x); }).filter(Boolean);
   if (!parts.length) return [];
 
@@ -2292,23 +2311,20 @@ function fileSetStreams(rawFile, pageUrl) {
   var base = mediaPattern.test(first) ? pageUrl : first;
   var rels = (base === first) ? parts.slice(1) : parts.slice(0);
 
+  // Only emit actual adaptive manifests from split file sets.
+  // Raw MP4/M4A entries are component files used by the URLSET packager and
+  // are not standalone CinemaCity watch streams.
   var out = [], seen = {};
   rels.forEach(function(rel) {
     if (!/\.m3u8(?:$|[?#])/i.test(rel) &&
         !/\.mpd(?:$|[?#])/i.test(rel) &&
-        !/\.mp4(?:$|[?#])/i.test(rel) &&
         !/\.urlset\/master\.m3u8(?:$|[?#])/i.test(rel)) return;
 
     var u = resolveCinemaMediaUrl(base, rel);
     if (!u || seen[u]) return;
     seen[u] = 1;
 
-    var kind = watchCandidateKind(u);
-    if (kind !== "hls" && kind !== "dash" && kind !== "mp4") {
-      if (/\.urlset\/master\.m3u8/i.test(u)) kind = "hls";
-      else return;
-    }
-
+    var kind = /\.mpd(?:$|[?#])/i.test(u) ? "dash" : "hls";
     var q = qualityOf(u, rel);
     var label = "CinemaCity Watch · " + q + " · " + kind.toUpperCase();
     out.push({
@@ -2318,7 +2334,7 @@ function fileSetStreams(rawFile, pageUrl) {
       quality:q,
       type:kind,
       provider:"cinemacity-v2-login",
-      headers:playbackHeaders(u, pageUrl, false),
+      headers:watchPlaybackHeaders(pageUrl),
       subtitles:[]
     });
   });
@@ -2326,11 +2342,21 @@ function fileSetStreams(rawFile, pageUrl) {
   return out;
 }
 
+function watchPlaybackHeaders(referer) {
+  var h = {
+    "User-Agent": userAgent(),
+    "Referer": referer || (BASE + "/"),
+    "Accept": "*/*"
+  };
+  if (cookieValue()) h["Cookie"] = cookieValue();
+  return h;
+}
+
 function playerScriptDiagnostic(html, newsId) {
   var payload = extractPlayerFilePayload(html || "");
   var atobCount = (clean(html).match(/atob\s*\(/ig) || []).length;
   var fileLen = clean(payload.rawFile).length;
-  return "CC64 PLAYER A" + String(atobCount) +
+  return "CC65 PLAYER A" + String(atobCount) +
     " F" + String(fileLen) +
     " ID" + String(newsId);
 }

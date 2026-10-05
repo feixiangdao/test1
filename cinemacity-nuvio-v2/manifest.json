@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.6.1",
-  "description": "CinemaCity V2 dynamic movie resolver with catalog fallback. Newly added titles can resolve through CinemaCity news_pages.xml when DLE search misses them.",
+  "version": "0.6.2",
+  "description": "CinemaCity V2 dynamic resolver with stable session-hash bootstrap and direct fallback for titles that exist on the site but fail CinemaCity search.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "Dynamic movie resolver. Uses DLE search first, then CinemaCity catalog fallback for newly added titles, then authenticated DH variants.",
-      "version": "0.6.1",
+      "description": "Dynamic movie resolver. Uses a stable authenticated hash, DLE search/catalog fallback, and confirmed direct-title fallback before resolving DH variants.",
+      "version": "0.6.2",
       "supportedTypes": [
         "movie"
       ],

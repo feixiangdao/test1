@@ -380,7 +380,7 @@ function megaPlayFromBoot(boot,channel){
       if(!u&&sd&&sd.enc)u=decryptMegaEnc(sd.enc);
       if(!/^https?:\/\//i.test(clean(u)))throw new Error("MegaPlay source missing");
       u=signMegaCdn(clean(u));
-      return verifyHls(u).then(function(v){
+      return verifyHlsWithHeaders(u,{"User-Agent":UA,"Referer":host+"/","Accept":"application/vnd.apple.mpegurl,*/*"}).then(function(v){
         var lab=channel==="dub"?"DUB":"SUB";
         var name="NoctraTV · ZStream · Tokyo · MegaPlay · "+lab+" · "+v.quality;
         return{

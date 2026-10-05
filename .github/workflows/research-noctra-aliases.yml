@@ -6,6 +6,7 @@ on:
     paths:
       - 'noctratv-nuvio/research-source-aliases.js'
       - 'noctratv-nuvio/research-tokyo-backends.js'
+      - 'noctratv-nuvio/research-tokyo-alias-api.js'
       - '.github/workflows/research-noctra-aliases.yml'
 
 jobs:
@@ -22,3 +23,4 @@ jobs:
         run: |
           node research-source-aliases.js
           node research-tokyo-backends.js
+          node research-tokyo-alias-api.js

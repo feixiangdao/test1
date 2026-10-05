@@ -7,6 +7,7 @@ on:
       - 'noctratv-nuvio/research-source-aliases.js'
       - 'noctratv-nuvio/research-tokyo-backends.js'
       - 'noctratv-nuvio/research-tokyo-alias-api.js'
+      - 'noctratv-nuvio/research-mzone-session.js'
       - '.github/workflows/research-noctra-aliases.yml'
 
 jobs:
@@ -24,3 +25,4 @@ jobs:
           node research-source-aliases.js
           node research-tokyo-backends.js
           node research-tokyo-alias-api.js
+          node research-mzone-session.js

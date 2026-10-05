@@ -8,6 +8,7 @@ var BASE="https://api.m-zone.org";
 var ORIGIN="https://noctratv.com";
 var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
 var SESSION=null;
+var SESSION_PROMISE=null;
 
 var SOURCES=[
   {id:"site-streamvault-silver",label:"Silver",movie:true,tv:false},
@@ -17,6 +18,30 @@ var SOURCES=[
 ];
 
 function clean(v){return v==null?"":String(v).trim();}
+function b64url(bytes){
+  var a=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes||0),s="";
+  for(var i=0;i<a.length;i++)s+=String.fromCharCode(a[i]);
+  return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function fingerprint(){
+  return{
+    webdriver:false,
+    languages:["en-US","en"],
+    plugins:5,
+    hardwareConcurrency:8,
+    deviceMemory:8,
+    maxTouchPoints:5,
+    platform:"Android",
+    brands:[
+      {brand:"Chromium",version:"140"},
+      {brand:"Google Chrome",version:"140"}
+    ],
+    mobile:true,
+    timezone:"Asia/Shanghai",
+    screen:{width:1080,height:2400,colorDepth:24,pixelRatio:2.75},
+    visibilityState:"visible"
+  };
+}
 function headers(extra){
   var h={
     "User-Agent":UA,
@@ -50,31 +75,36 @@ function challenge(){
   });
 }
 function sessionValid(s){
-  return s&&s.token&&Number(s.expiresAt||0)>Date.now()+30000;
+  return !!(s&&s.token&&Number(s.expiresAt||0)>Date.now()+30000);
 }
 function createSession(){
-  if(sessionValid(SESSION))return Promise.resolve(SESSION);
   return challenge().then(function(ch){
     if(!ch||!ch.challengeId||!ch.nonce||!ch.issuedAt)throw new Error("invalid challenge");
-    var body={
-      challengeId:ch.challengeId,
-      nonce:ch.nonce,
-      publicKey:null,
-      signature:"",
-      fingerprint:{
-        webdriver:false,
-        languages:["en-US","en"],
-        plugins:0,
-        hardwareConcurrency:8,
-        deviceMemory:8,
-        maxTouchPoints:5,
-        platform:"Android",
-        brands:[{brand:"Chromium",version:"131"},{brand:"Google Chrome",version:"131"}],
-        mobile:true,
-        timezone:"UTC",
-        screen:{width:1080,height:2400,colorDepth:24,pixelRatio:2.75},
-        visibilityState:"visible"
-      },
+    return globalThis.crypto.subtle.generateKey(
+      {name:"ECDSA",namedCurve:"P-256"},false,["sign","verify"]
+    ).then(function(signKey){
+      return Promise.all([
+        globalThis.crypto.subtle.exportKey("jwk",signKey.publicKey),
+        globalThis.crypto.subtle.sign(
+          {name:"ECDSA",hash:"SHA-256"},
+          signKey.privateKey,
+          new TextEncoder().encode(ch.challengeId+"."+ch.nonce+"."+ch.issuedAt)
+        )
+      ]).then(function(parts){
+        return{
+          ch:ch,
+          publicKey:parts[0],
+          signature:b64url(new Uint8Array(parts[1]))
+        };
+      });
+    });
+  }).then(function(x){
+    var payload={
+      challengeId:x.ch.challengeId,
+      nonce:x.ch.nonce,
+      publicKey:x.publicKey,
+      signature:x.signature,
+      fingerprint:fingerprint(),
       embedded:false,
       embedOrigin:"",
       sandboxed:false,
@@ -90,20 +120,34 @@ function createSession(){
       method:"POST",
       cache:"no-store",
       headers:headers({"Content-Type":"application/json"}),
-      body:JSON.stringify(body)
+      body:JSON.stringify(payload)
     }),10000,"session").then(function(r){
       return r.json().catch(function(){return{};}).then(function(j){
-        if(r.status===428||j.challengeRequired)throw new Error("interactive playback verification required");
-        if(!r.ok||j.success===false||!j.token)throw new Error(j.error||("session HTTP "+r.status));
-        SESSION={
+        if(r.status===428&&j&&j.challengeRequired){
+          var e=new Error("Turnstile required");
+          e.code="TURNSTILE_REQUIRED";
+          throw e;
+        }
+        if(!r.ok||!j||j.success===false||!j.token||!j.sessionId||!j.expiresAt){
+          throw new Error(clean(j&&j.error)||("session HTTP "+r.status));
+        }
+        return{
           token:String(j.token),
-          sessionId:clean(j.sessionId),
-          expiresAt:Number(j.expiresAt)||0
+          sessionId:String(j.sessionId),
+          expiresAt:Number(j.expiresAt)
         };
-        return SESSION;
       });
     });
   });
+}
+function getSession(){
+  if(sessionValid(SESSION))return Promise.resolve(SESSION);
+  if(SESSION_PROMISE)return SESSION_PROMISE;
+  SESSION_PROMISE=createSession().then(function(s){
+    SESSION=s;
+    return s;
+  }).finally(function(){SESSION_PROMISE=null;});
+  return SESSION_PROMISE;
 }
 function qualityFromManifest(text){
   var s=String(text||""),m,max=0,re=/RESOLUTION=\d+x(\d+)/ig;
@@ -195,7 +239,7 @@ function getStreams(tmdbId,mediaType,season,episode){
   if(!tmdbId||(mediaType!=="movie"&&mediaType!=="tv"))return Promise.resolve([]);
   if(mediaType==="tv"&&(!season||!episode))return Promise.resolve([]);
   var list=SOURCES.filter(function(s){return mediaType==="tv"?s.tv:s.movie;});
-  return createSession().then(function(sess){
+  return getSession().then(function(sess){
     return Promise.all(list.map(function(s){return resolveOne(s,tmdbId,mediaType,season,episode,sess);}));
   }).then(function(rows){
     var out=[],seen={};

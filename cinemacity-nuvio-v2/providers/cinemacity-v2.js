@@ -1014,13 +1014,12 @@ function compactAjaxRow(x) {
 }
 
 function searchAndCandidateProbe() {
-  var q = "The Matrix";
   var bootstrapUrl = BASE + "/index.php?do=search";
   var headers = baseHeaders(BASE + "/", true);
   headers["X-Requested-With"] = "XMLHttpRequest";
   headers["Origin"] = BASE;
   headers["Content-Type"] = "application/x-www-form-urlencoded";
-  var body = "do=search&subaction=search&story=" + encodeURIComponent(q);
+  var body = "do=search&subaction=search&story=" + encodeURIComponent("The Matrix");
 
   return fetch(bootstrapUrl, {
     method: "POST",
@@ -1047,66 +1046,39 @@ function searchAndCandidateProbe() {
       if (!hash) return rows;
 
       return Promise.all([
-        ajaxSearchProbe("MODS", "/engine/mods/dle_search/ajax.php", hash, q, "/"),
-        ajaxSearchProbe("LAZY", "/engine/lazydev/dle_search/ajax.php", hash, q, "/")
+        ajaxSearchProbe("MATRIX", "/engine/mods/dle_search/ajax.php", hash, "The Matrix", "/"),
+        ajaxSearchProbe("SPIDER", "/engine/mods/dle_search/ajax.php", hash, "Spider-Man Brand New Day", "/"),
+        ajaxSearchProbe("BACKROOMS", "/engine/mods/dle_search/ajax.php", hash, "Backrooms", "/"),
+        ajaxSearchProbe("OBSESSION", "/engine/mods/dle_search/ajax.php", hash, "Obsession", "/")
       ]).then(function(results) {
-        results.forEach(function(x) { rows.push(compactAjaxRow(x)); });
-
-        var winner = null;
         results.forEach(function(x) {
-          if (!x.info || !x.info.match) return;
-          if (!winner || x.info.bestScore > winner.info.bestScore) winner = x;
-        });
+          var t = x.label +
+            " " + String(x.status) +
+            " J" + String(x.json || 0) +
+            " CF" + String(x.cf) +
+            " G" + String(x.guest) +
+            " L" + String((x.html || "").length) +
+            " N" + String((x.info.items || []).length);
 
-        if (!winner) {
-          var preview = [];
-          var seen = {};
-          results.forEach(function(x) {
-            (x.info.items || []).forEach(function(item) {
-              var key = normalizeTitle(item.slugTitle || item.title || "") + "|" + (item.slugYear || "");
-              if (seen[key]) return;
-              seen[key] = 1;
-              preview.push({
-                label: x.label,
-                text: clean(item.slugTitle || item.title || ""),
-                year: item.slugYear || "",
-                url: item.url
-              });
-            });
-          });
-          preview.slice(0,3).forEach(function(it,idx) {
-            var t = "QTOP" + String(idx+1) + " " + it.label + " · " +
-              it.text.slice(0,36) + (it.year ? " · " + it.year : "");
-            rows.push({
-              name:t,title:t,url:it.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
-            });
-          });
-          return rows;
-        }
+          var prefix = clean(x.html || "")
+            .replace(/<[^>]*>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 55);
 
-        var candidate = winner.info.match.url;
-        return fetch(candidate, {
-          headers: browserNavHeaders(BASE + winner.endpoint)
-        }).then(function(cr) {
-          return cr.text().then(function(ch) {
-            var ctitle = String(cr.status) + " · CANDIDATE · CF=" + (challengeHtml(ch) ? 1 : 0) +
-              " G=" + (guestBlocked(ch) ? 1 : 0) +
-              " A=" + (/atob\s*\(/i.test(ch) ? 1 : 0) +
-              " L=" + String(ch.length);
-            rows.push({
-              name:ctitle,title:ctitle,url:candidate,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
-            });
-            return rows;
-          });
-        }).catch(function(e) {
-          var msg=e&&e.message?e.message:String(e||"error");
+          if (prefix) t += " · " + prefix;
+
           rows.push({
-            name:"0 · CANDIDATE · "+msg.slice(0,90),
-            title:"0 · CANDIDATE · "+msg.slice(0,90),
-            url:candidate,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
+            name: t,
+            title: t,
+            url: BASE + x.endpoint,
+            quality: "DIAG",
+            type: "diagnostic",
+            provider: "cinemacity-v2-login"
           });
-          return rows;
         });
+
+        return rows;
       });
     });
   }).catch(function(e) {
@@ -1114,7 +1086,10 @@ function searchAndCandidateProbe() {
     return [{
       name:"0 · BOOT · "+msg.slice(0,100),
       title:"0 · BOOT · "+msg.slice(0,100),
-      url:bootstrapUrl,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
+      url:bootstrapUrl,
+      quality:"DIAG",
+      type:"diagnostic",
+      provider:"cinemacity-v2-login"
     }];
   });
 }

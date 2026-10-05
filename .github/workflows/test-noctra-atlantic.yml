@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - 'noctratv-nuvio/providers/atlantic-artemis.js'
+      - 'noctratv-nuvio/research-atlantic-current.js'
       - '.github/workflows/test-noctra-atlantic.yml'
 
 jobs:
@@ -18,6 +19,9 @@ jobs:
           node-version: '22'
       - name: Syntax
         run: node --check noctratv-nuvio/providers/atlantic-artemis.js
+      - name: Research current Atlantic bundle
+        working-directory: noctratv-nuvio
+        run: node research-atlantic-current.js
       - name: Focused live probe
         working-directory: noctratv-nuvio
         run: |

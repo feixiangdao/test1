@@ -180,7 +180,12 @@ function validate(url,type,h){
     });
   }
   return withTimeout(fetch(url,{headers:h}),10000,"HLS").then(function(r){
-    if(!r.ok)throw new Error("HLS HTTP "+r.status);
+    if(!r.ok){
+      var wa=clean(r.headers&&r.headers.get?r.headers.get("www-authenticate"):"");
+      var xc=clean(r.headers&&r.headers.get?r.headers.get("x-mzone-error"):"");
+      console.log("[Noctra/StreamVault] HLS auth status="+r.status+" www="+wa+" xerr="+xc+" sentHeaderKeys="+Object.keys(h||{}).join(","));
+      throw new Error("HLS HTTP "+r.status);
+    }
     return r.text();
   }).then(function(body){
     if(String(body||"").indexOf("#EXTM3U")!==0)throw new Error("not HLS");
@@ -217,7 +222,7 @@ function resolveOne(src,tmdbId,mediaType,season,episode,sess){
         console.log("[Noctra/StreamVault] "+src.label+
           " resolved host="+du.hostname+
           " path="+du.pathname+
-          " hasQuery="+(du.search?1:0)+
+          " queryKeys="+Array.from(du.searchParams.keys()).join(",")+
           " resultHeaderKeys="+Object.keys(x.headers&&typeof x.headers==="object"?x.headers:{}).join(","));
       }catch(_){}
       u=appendLease(u,sess.token);

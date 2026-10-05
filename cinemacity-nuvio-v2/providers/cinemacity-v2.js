@@ -1251,7 +1251,6 @@ function dhSizesProbe(newsId, hash, referer) {
             if (/\.(?:mp4|m4a|m3u8)(?:$|[?#])/i.test(k)) {
               mediaCount++;
               mediaKeys.push(k);
-              mediaKeys.push(k);
               if (preview.length < 3) preview.push(k);
               if (values.length < 3) {
                 var v = obj[k];
@@ -1278,7 +1277,6 @@ function dhSizesProbe(newsId, hash, referer) {
         mediaKeys:mediaKeys,
         preview:preview,
         values:values,
-        mediaKeys:mediaKeys,
         url:url
       };
     });
@@ -1555,7 +1553,14 @@ function probeCandidateStream(label, url, referer) {
 }
 
 function hlsCandidateProbe(label, base, mediaKeys, referer) {
-  var rest = (mediaKeys || []).join(",");
+  var uniq = [];
+  var seen = {};
+  (mediaKeys || []).forEach(function(k) {
+    if (!k || seen[k]) return;
+    seen[k] = 1;
+    uniq.push(k);
+  });
+  var rest = uniq.join(",");
   var url = base.replace(/\/$/, "") + "/public_files/" + rest + ".urlset/master.m3u8";
   var headers = baseHeaders(referer || (BASE + "/"), true);
   headers["Accept"] = "application/vnd.apple.mpegurl, application/x-mpegURL, */*";
@@ -1632,7 +1637,13 @@ function searchAndCandidateProbe() {
           if (!newsId) return rows;
 
           return dhSizesProbe(newsId, hash, item.url).then(function(dh) {
-            var keys = dh.mediaKeys || [];
+            var keys = [];
+            var seenKeys = {};
+            (dh.mediaKeys || []).forEach(function(k) {
+              if (!k || seenKeys[k]) return;
+              seenKeys[k] = 1;
+              keys.push(k);
+            });
             var videos = keys.filter(function(k){ return /\.mp4(?:$|[?#])/i.test(k); });
             var audios = keys.filter(function(k){ return /\.m4a(?:$|[?#])/i.test(k); });
 

@@ -1598,6 +1598,16 @@ function hlsCandidateProbe(label, base, mediaKeys, referer) {
   });
 }
 
+function compactCode(x) {
+  if (!x) return "0";
+  var code = String(x.status || 0);
+  if (x.m3u) code += "M";
+  if (x.cf) code += "C";
+  if (x.atob) code += "A";
+  if (x.files) code += "P";
+  return code;
+}
+
 function searchAndCandidateProbe() {
   var bootstrapUrl = BASE + "/index.php?do=search";
   var headers = baseHeaders(BASE + "/", true);
@@ -1614,64 +1624,116 @@ function searchAndCandidateProbe() {
     return r.text().then(function(html) {
       var boot = inspectSearchBody(html, "Spider-Man Brand New Day", "2026");
       var hash = boot.hash || "";
-      var rows = [{
-        name:"BOOT "+String(r.status)+" CF"+(challengeHtml(html)?"1":"0")+" G"+(guestBlocked(html)?"1":"0")+" HASH"+(hash?"1":"0"),
-        title:"BOOT "+String(r.status)+" CF"+(challengeHtml(html)?"1":"0")+" G"+(guestBlocked(html)?"1":"0")+" HASH"+(hash?"1":"0"),
-        url:bootstrapUrl,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
-      }];
-      if (!hash) return rows;
+
+      if (!hash) {
+        var fail = "CCDIAG v0.5.0 K0 NEXT=COOKIE_OR_HASH";
+        return [{
+          name:fail,title:fail,
+          url:BASE+"/#"+encodeURIComponent(fail),
+          quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
+        }];
+      }
 
       return ajaxSearchProbe("SPIDER", "/engine/mods/dle_search/ajax.php", hash, "Spider-Man Brand New Day", "/")
         .then(function(x) {
           var item = (x.info.items || [])[0] || null;
-          var st = "SEARCH "+String(x.status)+" J"+String(x.json||0)+" L"+String((x.html||"").length)+" N"+String((x.info.items||[]).length);
-          rows.push({name:st,title:st,url:BASE+x.endpoint,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
-          if (!item || !item.url) return rows;
+          if (!item || !item.url) {
+            var fail = "CCDIAG v0.5.0 K1 Q0 NEXT=SEARCH";
+            return [{
+              name:fail,title:fail,
+              url:BASE+"/#"+encodeURIComponent(fail),
+              quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
+            }];
+          }
 
           var newsId = parseNewsId(item.url);
-          rows.push({
-            name:"ITEM ID="+(newsId||"?")+" · "+clean(item.slugTitle||item.title||"").slice(0,42),
-            title:"ITEM ID="+(newsId||"?")+" · "+clean(item.slugTitle||item.title||"").slice(0,42),
-            url:item.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
-          });
-          if (!newsId) return rows;
+          if (!newsId) {
+            var fail = "CCDIAG v0.5.0 K1 Q1 ID0 NEXT=NEWSID";
+            return [{
+              name:fail,title:fail,
+              url:BASE+"/#"+encodeURIComponent(fail),
+              quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
+            }];
+          }
 
-          var routes = [
-            ["PRETTY", item.url],
-            ["NEWSID", BASE + "/index.php?newsid=" + encodeURIComponent(newsId)],
-            ["ROOTID", BASE + "/?newsid=" + encodeURIComponent(newsId)],
-            ["FULL", BASE + "/index.php?do=fullstory&newsid=" + encodeURIComponent(newsId)],
-            ["SHOW", BASE + "/index.php?do=showfull&newsid=" + encodeURIComponent(newsId)],
-            ["PRINT", BASE + "/engine/print.php?newsid=" + encodeURIComponent(newsId)]
+          var altRoutes = [
+            ["P", item.url],
+            ["N", BASE + "/index.php?newsid=" + encodeURIComponent(newsId)],
+            ["F", BASE + "/index.php?do=fullstory&newsid=" + encodeURIComponent(newsId)],
+            ["R", BASE + "/engine/print.php?newsid=" + encodeURIComponent(newsId)]
           ];
 
-          return Promise.all(routes.map(function(pair) {
-            return idRouteProbe(pair[0], pair[1], bootstrapUrl);
-          })).then(function(results) {
-            results.forEach(function(p) {
-              var t = p.label+" "+String(p.status)+
-                " CF"+String(p.cf)+
-                " G"+String(p.guest)+
-                " A"+String(p.atob)+
-                " PF"+String(p.files)+
-                " D"+String(p.direct)+
-                " L"+String(p.len);
-              if (p.canonical) t += " CAN=" + clean(p.canonical).slice(0,70);
-              rows.push({
-                name:t,title:t,url:p.finalUrl||p.url,
-                quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
-              });
+          return Promise.all([
+            dhSizesProbe(newsId, hash, item.url),
+            Promise.all(altRoutes.map(function(pair) {
+              return idRouteProbe(pair[0], pair[1], bootstrapUrl);
+            }))
+          ]).then(function(main) {
+            var dh = main[0] || {};
+            var alts = main[1] || [];
+
+            var keys = [];
+            var seen = {};
+            (dh.mediaKeys || []).forEach(function(k) {
+              if (!k || seen[k]) return;
+              seen[k] = 1;
+              keys.push(k);
             });
-            return rows;
+
+            var hlsBases = [
+              ["O", BASE],
+              ["L", "https://cc.leanhhu061206.workers.dev"],
+              ["R", "https://cc.realbestia.com"]
+            ];
+
+            return Promise.all(hlsBases.map(function(pair) {
+              return hlsCandidateProbe(pair[0], pair[1], keys, item.url);
+            })).then(function(hls) {
+              var altMap = {};
+              alts.forEach(function(a){ altMap[a.label] = a; });
+              var hlsMap = {};
+              hls.forEach(function(a){ hlsMap[a.label] = a; });
+
+              var anyAltUsable = alts.some(function(a) {
+                return a.status === 200 && !a.cf && (a.atob > 0 || a.files > 0 || a.direct > 0);
+              });
+              var anyHls = hls.some(function(a){ return a.m3u === 1; });
+
+              var next = anyAltUsable ? "PARSE_DETAIL" :
+                         anyHls ? "USE_HLS" :
+                         (dh.media || 0) > 0 ? "DETAIL_PROXY" : "NO_MEDIA";
+
+              var report =
+                "CCDIAG v0.5.0 K1 Q1 ID" + String(newsId) +
+                " DH" + String(dh.media || 0) +
+                " ALT=P" + compactCode(altMap.P) +
+                "/N" + compactCode(altMap.N) +
+                "/F" + compactCode(altMap.F) +
+                "/R" + compactCode(altMap.R) +
+                " HLS=O" + compactCode(hlsMap.O) +
+                "/L" + compactCode(hlsMap.L) +
+                "/R" + compactCode(hlsMap.R) +
+                " NEXT=" + next;
+
+              return [{
+                name:report,
+                title:report,
+                url:BASE + "/#" + encodeURIComponent(report),
+                quality:"DIAG",
+                type:"diagnostic",
+                provider:"cinemacity-v2-login"
+              }];
+            });
           });
         });
     });
   }).catch(function(e) {
     var msg=e&&e.message?e.message:String(e||"error");
+    var report="CCDIAG v0.5.0 ERR="+msg.slice(0,60);
     return [{
-      name:"0 · BOOT · "+msg.slice(0,100),
-      title:"0 · BOOT · "+msg.slice(0,100),
-      url:bootstrapUrl,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
+      name:report,title:report,
+      url:BASE+"/#"+encodeURIComponent(report),
+      quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
     }];
   });
 }

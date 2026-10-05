@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.33.0",
+  "version": "4.34.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1155,15 +1155,14 @@
     {
       "id": "noctra-streamvault",
       "name": "NoctraTV · StreamVault",
-      "description": "Current NoctraTV StreamVault selected-source family: Silver, Zoisite, Iron and Sunstone. Uses the MZone playback compatibility session locally and returns only validated direct media. Remains disabled while interactive verification behavior is being tested on non-datacenter networks.",
-      "version": "0.1.0",
+      "description": "noctratv.com StreamVault family. Uses the current MZone compatibility playback session locally; Silver is verified for movie playback through /m3u8-proxy with mz_lease on the root URL and a static playback-lease header inherited by HLS child/segment requests. Zoisite/Iron/Sunstone remain upstream dependency failures and are skipped.",
+      "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
-        "movie",
-        "tv"
+        "movie"
       ],
       "filename": "providers/streamvault.js",
-      "enabled": false,
+      "enabled": true,
       "formats": [
         "m3u8",
         "mp4"

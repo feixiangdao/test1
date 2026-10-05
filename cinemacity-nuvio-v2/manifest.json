@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.3.7",
-  "description": "CinemaCity V2 playback-chain diagnostic. Uses known Spider-Man search result, extracts news_id, then probes the detail page and DLE playlists AJAX endpoint.",
+  "version": "0.3.8",
+  "description": "CinemaCity V2 site-controller diagnostic. Probes controller.php?mod=search and mod=dh&action=sizes using the authenticated hash/news_id.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "Playback-chain diagnostic. SEARCH finds Spider-Man; ITEM shows news_id; DETAIL and PLAYLIST report CF/guest/atob/direct/data-file counts.",
-      "version": "0.3.7",
+      "description": "CinemaCity controller diagnostic. CTRLSEARCH checks the site-native search module; DH reports JSON keys and media-file entries from mod=dh sizes.",
+      "version": "0.3.8",
       "supportedTypes": [
         "movie"
       ],

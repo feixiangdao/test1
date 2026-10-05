@@ -5,7 +5,6 @@ on:
   push:
     paths:
       - 'noctratv-nuvio/providers/atlantic-artemis.js'
-      - 'noctratv-nuvio/research-atlantic-current.js'
       - '.github/workflows/test-noctra-atlantic.yml'
 
 jobs:
@@ -19,33 +18,15 @@ jobs:
           node-version: '22'
       - name: Syntax
         run: node --check noctratv-nuvio/providers/atlantic-artemis.js
-      - name: Research current Atlantic bundle
-        working-directory: noctratv-nuvio
-        run: node research-atlantic-current.js
       - name: Focused live probe
         working-directory: noctratv-nuvio
         run: |
           node - <<'NODE'
-          const H={
-            'User-Agent':'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36',
-            'Origin':'https://atlantic.st','Referer':'https://atlantic.st/','Accept':'*/*'
-          };
-          for(const u of [
-            'https://stream.hls.lol/helios?tmdbId=693134&type=movie',
-            'https://stream.hls.lol/helios?tmdbId=1399&type=tv&seasonId=1&episodeId=1'
-          ]){
-            try{
-              const r=await fetch(u,{headers:H});
-              const t=await r.text();
-              console.log('HELIOS RAW status='+r.status+' url='+u);
-              console.log(t.slice(0,6000));
-            }catch(e){console.log('HELIOS RAW error '+e.message)}
-          }
           const p=require('./providers/atlantic-artemis.js');
           async function run(label,args){
             const rows=await Promise.race([
               p.getStreams(...args),
-              new Promise(r=>setTimeout(()=>r([]),45000))
+              new Promise(r=>setTimeout(()=>r([]),30000))
             ]);
             console.log(label+': streams='+(rows||[]).length);
             (rows||[]).forEach((x,i)=>console.log('  '+(i+1)+'. '+x.name+' '+x.url));

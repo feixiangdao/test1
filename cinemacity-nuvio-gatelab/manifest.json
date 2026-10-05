@@ -1,0 +1,28 @@
+{
+  "name": "CinemaCity Gate Lab",
+  "version": "0.9.0",
+  "description": "CinemaCity entitlement/reverse-engineering lab built from the exact working v0.7.3 playback path. It compares authenticated vs guest PlayerJS qualities, real HLS variants, DH metadata qualities, premium-page markers, and same-origin script wiring without altering the stable provider.",
+  "scrapers": [
+    {
+      "id": "cinemacity-gatelab-090",
+      "name": "CinemaCity Gate Lab",
+      "description": "Keeps the confirmed v0.7.3 stream path and appends one GATELAB diagnostic: premium markers, group hint, auth/guest PlayerJS qualities, actual HLS qualities, DH metadata qualities, and page-script wiring.",
+      "version": "0.9.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/cinemacity-gatelab.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true,
+      "hasSettings": true
+    }
+  ]
+}

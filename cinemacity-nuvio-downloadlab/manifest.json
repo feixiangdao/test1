@@ -1,17 +1,17 @@
 {
   "name": "CinemaCity Download Lab",
-  "version": "1.3.0",
-  "description": "CinemaCity Download Lab 1.3.0. Same install URL and scraper ID. DUI3 narrows analysis to the exact sizes/download action sites in libs.js to avoid cross-contamination between adjacent code blocks.",
+  "version": "1.4.0",
+  "description": "CinemaCity Download Lab 1.4.0. Same URL and scraper ID. DUI4 traces official libs.js helper signatures and call sites to identify where download base URLs and quality selections originate.",
   "scrapers": [
     {
       "id": "cinemacity-downloadlab-100",
-      "name": "CinemaCity Download Lab v1.3.0",
-      "description": "DUI3: reports nearest function, occurrence count, method, endpoint family, parameters, call style, response handling and visible client-side entitlement checks for official sizes/download logic.",
-      "version": "1.3.0",
+      "name": "CinemaCity Download Lab v1.4.0",
+      "description": "DUI4: loadSizeMap/makeDownloadHref signatures, semantic shapes and call sites. Diagnostic-only.",
+      "version": "1.4.0",
       "supportedTypes": [
         "movie"
       ],
-      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/65c1484668c96ba9c8d09820e3327036362959ce/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab.js",
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/aa11999f8af56a7d18050207feb76f1c457bc631/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab.js",
       "enabled": true,
       "formats": [
         "m3u8",

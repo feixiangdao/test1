@@ -11,7 +11,7 @@
       "supportedTypes": [
         "movie"
       ],
-      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/PLACEHOLDER_COMMIT/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab.js",
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/946e8dfbeb8e7d5f4be84e377d7427de38d021a3/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab.js",
       "enabled": true,
       "formats": [
         "m3u8",

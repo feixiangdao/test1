@@ -1,0 +1,28 @@
+{
+  "name": "CinemaCity Official Download Lab",
+  "version": "1.1.0",
+  "description": "Experimental CinemaCity official-download UI reverse-engineering lab built from the confirmed working v0.7.3 playback path. It inspects the logged-in detail page and same-origin JavaScript for the site's own download controls/endpoints without changing the stable provider.",
+  "scrapers": [
+    {
+      "id": "cinemacity-downloadui-110",
+      "name": "CinemaCity Official Download Lab",
+      "description": "Stable v0.7.3 playback plus one DUI diagnostic that reports official 1080p download markup attributes and same-origin download JavaScript wiring.",
+      "version": "1.1.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/cinemacity-downloadui.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true,
+      "hasSettings": true
+    }
+  ]
+}

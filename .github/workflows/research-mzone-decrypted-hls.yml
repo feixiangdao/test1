@@ -1,0 +1,106 @@
+name: Research MZone decrypted HLS
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-mzone-decrypted-hls.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect decrypted p-v4 HLS
+        run: |
+          node - <<'NODE'
+          const BASE='https://api.m-zone.org';
+          const ORIGIN='https://noctratv.com';
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
+          const enc=new TextEncoder(),dec=new TextDecoder(),MAGIC=new Uint8Array([77,90,51,1]);
+          function b64url(b){return Buffer.from(new Uint8Array(b)).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+          function fromB64url(s){s=String(s||'').replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return new Uint8Array(Buffer.from(s,'base64'));}
+          function cookieFrom(r){const s=r.headers.get('set-cookie')||'';return s.split(',').map(x=>x.split(';')[0].trim()).filter(Boolean).join('; ');}
+          function abs(u,b){try{return new URL(u,b).toString()}catch{return u}}
+          async function createSession(){
+            const cr=await fetch(BASE+'/api/player/v2/challenge',{headers:{'User-Agent':UA,Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/'}});
+            const ch=await cr.json(),c1=cookieFrom(cr);
+            const sign=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);
+            const pub=await crypto.subtle.exportKey('jwk',sign.publicKey);
+            const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},sign.privateKey,enc.encode(ch.challengeId+'.'+ch.nonce+'.'+ch.issuedAt));
+            const ecdh=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},false,['deriveBits']);
+            const tpub=await crypto.subtle.exportKey('jwk',ecdh.publicKey);
+            const payload={challengeId:ch.challengeId,nonce:ch.nonce,publicKey:pub,signature:b64url(sig),fingerprint:{webdriver:false,languages:['en-US','en'],plugins:5,hardwareConcurrency:8,deviceMemory:8,maxTouchPoints:5,platform:'Android',brands:[{brand:'Chromium',version:'140'},{brand:'Google Chrome',version:'140'}],mobile:true,timezone:'Asia/Shanghai',screen:{width:1080,height:2400,colorDepth:24,pixelRatio:2.75},visibilityState:'visible'},embedded:false,embedOrigin:'',sandboxed:false,turnstileToken:'',supportsEncryptedTransport:true,supportsEncryptedCapabilities:true,transportPublicKey:tpub,playerVersion:'mplayer-web-v2',playbackSessionVersion:2,capabilities:['hls','dash','codec-avc']};
+            const sr=await fetch(BASE+'/api/player/v2/session',{method:'POST',headers:{'User-Agent':UA,'Content-Type':'application/json',Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/',...(c1?{Cookie:c1}:{})},body:JSON.stringify(payload)});
+            const sj=await sr.json();
+            if(!sr.ok||!sj.token)throw new Error(sj.error||'session fail');
+            const sp=await crypto.subtle.importKey('jwk',sj.transport.serverPublicKey,{name:'ECDH',namedCurve:'P-256'},false,[]);
+            const bits=await crypto.subtle.deriveBits({name:'ECDH',public:sp},ecdh.privateKey,256);
+            const hk=await crypto.subtle.importKey('raw',bits,'HKDF',false,['deriveKey']);
+            const key=await crypto.subtle.deriveKey({name:'HKDF',hash:'SHA-256',salt:fromB64url(sj.transport.salt),info:enc.encode('mzone-playback-v3:'+sj.sessionId)},hk,{name:'AES-GCM',length:256},false,['decrypt']);
+            return {token:sj.token,sessionId:sj.sessionId,cookie:[c1,cookieFrom(sr)].filter(Boolean).join('; '),sign,key};
+          }
+          async function proof(url,s){
+            const u=new URL(url),ts=Date.now(),nonce=crypto.getRandomValues(new Uint8Array(18));
+            const hash=await crypto.subtle.digest('SHA-256',new Uint8Array());
+            const msg=['mzone-proof-v4',s.sessionId,'GET',u.pathname+u.search,b64url(hash),String(ts),b64url(nonce)].join('\n');
+            const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},s.sign.privateKey,enc.encode(msg));
+            return {'X-MZone-Proof-Version':'4','X-MZone-Proof-Timestamp':String(ts),'X-MZone-Proof-Nonce':b64url(nonce),'X-MZone-Proof':b64url(sig)};
+          }
+          async function decryptEnvelope(buf,s,url){
+            const a=new Uint8Array(buf);
+            if(!MAGIC.every((v,i)=>a[i]===v))return dec.decode(a);
+            const iv=a.slice(4,16),ct=a.slice(16),path=new URL(url).pathname;
+            const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv,additionalData:enc.encode(s.sessionId+'|response|'+path),tagLength:128},s.key,ct);
+            return dec.decode(pt);
+          }
+          async function resolve(s,id){
+            const rr=await fetch(BASE+'/mplayer/'+id+'/resolve',{method:'POST',headers:{'User-Agent':UA,'Content-Type':'application/json',Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/','X-MZone-Playback-Lease':s.token,'X-MZone-Transport':'3',...(s.cookie?{Cookie:s.cookie}:{})},body:JSON.stringify({codecCapabilities:{},type:'movie',tmdbId:'238'})});
+            const j=await rr.json(),r=j.result||{},url=r.url||r.playlist||r.file||'';
+            console.log('RESOLVE '+id+' status='+rr.status+' maxHeight='+(r.maxHeight||'')+' path='+(url?new URL(url).pathname:''));
+            if(!url)throw new Error(j.error||'no url');
+            return url;
+          }
+          async function fetchMaster(url,s){
+            const ph=await proof(url,s);
+            const r=await fetch(url,{headers:{'User-Agent':UA,'X-MZone-Playback-Lease':s.token,'X-MZone-Transport':'3','X-MZone-Encrypted-Accept':'3',...(s.cookie?{Cookie:s.cookie}:{}),...ph}});
+            const text=await decryptEnvelope(await r.arrayBuffer(),s,url);
+            console.log('MASTER status='+r.status+' chars='+text.length+' prefix='+text.slice(0,80).replace(/\s+/g,' '));
+            const lines=text.split(/\r?\n/);
+            const urls=[];
+            for(let i=0;i<lines.length;i++){
+              const L=lines[i].trim();
+              if(L&&L[0]!=='#') urls.push(abs(L,url));
+            }
+            console.log('MASTER_URLS count='+urls.length);
+            urls.slice(0,12).forEach((u,i)=>{const x=new URL(u);console.log('  '+i+' host='+x.hostname+' path='+x.pathname+' queryKeys='+[...x.searchParams.keys()].join(','));});
+            return urls;
+          }
+          async function directProbe(url){
+            const r=await fetch(url,{headers:{'User-Agent':UA}});
+            const ct=r.headers.get('content-type')||'';
+            const body=await r.text().catch(()=> '');
+            console.log('DIRECT_VARIANT status='+r.status+' ct='+ct+' prefix='+body.slice(0,80).replace(/\s+/g,' '));
+            if(r.status===200&&body.startsWith('#EXTM3U')){
+              const media=body.split(/\r?\n/).map(x=>x.trim()).find(x=>x&&x[0]!=='#');
+              if(media){
+                const seg=abs(media,url);
+                const sr=await fetch(seg,{headers:{'User-Agent':UA,Range:'bytes=0-1023'}});
+                console.log('DIRECT_SEGMENT status='+sr.status+' ct='+(sr.headers.get('content-type')||'')+' host='+new URL(seg).hostname);
+              }
+            }
+          }
+          (async()=>{
+            const s=await createSession();
+            for(const id of ['site-streamvault-silver','site-cinema-army-cookiebakers','site-oneshows-ethan']){
+              try{
+                const p=await resolve(s,id);
+                const urls=await fetchMaster(p,s);
+                if(urls[0])await directProbe(urls[0]);
+              }catch(e){console.log(id+' ERROR '+e.message)}
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

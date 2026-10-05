@@ -1,0 +1,68 @@
+name: Analyze CinemaCity download orchestration (libs.js)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cinemacity-orch-analysis
+    paths:
+      - '.github/workflows/analyze-cinemacity-orch.yml'
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch detail page and locate libs.js
+        shell: bash
+        run: |
+          mkdir -p /tmp/cc
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+          curl -sSL -A "$UA" \
+            -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' \
+            -H 'Accept-Language: en-US,en;q=0.9' \
+            -o /tmp/cc/detail.html \
+            -w "DETAIL http=%{http_code} size=%{size_download}\n" \
+            "https://cinemacity.cc/movies/3290-unabomber.html" || true
+
+          echo "=== head ==="
+          head -c 400 /tmp/cc/detail.html || true
+
+          echo "=== script srcs ==="
+          grep -oiE '<script[^>]*src=["'"'"'][^"'"'"']+["'"'"']' /tmp/cc/detail.html 2>/dev/null | sed -E 's/.*src=["'"'"']([^"'"'"']+).*/\1/' | sort -u || echo "NONE"
+
+          echo "=== libs.js mentions ==="
+          grep -oiE '[^"'"'"' >]*libs\.js[^"'"'"' >]*' /tmp/cc/detail.html 2>/dev/null | sort -u || echo "NONE"
+
+          echo "=== download markup hints ==="
+          grep -oiE 'class="[^"]*(download|modal)[^"]*"' /tmp/cc/detail.html 2>/dev/null | sort -u | head -20 || echo "NONE"
+          grep -oiE 'data-tr_[a-zA-Z0-9_-]+' /tmp/cc/detail.html 2>/dev/null | sort -u | head -20 || echo "NONE"
+
+      - name: Probe likely libs.js paths
+        shell: bash
+        run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+          for p in \
+            "templates/cinemacity/js/libs.js" \
+            "templates/CinemaCity/js/libs.js" \
+            "templates/cinemacity/libs.js" \
+            "js/libs.js" ; do
+            out="/tmp/cc/$(echo "$p" | tr '/' '_')"
+            code=$(curl -sSL -A "$UA" -o "$out" -w "%{http_code}" "https://cinemacity.cc/$p" || echo "000")
+            sz=$(wc -c < "$out" 2>/dev/null || echo 0)
+            echo "$code  $sz  $p"
+          done
+
+      - name: Dump any captured libs.js
+        shell: bash
+        run: |
+          echo "=== files ==="
+          ls -la /tmp/cc/ || true
+          for f in /tmp/cc/*libs*; do
+            [ -f "$f" ] || continue
+            echo "=== $f ($(wc -c < "$f") bytes) ==="
+            head -c 300 "$f"
+            echo
+          done

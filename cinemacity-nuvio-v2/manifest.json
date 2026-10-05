@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.4.2",
-  "description": "CinemaCity V2 media-wiring probe. Scans inline HTML and up to five non-library scripts for DH/SIZES/DOWNLOAD/FILES/URLSET logic; hides numeric size values.",
+  "version": "0.4.3",
+  "description": "CinemaCity V2 DLE article-route diagnostic. Uses the known news_id to probe index.php?newsid=... and newsid+seourl for PlayerJS/public_files without relying on the broken pretty URL.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity wiring probe. Output prioritizes INLINE and JS rows; numeric DH size values are omitted.",
-      "version": "0.4.2",
+      "description": "CinemaCity DLE route diagnostic. ID/SEOID rows report CF, guest, atob, public_files, direct-media and body length.",
+      "version": "0.4.3",
       "supportedTypes": [
         "movie"
       ],

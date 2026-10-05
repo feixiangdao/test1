@@ -2392,7 +2392,7 @@ function urlsetQualityVariants(raw, pageUrl) {
     if (!emittedVideo) chosen.unshift(video);
 
     var variantUrl = prefix + chosen.join(",") + ",.urlset/master.m3u8" + after;
-    var label = "CinemaCity Download Lab v1.2.0 · " + q + " · HLS";
+    var label = "CinemaCity Download Lab v1.3.0 · " + q + " · HLS";
     rows.push({
       name:label,
       title:label,
@@ -2422,7 +2422,7 @@ function fileSetStreams(fileData, pageUrl) {
   if (!raw) return [];
 
   if (/^https?:\/\//i.test(raw) && /\.urlset\/master\.m3u8(?:$|[?#])/i.test(raw)) {
-    var autoLabel = "CinemaCity Download Lab v1.2.0 · Auto · HLS";
+    var autoLabel = "CinemaCity Download Lab v1.3.0 · Auto · HLS";
     var rows = [{
       name:autoLabel,
       title:autoLabel,
@@ -2459,7 +2459,7 @@ function fileSetStreams(fileData, pageUrl) {
     var kind = watchCandidateKind(u);
     if (kind !== "hls" && kind !== "dash" && kind !== "mp4") return;
 
-    var label = "CinemaCity Download Lab v1.2.0 · " + (q || "Auto") + " · " + kind.toUpperCase();
+    var label = "CinemaCity Download Lab v1.3.0 · " + (q || "Auto") + " · " + kind.toUpperCase();
     out.push({
       name:label,
       title:label,
@@ -2538,7 +2538,7 @@ function expandHlsMasterVariants(autoStream, pageUrl) {
         var codecs = hlsAttr(line, "CODECS");
         var muxedAudio = !audioGroup && /mp4a|aac|ac-3|ec-3|opus/i.test(codecs);
 
-        var label = "CinemaCity Download Lab v1.2.0 · " + q + " · HLS";
+        var label = "CinemaCity Download Lab v1.3.0 · " + q + " · HLS";
         if (hasExternalAudio && audioGroup && !muxedAudio) label += " · TEST";
 
         rows.push({
@@ -2776,66 +2776,76 @@ function downloadMarkupProbe(html) {
 
 function ajaxCallShape(js, actionName) {
   var text = clean(js);
-  var lower = text.toLowerCase();
-  var needles = [
-    "action=" + actionName.toLowerCase(),
-    "action:'" + actionName.toLowerCase() + "'",
-    'action:"' + actionName.toLowerCase() + '"',
-    "action : '" + actionName.toLowerCase() + "'",
-    'action : "' + actionName.toLowerCase() + '"'
+  var action = clean(actionName).toLowerCase();
+  var matches = [];
+  var patterns = [
+    new RegExp("action\\s*[:=]\\s*['\\\"]" + action + "['\\\"]","ig"),
+    new RegExp("[?&]action=" + action + "\\b","ig")
   ];
-  var idx = -1;
-  for (var i=0;i<needles.length;i++) {
-    idx = lower.indexOf(needles[i]);
-    if (idx >= 0) break;
-  }
-  if (idx < 0) {
-    var re = new RegExp("action\\s*[:=]\\s*['\\\"]" + actionName + "['\\\"]", "i");
-    var m0 = re.exec(text);
-    if (m0) idx = m0.index;
-  }
-  if (idx < 0) return null;
 
-  var frag = text.slice(Math.max(0,idx-1800), Math.min(text.length,idx+2600));
-  var before = text.slice(Math.max(0,idx-900), idx);
+  patterns.forEach(function(re) {
+    var m;
+    while ((m = re.exec(text)) !== null) {
+      matches.push({idx:m.index,raw:m[0]});
+      if (matches.length >= 8) break;
+    }
+  });
+  if (!matches.length) return null;
+  matches.sort(function(a,b){ return a.idx-b.idx; });
+
+  var idx = matches[0].idx;
+  var local = text.slice(Math.max(0,idx-520), Math.min(text.length,idx+760));
+  var before = text.slice(Math.max(0,idx-1200), idx);
+
   var fn = "?";
   var fm, fre = /function\s+([A-Za-z_$][\w$]*)\s*\(/g;
   while ((fm = fre.exec(before)) !== null) fn = fm[1];
 
   var method = "?";
-  if (/(?:type|method)\s*:\s*["']POST["']/i.test(frag) || /\$\.post\s*\(/i.test(frag)) method = "POST";
-  else if (/(?:type|method)\s*:\s*["']GET["']/i.test(frag) || /\$\.get(?:JSON)?\s*\(/i.test(frag)) method = "GET";
+  if (/\$\.post\s*\(/i.test(local) || /(?:type|method)\s*:\s*["']POST["']/i.test(local)) method = "POST";
+  else if (/\$\.get(?:JSON)?\s*\(/i.test(local) || /(?:type|method)\s*:\s*["']GET["']/i.test(local)) method = "GET";
 
   var endpoint = "OTHER";
-  if (/controller\.php/i.test(frag)) endpoint = "CTRL";
-  if (/mod\s*[:=]\s*["']?dh["']?|mod=dh/i.test(frag)) endpoint += "+DH";
+  if (/controller\.php/i.test(local)) endpoint = "CTRL";
+  if (/mod\s*[:=]\s*["']?dh["']?|mod=dh/i.test(local)) endpoint += "+DH";
+  if (/[?&]action\s*=\s*download/i.test(local) && !/controller\.php/i.test(local)) endpoint = "BASEQ";
+  if (/urlset\/master\.m3u8/i.test(local)) endpoint += "+URLSET";
 
   var params = [];
   ["news_id","user_hash","video","audio","subtitle","name"].forEach(function(p){
     var rr = new RegExp("\\b" + p + "\\b","i");
-    if (rr.test(frag)) params.push(p.replace("user_hash","hash").replace("news_id","nid").replace("subtitle","sub"));
+    if (rr.test(local)) params.push(p.replace("user_hash","hash").replace("news_id","nid").replace("subtitle","sub"));
   });
 
   var resp = [];
-  if (/window\.location|location\.href|location\.assign/i.test(frag)) resp.push("LOC");
-  if (/blob\s*\(|responseType\s*[:=]\s*["']blob/i.test(frag)) resp.push("BLOB");
-  if (/JSON\.parse|dataType\s*:\s*["']json/i.test(frag)) resp.push("JSON");
-  if (/success\s*:\s*function|\.then\s*\(/i.test(frag)) resp.push("CB");
-  if (/\.click\s*\(|createElement\s*\(\s*["']a["']/i.test(frag)) resp.push("A");
+  if (/window\.location|location\.href|location\.assign/i.test(local)) resp.push("LOC");
+  if (/blob\s*\(|responseType\s*[:=]\s*["']blob/i.test(local)) resp.push("BLOB");
+  if (/JSON\.parse|dataType\s*:\s*["']json/i.test(local)) resp.push("JSON");
+  if (/success\s*:\s*function|\.then\s*\(/i.test(local)) resp.push("CB");
+  if (/createElement\s*\(\s*["']a["']|\.click\s*\(/i.test(local)) resp.push("A");
 
   var gate = [];
-  if (/premium/i.test(frag)) gate.push("PREM");
-  if (/supporter/i.test(frag)) gate.push("SUP");
-  if (/user[_-]?group|group[_-]?id|member[_-]?group/i.test(frag)) gate.push("GROUP");
-  if (/subscription|membership|paid[_-]?status/i.test(frag)) gate.push("SUB");
+  if (/premium/i.test(local)) gate.push("PREM");
+  if (/supporter/i.test(local)) gate.push("SUP");
+  if (/user[_-]?group|group[_-]?id|member[_-]?group/i.test(local)) gate.push("GROUP");
+  if (/subscription|membership|paid[_-]?status/i.test(local)) gate.push("SUB");
+
+  var style = [];
+  if (/\$\.ajax\s*\(/i.test(local)) style.push("AJAX");
+  if (/\$\.get(?:JSON)?\s*\(/i.test(local)) style.push("JQGET");
+  if (/\$\.post\s*\(/i.test(local)) style.push("JQPOST");
+  if (/fetch\s*\(/i.test(local)) style.push("FETCH");
+  if (/["']\?action=download/i.test(local) || /\+\s*["']\?action=download/i.test(local)) style.push("QBUILD");
 
   return {
     fn:fn,
+    count:matches.length,
     method:method,
     endpoint:endpoint,
     params:params.join(",") || "none",
     resp:resp.join("+") || "0",
-    gate:gate.join("+") || "0"
+    gate:gate.join("+") || "0",
+    style:style.join("+") || "0"
   };
 }
 
@@ -2872,8 +2882,8 @@ function downloadScriptProbe(html, pageUrl) {
         var deep = "";
         if (sz || dl) {
           var chunks = [basenameOfUrl(u)];
-          if (sz) chunks.push("SZ=" + sz.method + "/" + sz.endpoint + "/" + sz.params + "/G" + sz.gate);
-          if (dl) chunks.push("DL=" + dl.method + "/" + dl.endpoint + "/" + dl.params + "/R" + dl.resp + "/G" + dl.gate);
+          if (sz) chunks.push("SZ=" + sz.fn + "#" + sz.count + ":" + sz.method + "/" + sz.endpoint + "/" + sz.params + "/S" + sz.style + "/G" + sz.gate);
+          if (dl) chunks.push("DL=" + dl.fn + "#" + dl.count + ":" + dl.method + "/" + dl.endpoint + "/" + dl.params + "/S" + dl.style + "/R" + dl.resp + "/G" + dl.gate);
           deep = chunks.join(" ");
         }
 
@@ -2897,7 +2907,7 @@ function officialDownloadDiagnostic(item, detailHtml, newsId) {
   var mp = downloadMarkupProbe(detailHtml || "");
   return downloadScriptProbe(detailHtml || "", item.url).then(function(js){
     return diagnosticRow(
-      "DUI2 H1080=" + String(mp.has1080) +
+      "DUI3 H1080=" + String(mp.has1080) +
       " M=" + mp.flags +
       " A=" + mp.attrs +
       " JS=" + js.summary +

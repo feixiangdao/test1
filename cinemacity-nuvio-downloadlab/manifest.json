@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Download Lab",
-  "version": "1.0.0",
-  "description": "Experimental CinemaCity download-path playback lab built from the confirmed working v0.7.3 provider. It exposes the official PlayerJS action=download URLs for each available video quality using the configured user's own session.",
+  "version": "1.1.0",
+  "description": "CinemaCity Download Lab 1.1.0 keeps the same install URL and scraper ID, while adding official-download UI reverse engineering on top of the confirmed working v0.7.3 playback path.",
   "scrapers": [
     {
       "id": "cinemacity-downloadlab-100",
       "name": "CinemaCity Download Lab",
-      "description": "Stable v0.7.3 playback plus experimental Download 1080p/720p/360p MP4 entries generated from the official PlayerJS file set. No shared credentials are embedded.",
-      "version": "1.0.0",
+      "description": "Same Download Lab install address, now with DUI diagnostics for official 1080p download markup and same-origin JavaScript wiring.",
+      "version": "1.1.0",
       "supportedTypes": [
         "movie"
       ],

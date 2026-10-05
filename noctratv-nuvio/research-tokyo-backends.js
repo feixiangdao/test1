@@ -13,6 +13,7 @@ function abs(x,b){try{return new URL(x,b).href}catch{return''}}
   // Known current/static fallback from latest alias research.
   srcs.push('https://noctratv.com/assets/pStreamBackend-BO-fiiV-.js');
   srcs.push('https://noctratv.com/assets/index-B_JGO8C1.js');
+  srcs.push('https://noctratv.com/assets/vortexApiSource-B-QupYve.js');
   for(const u of [...new Set(srcs)]){
     let s;try{s=await txt(u)}catch(e){console.log('ERR '+u+' '+e.message);continue}
     if(!/corazon|kickassanime|anikai/i.test(s))continue;

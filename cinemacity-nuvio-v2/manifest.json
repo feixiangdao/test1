@@ -1,12 +1,12 @@
 {
   "name": "CinemaCity Local V2",
   "version": "0.4.3",
-  "description": "CinemaCity V2 public_files diagnostic. Uses DH media keys to probe direct /public_files files and .urlset/master.m3u8 construction, reporting redirects and final host.",
+  "description": "CinemaCity V2 DH download probe. Chooses one video/audio pair from the sizes JSON and probes mod=dh&action=download with Range bytes=0-1 to reveal media response/redirect without downloading the full file.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity public_files probe. PF_FILE/PF_SET/PF_ONESET report status, redirect, final host and whether an HLS master playlist is returned.",
+      "description": "CinemaCity DH download probe. PICK shows selected media files; DOWNLOAD shows status/content-type/content-range/final host using only a tiny range request.",
       "version": "0.4.3",
       "supportedTypes": [
         "movie"

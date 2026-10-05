@@ -18,4 +18,6 @@ jobs:
           node-version: '22'
       - name: Probe current NoctraTV frontend aliases
         working-directory: noctratv-nuvio
-        run: node research-source-aliases.js
+        run: |
+          node research-source-aliases.js
+          node research-tokyo-backends.js

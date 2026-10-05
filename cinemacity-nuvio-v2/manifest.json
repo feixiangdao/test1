@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.4.3",
-  "description": "CinemaCity V2 DH download probe. Chooses one video/audio pair from the sizes JSON and probes mod=dh&action=download with Range bytes=0-1 to reveal media response/redirect without downloading the full file.",
+  "version": "0.4.4",
+  "description": "CinemaCity V2 DH response inspector. Separates manual redirect vs followed response and shows Location, Content-Disposition, MIME, Content-Range and the first 64 response bytes.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity DH download probe. PICK shows selected media files; DOWNLOAD shows status/content-type/content-range/final host using only a tiny range request.",
-      "version": "0.4.3",
+      "description": "DH response inspector. MANUAL shows redirect headers; FOLLOW shows actual response; BODY shows first bytes without downloading the full file.",
+      "version": "0.4.4",
       "supportedTypes": [
         "movie"
       ],

@@ -181,27 +181,32 @@ function appendLease(u,token){
   }catch(_){}
   return u;
 }
+function validationHeaders(url,h){
+  var out={};
+  Object.keys(h||{}).forEach(function(k){out[k]=h[k];});
+  try{
+    var u=new URL(url);
+    if(u.searchParams.has("mz_lease")){
+      Object.keys(out).forEach(function(k){
+        if(k.toLowerCase()==="x-mzone-playback-lease")delete out[k];
+      });
+    }
+  }catch(_){}
+  return out;
+}
 function validate(url,type,h){
   if(!/^https?:\/\//i.test(clean(url)))return Promise.resolve(null);
+  var vh=validationHeaders(url,h);
   if(type==="mp4"||/\.mp4(?:[?#]|$)/i.test(url)){
-    return withTimeout(fetch(url,{headers:h}),10000,"MP4").then(function(r){
+    return withTimeout(fetch(url,{headers:vh}),10000,"MP4").then(function(r){
       if(!r.ok)throw new Error("MP4 HTTP "+r.status);
       var ct=(r.headers.get("content-type")||"").toLowerCase();
       if(ct.indexOf("text/html")>=0||ct.indexOf("application/json")>=0)throw new Error("not media");
       return{url:url,type:"mp4",quality:"Auto"};
     });
   }
-  return withTimeout(fetch(url,{headers:h}),10000,"HLS").then(function(r){
-    if(!r.ok){
-      var wa=clean(r.headers&&r.headers.get?r.headers.get("www-authenticate"):"");
-      var xc=clean(r.headers&&r.headers.get?r.headers.get("x-mzone-error"):"");
-      return r.text().catch(function(){return"";}).then(function(body){
-        var short=String(body||"").replace(/\s+/g," ").slice(0,240);
-        short=short.replace(/[A-Za-z0-9_-]{24,}/g,"<redacted>");
-        console.log("[Noctra/StreamVault] HLS auth status="+r.status+" www="+wa+" xerr="+xc+" sentHeaderKeys="+Object.keys(h||{}).join(",")+" body="+short);
-        throw new Error("HLS HTTP "+r.status);
-      });
-    }
+  return withTimeout(fetch(url,{headers:vh}),10000,"HLS").then(function(r){
+    if(!r.ok)throw new Error("HLS HTTP "+r.status);
     return r.text();
   }).then(function(body){
     if(String(body||"").indexOf("#EXTM3U")!==0)throw new Error("not HLS");
@@ -229,11 +234,6 @@ function resolveOne(src,tmdbId,mediaType,season,episode,sess){
     headers:h,
     body:JSON.stringify(payload)
   }),16000,src.label+" resolve").then(function(r){
-    try{
-      var names=[];
-      if(r.headers&&r.headers.forEach)r.headers.forEach(function(v,k){names.push(k);});
-      console.log("[Noctra/StreamVault] "+src.label+" resolveHeaderKeys="+names.join(","));
-    }catch(_){}
     return r.json().catch(function(){return{};}).then(function(j){
       if(!r.ok||j.success===false||!j.result)throw new Error(j.error||("HTTP "+r.status));
       var x=j.result||{};

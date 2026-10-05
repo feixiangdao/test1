@@ -1283,6 +1283,42 @@ function dhSizesProbe(newsId, hash, referer) {
   });
 }
 
+function idRouteProbe(label, url, referer) {
+  var headers = browserNavHeaders(referer || (BASE + "/"));
+  return fetch(url, { headers:headers, redirect:"follow" }).then(function(r) {
+    return r.text().then(function(html) {
+      var canonical = "";
+      var cm = html.match(/<link\b[^>]*rel\s*=\s*["']canonical["'][^>]*href\s*=\s*["']([^"']+)["']/i) ||
+               html.match(/<link\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*rel\s*=\s*["']canonical["']/i);
+      if (cm) canonical = resolveUrl(cm[1], BASE + "/");
+
+      var atobCount = (html.match(/atob\s*\(/ig) || []).length;
+      var publicFiles = (html.match(/public_files/ig) || []).length;
+      var direct = (html.match(/https?:\/\/[^"'<>\s]+\.(?:m3u8|mp4|m4a|mpd)(?:[?#][^"'<>\s]*)?/ig) || []).length;
+
+      return {
+        label:label,
+        status:r.status,
+        finalUrl:r.url || url,
+        len:html.length,
+        cf:challengeHtml(html)?1:0,
+        guest:guestBlocked(html)?1:0,
+        atob:atobCount,
+        files:publicFiles,
+        direct:direct,
+        canonical:canonical,
+        html:html,
+        url:url
+      };
+    });
+  }).catch(function(e) {
+    return {
+      label:label,status:0,finalUrl:url,len:0,cf:0,guest:0,atob:0,files:0,direct:0,canonical:"",html:"",url:url,
+      error:e&&e.message?e.message:String(e||"error")
+    };
+  });
+}
+
 function searchAndCandidateProbe() {
   var bootstrapUrl = BASE + "/index.php?do=search";
   var headers = baseHeaders(BASE + "/", true);
@@ -1299,20 +1335,11 @@ function searchAndCandidateProbe() {
     return r.text().then(function(html) {
       var boot = inspectSearchBody(html, "Spider-Man Brand New Day", "2026");
       var hash = boot.hash || "";
-      var scriptSources = extractInterestingScriptSources(html);
-      var inline = scanInlineWiring(html);
       var rows = [{
         name:"BOOT "+String(r.status)+" CF"+(challengeHtml(html)?"1":"0")+" G"+(guestBlocked(html)?"1":"0")+" HASH"+(hash?"1":"0"),
         title:"BOOT "+String(r.status)+" CF"+(challengeHtml(html)?"1":"0")+" G"+(guestBlocked(html)?"1":"0")+" HASH"+(hash?"1":"0"),
         url:bootstrapUrl,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"
       }];
-      if ((inline.flags || []).length || inline.snippet) {
-        var it = "INLINE [" + (inline.flags || []).join(",") + "]";
-        if (inline.snippet) it += " · " + inline.snippet.slice(0,160);
-        rows.push({name:it,title:it,url:bootstrapUrl+"#inline",quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
-      } else {
-        rows.push({name:"INLINE [] · no-media-wiring",title:"INLINE [] · no-media-wiring",url:bootstrapUrl+"#inline",quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
-      }
       if (!hash) return rows;
 
       return ajaxSearchProbe("SPIDER", "/engine/mods/dle_search/ajax.php", hash, "Spider-Man Brand New Day", "/")
@@ -1323,6 +1350,7 @@ function searchAndCandidateProbe() {
           if (!item || !item.url) return rows;
 
           var newsId = parseNewsId(item.url);
+          var slug = clean(item.url).split("/").pop().replace(/\.html(?:\?.*)?$/i,"").replace(/^\d+-/,"");
           rows.push({
             name:"ITEM ID="+(newsId||"?")+" · "+clean(item.slugTitle||item.title||"").slice(0,42),
             title:"ITEM ID="+(newsId||"?")+" · "+clean(item.slugTitle||item.title||"").slice(0,42),
@@ -1330,20 +1358,26 @@ function searchAndCandidateProbe() {
           });
           if (!newsId) return rows;
 
+          var shortUrl = BASE + "/index.php?newsid=" + encodeURIComponent(newsId);
+          var seourlUrl = shortUrl + "&seourl=" + encodeURIComponent(slug || "");
+
           return Promise.all([
             dhSizesProbe(newsId, hash, item.url),
-            Promise.all(scriptSources.slice(0,6).map(jsWiringProbe))
+            idRouteProbe("ID", shortUrl, BASE + "/"),
+            idRouteProbe("SEOID", seourlUrl, BASE + "/")
           ]).then(function(probes) {
-            var dh=probes[0], jsRows=probes[1] || [];
+            var dh=probes[0], idp=probes[1], seop=probes[2];
 
-            var dht="DH "+String(dh.status)+" J"+dh.json+" L"+dh.len+" K"+dh.keys+" MEDIA"+dh.media;
+            var dht="DH "+String(dh.status)+" J"+dh.json+" K"+dh.keys+" MEDIA"+dh.media;
             rows.push({name:dht,title:dht,url:dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
 
-            jsRows.slice(0,5).forEach(function(j,idx) {
-              var t="JS"+String(idx+1)+" "+String(j.status)+" ["+(j.flags||[]).join(",")+"] L"+String(j.len);
-              if (j.snippet) t += " · "+j.snippet.slice(0,150);
-              else t += " · no-media-wiring";
-              rows.push({name:t,title:t,url:j.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+            [idp,seop].forEach(function(p) {
+              var t=p.label+" "+String(p.status)+" CF"+p.cf+" G"+p.guest+" A"+p.atob+" F"+p.files+" D"+p.direct+" L"+p.len;
+              rows.push({name:t,title:t,url:p.finalUrl||p.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+              if (p.canonical) {
+                var ct=p.label+"CAN · "+clean(p.canonical).slice(0,100);
+                rows.push({name:ct,title:ct,url:p.canonical,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+              }
             });
 
             dh.preview.slice(0,2).forEach(function(k,idx) {

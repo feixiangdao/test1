@@ -924,31 +924,56 @@ function ajaxRow(x) {
   };
 }
 
-function ajaxSearchProbe(label, endpoint, hash, query) {
+function unwrapDleSearchPayload(raw) {
+  var text = clean(raw);
+  var json = 0;
+  var content = text;
+  try {
+    var parsed = JSON.parse(text);
+    json = 1;
+    if (parsed && typeof parsed === "object") {
+      if (typeof parsed.content === "string") content = parsed.content;
+      else if (typeof parsed.response === "string") content = parsed.response;
+      else if (typeof parsed.html === "string") content = parsed.html;
+    }
+  } catch (_) {}
+  return {
+    raw: text,
+    content: content,
+    json: json
+  };
+}
+
+function ajaxSearchProbe(label, endpoint, hash, query, thisUrl) {
   var headers = baseHeaders(BASE + "/", true);
   headers["Origin"] = BASE;
   headers["Referer"] = BASE + "/";
   headers["X-Requested-With"] = "XMLHttpRequest";
   headers["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8";
-  headers["Accept"] = "*/*";
+  headers["Accept"] = "application/json, text/javascript, */*; q=0.01";
 
   var body = "story=" + encodeURIComponent(query) +
-    "&dle_hash=" + encodeURIComponent(hash || "");
+    "&dle_hash=" + encodeURIComponent(hash || "") +
+    "&thisUrl=" + encodeURIComponent(thisUrl || "/");
 
   return fetch(BASE + endpoint, {
     method: "POST",
     headers: headers,
     body: body
   }).then(function(r) {
-    return r.text().then(function(html) {
+    return r.text().then(function(raw) {
+      var payload = unwrapDleSearchPayload(raw);
+      var html = payload.content;
       var info = inspectSearchBody(html, "The Matrix", "1999");
       return {
         label: label,
         status: r.status,
         html: html,
+        raw: raw,
+        json: payload.json,
         info: info,
-        cf: challengeHtml(html) ? 1 : 0,
-        guest: guestBlocked(html) ? 1 : 0,
+        cf: challengeHtml(raw) || challengeHtml(html) ? 1 : 0,
+        guest: guestBlocked(raw) || guestBlocked(html) ? 1 : 0,
         endpoint: endpoint
       };
     });
@@ -957,6 +982,8 @@ function ajaxSearchProbe(label, endpoint, hash, query) {
       label: label,
       status: 0,
       html: "",
+      raw: "",
+      json: 0,
       info: { items: [], match: null, bestScore: -999, hashFound: 0 },
       cf: 0,
       guest: 0,
@@ -969,8 +996,10 @@ function ajaxSearchProbe(label, endpoint, hash, query) {
 function compactAjaxRow(x) {
   var t = x.label +
     " " + String(x.status) +
+    " J" + String(x.json || 0) +
     " CF" + String(x.cf) +
     " G" + String(x.guest) +
+    " L" + String((x.html || "").length) +
     " N" + String((x.info.items || []).length) +
     " M" + (x.info.match ? "1" : "0") +
     " S" + String(x.info.bestScore);
@@ -1018,8 +1047,8 @@ function searchAndCandidateProbe() {
       if (!hash) return rows;
 
       return Promise.all([
-        ajaxSearchProbe("MODS", "/engine/mods/dle_search/ajax.php", hash, q),
-        ajaxSearchProbe("LAZY", "/engine/lazydev/dle_search/ajax.php", hash, q)
+        ajaxSearchProbe("MODS", "/engine/mods/dle_search/ajax.php", hash, q, "/"),
+        ajaxSearchProbe("LAZY", "/engine/lazydev/dle_search/ajax.php", hash, q, "/")
       ]).then(function(results) {
         results.forEach(function(x) { rows.push(compactAjaxRow(x)); });
 

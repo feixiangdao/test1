@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.29.0",
+  "version": "4.30.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1167,6 +1167,28 @@
       "formats": [
         "m3u8",
         "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-tokyo",
+      "name": "NoctraTV · Tokyo",
+      "description": "noctratv.com top-level Tokyo family: Barcelona SUB/DUB, Seville SUB, Kyoto SUB/HSUB/DUB. Reproduces the current MZone v2 playback-session handshake locally, then calls the exact Noctra alias resolver endpoints. Kept disabled until a residential-device probe confirms the session is accepted without interactive Turnstile.",
+      "version": "0.1.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/tokyo.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
       ],
       "contentLanguage": [
         "multi"

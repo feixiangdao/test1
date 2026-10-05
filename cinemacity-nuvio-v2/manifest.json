@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.5.2",
-  "description": "CinemaCity V2 released-title auto-play probe. Uses a currently live WEB-DL item for Test Provider, then tries verified HLS, direct media and authenticated DH download.",
+  "version": "0.5.3",
+  "description": "CinemaCity V2 DH playback build. Accepts CinemaCity partial-content responses when HTTP 206 plus Content-Range or MP4 signature confirms the media stream.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "Released-title playback probe. Test Provider uses a live CinemaCity WEB-DL item and returns a verified HLS/direct/DH stream when possible.",
-      "version": "0.5.2",
+      "description": "DH playback probe. Test Provider accepts HTTP 206 partial-content as playable when Content-Range or MP4 signature confirms the stream.",
+      "version": "0.5.3",
       "supportedTypes": [
         "movie"
       ],

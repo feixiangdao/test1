@@ -1786,7 +1786,7 @@ function searchAndCandidateProbe() {
               }
               if (goodHls) {
                 var hs = hlsProbeStream(goodHls, item.url);
-                var hr = "CC76 USE_HLS " + goodHls.label + compactCode(goodHls) +
+                var hr = "CC77 USE_HLS " + goodHls.label + compactCode(goodHls) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return hs ? [diagnosticRow(hr), hs] : [diagnosticRow(hr)];
               }
@@ -1795,7 +1795,7 @@ function searchAndCandidateProbe() {
               // return those direct streams.
               var directRows = directStreamsFromRoutes(alts);
               if (directRows.length) {
-                var dr = "CC76 USE_DIRECT N" + String(directRows.length) +
+                var dr = "CC77 USE_DIRECT N" + String(directRows.length) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return [diagnosticRow(dr)].concat(directRows);
               }
@@ -1818,7 +1818,7 @@ function searchAndCandidateProbe() {
                   "/R" + compactCode(hlsMap.R);
 
                 if (ds) {
-                  var ok = "CC76 USE_DL " + String(f.status || 0) +
+                  var ok = "CC77 USE_DL " + String(f.status || 0) +
                     " R" + String(f.rangeOk || 0) +
                     " T" + String(f.ftyp || 0) +
                     " ID" + String(newsId) + " DH" + String(dh.media || 0);
@@ -1826,7 +1826,7 @@ function searchAndCandidateProbe() {
                 }
 
                 var m = dp && dp.manual ? dp.manual : {};
-                var fail = "CC76 O" + compactCode(hlsMap.O) +
+                var fail = "CC77 O" + compactCode(hlsMap.O) +
                   " L" + compactCode(hlsMap.L) +
                   " R" + compactCode(hlsMap.R) +
                   " M" + String(m.status || 0) +
@@ -2588,7 +2588,7 @@ function playerScriptDiagnostic(html, newsId) {
   var fileLen = clean(payload.rawFile).length;
   var typ = Array.isArray(payload.fileData) ? "A" : (typeof payload.fileData === "object" && payload.fileData ? "O" : "S");
   var us = /\.urlset\/master\.m3u8/i.test(clean(pickMovieFileValue(payload.fileData))) ? 1 : 0;
-  return "CC76 PLAYER A" + String(atobCount) +
+  return "CC77 PLAYER A" + String(atobCount) +
     " F" + String(fileLen) +
     " T" + typ +
     " U" + String(us) +
@@ -2617,33 +2617,6 @@ function parseContentRangeTotal(cr) {
   return m ? Number(m[1]) : 0;
 }
 
-function bytesToAscii(buf) {
-  try {
-    var arr = new Uint8Array(buf || new ArrayBuffer(0));
-    var out = "";
-    for (var i=0;i<Math.min(arr.length,96);i++) {
-      var b = arr[i];
-      out += (b >= 32 && b <= 126) ? String.fromCharCode(b) : " ";
-    }
-    return clean(out).replace(/\s+/g," ");
-  } catch (_) {
-    return "";
-  }
-}
-
-function classifyDhBody(ascii, ct) {
-  var s = clean(ascii).toLowerCase();
-  var t = clean(ct).toLowerCase();
-  if (/premium|upgrade|subscription|member|membership/.test(s)) return "PREMIUM";
-  if (/forbidden|denied|unauthorized|permission|not allowed/.test(s)) return "DENIED";
-  if (/not found|missing/.test(s)) return "NOTFOUND";
-  if (/invalid|bad request|error|failed/.test(s)) return "INVALID";
-  if (/text\/html/.test(t) || /<html|<!doctype/.test(s)) return "HTML";
-  if (/text\//.test(t) || /json/.test(t)) return "TEXT";
-  if (/video\/|audio\/|octet-stream/.test(t)) return "MEDIA";
-  return s ? "OTHER" : "EMPTY";
-}
-
 function rangeHeaderProbe(url, referer, start) {
   var end = start + 63;
   var h = playbackHeaders(url, referer, true);
@@ -2656,54 +2629,33 @@ function rangeHeaderProbe(url, referer, start) {
     try { cl = clean(r.headers.get("content-length") || ""); } catch (_) {}
     try { ct = clean(r.headers.get("content-type") || ""); } catch (_) {}
     var okRange = (r.status === 206 && new RegExp("bytes\\s+" + start + "-", "i").test(cr)) ? 1 : 0;
-
-    return r.arrayBuffer().then(function(buf) {
-      var ascii = bytesToAscii(buf);
-      return {
-        status:r.status,
-        range:okRange,
-        cr:cr,
-        cl:cl,
-        ct:ct,
-        total:parseContentRangeTotal(cr),
-        bodyLen:buf ? buf.byteLength : 0,
-        msg:classifyDhBody(ascii, ct)
-      };
-    }).catch(function() {
-      return {
-        status:r.status,
-        range:okRange,
-        cr:cr,
-        cl:cl,
-        ct:ct,
-        total:parseContentRangeTotal(cr),
-        bodyLen:0,
-        msg:classifyDhBody("", ct)
-      };
-    });
+    return {
+      status:r.status,
+      range:okRange,
+      cr:cr,
+      cl:cl,
+      ct:ct,
+      total:parseContentRangeTotal(cr)
+    };
   }).catch(function(e) {
-    return {status:0,range:0,cr:"",cl:"",ct:"",total:0,bodyLen:0,msg:"FETCHERR",error:e&&e.message?e.message:String(e||"error")};
+    return {status:0,range:0,cr:"",cl:"",ct:"",total:0,error:e&&e.message?e.message:String(e||"error")};
   });
 }
 
 function adaptiveRangeProbe(url, referer) {
   return rangeHeaderProbe(url, referer, 0).then(function(first) {
     var total = Number(first.total || 0);
-
-    // A tiny "file" is almost certainly an error/status payload, not media.
-    if (total > 0 && total <= 4096) {
-      return {first:first, second:{status:0,range:0,total:total,msg:"SKIP"}, offset:0};
-    }
-
     var offset = 65536;
+
     if (total > 0) {
-      if (total <= 131072) offset = Math.max(64, Math.floor(total / 2));
+      if (total <= 128) offset = 0;
+      else if (total <= 131072) offset = Math.max(64, Math.floor(total / 2));
       else offset = Math.min(65536, Math.max(64, Math.floor(total / 4)));
       if (offset >= total) offset = Math.max(0, total - 64);
     }
 
     if (offset <= 0) {
-      return {first:first, second:{status:0,range:0,total:total,msg:"SKIP"}, offset:offset};
+      return {first:first, second:{status:0,range:0,total:total}, offset:offset};
     }
 
     return rangeHeaderProbe(url, referer, offset).then(function(second) {
@@ -2757,14 +2709,12 @@ function hdDownloadEntitlementProbe(item, detailHtml, newsId) {
       var fullRange = (a.range === 1 && b.range === 1) ? 1 : 0;
       var total = Number(a.total || b.total || 0);
       return diagnosticRow(
-        "HDPROBE3 " + q +
+        "HDPROBE2 " + q +
         " Q=" + (qs || q) +
         " S" + String(a.status || 0) + "/" + String(b.status || 0) +
         " R" + String(a.range || 0) + String(b.range || 0) +
         " O" + String(rr.offset || 0) +
         " T" + String(total || 0) +
-        " B" + String(a.bodyLen || 0) +
-        " M=" + String(a.msg || "UNK") +
         " ARB" + String(fullRange) +
         " ID" + String(newsId)
       );

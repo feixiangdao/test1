@@ -1,0 +1,75 @@
+name: Extract NoctraTV source catalog
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/extract-noctra-source-catalog.yml'
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Extract current source catalog
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const manifest=JSON.parse(fs.readFileSync('noctratv-nuvio/manifest.json','utf8'));
+          const localNames=manifest.scrapers.map(x=>String(x.name||'').toLowerCase());
+          const localIds=manifest.scrapers.map(x=>String(x.id||'').toLowerCase());
+          const url='https://noctratv.com/assets/pStreamBackend-BO-fiiV-.js';
+
+          function norm(s){
+            return String(s||'').toLowerCase()
+              .replace(/noctratv/g,'')
+              .replace(/[^a-z0-9]+/g,' ')
+              .trim();
+          }
+          function covered(id,name){
+            const n=norm(name), iid=String(id||'').toLowerCase();
+            if(localIds.some(x=>iid.includes(x.replace(/^noctra-/,''))||x.includes(iid)))return true;
+            return localNames.some(x=>{
+              const ln=norm(x);
+              return ln===n || (n.length>5 && (ln.includes(n)||n.includes(ln)));
+            });
+          }
+
+          (async()=>{
+            const r=await fetch(url);
+            if(!r.ok)throw new Error('bundle HTTP '+r.status);
+            const s=await r.text();
+
+            // Objects are minified and source rows have a stable id/name/family prefix.
+            const re=/\{id:"([^"]+)",name:"([^"]+)",family:"([^"]+)"([^{}]{0,900})\}/g;
+            const rows=[];
+            let m;
+            while((m=re.exec(s))){
+              const tail=m[4]||'';
+              let enabled=null;
+              if(/enabled:!0/.test(tail))enabled=true;
+              else if(/enabled:!1/.test(tail))enabled=false;
+              const movie=/movie:!0/.test(tail)?true:/movie:!1/.test(tail)?false:null;
+              const tv=/tv:!0/.test(tail)?true:/tv:!1/.test(tail)?false:null;
+              const sm=(tail.match(/source:"([^"]+)"/)||[])[1]||'';
+              const service=(tail.match(/service:"([^"]+)"/)||[])[1]||'';
+              const reason=(tail.match(/reason:"([^"]+)"/)||[])[1]||'';
+              rows.push({id:m[1],name:m[2],family:m[3],source:sm,service,enabled,movie,tv,reason});
+            }
+
+            // Deduplicate by id.
+            const uniq=[...new Map(rows.map(x=>[x.id,x])).values()];
+            const current=uniq.filter(x=>x.enabled!==false);
+            const missing=current.filter(x=>!covered(x.id,x.name));
+
+            console.log('TOTAL parsed='+uniq.length+' current='+current.length+' missing='+missing.length);
+            console.log('\n=== CURRENT ENABLED/UNSPECIFIED ===');
+            current.forEach(x=>console.log(JSON.stringify(x)));
+            console.log('\n=== LIKELY MISSING FROM LOCAL MANIFEST ===');
+            missing.forEach(x=>console.log(JSON.stringify(x)));
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

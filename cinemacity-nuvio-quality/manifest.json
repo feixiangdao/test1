@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Quality Lab",
-  "version": "0.7.3",
-  "description": "CinemaCity Quality Lab with adaptive HD download entitlement diagnostics. It tests the user's own official DH endpoint at byte 0 and a safe in-range offset derived from Content-Range, reporting the advertised total size and random-range support.",
+  "version": "0.7.4",
+  "description": "CinemaCity Quality Lab with tiny-response classification for the official DH download endpoint. HDPROBE3 distinguishes real media-range behavior from small text/status payloads such as premium/denied/invalid responses.",
   "scrapers": [
     {
       "id": "cinemacity-quality-070",
       "name": "CinemaCity Quality · Login Session",
-      "description": "Quality resolver + HDPROBE2. Reports HD qualities exposed by the official sizes endpoint and whether the configured account's official download endpoint supports a second valid byte range. No premium-watch bypass is attempted.",
-      "version": "0.7.3",
+      "description": "Quality resolver + HDPROBE3. Classifies tiny official DH responses (PREMIUM/DENIED/INVALID/etc.) before attempting a second range request; no premium entitlement bypass is attempted.",
+      "version": "0.7.4",
       "supportedTypes": [
         "movie"
       ],

@@ -195,8 +195,12 @@ function validate(url,type,h){
     if(!r.ok){
       var wa=clean(r.headers&&r.headers.get?r.headers.get("www-authenticate"):"");
       var xc=clean(r.headers&&r.headers.get?r.headers.get("x-mzone-error"):"");
-      console.log("[Noctra/StreamVault] HLS auth status="+r.status+" www="+wa+" xerr="+xc+" sentHeaderKeys="+Object.keys(h||{}).join(","));
-      throw new Error("HLS HTTP "+r.status);
+      return r.text().catch(function(){return"";}).then(function(body){
+        var short=String(body||"").replace(/\s+/g," ").slice(0,240);
+        short=short.replace(/[A-Za-z0-9_-]{24,}/g,"<redacted>");
+        console.log("[Noctra/StreamVault] HLS auth status="+r.status+" www="+wa+" xerr="+xc+" sentHeaderKeys="+Object.keys(h||{}).join(",")+" body="+short);
+        throw new Error("HLS HTTP "+r.status);
+      });
     }
     return r.text();
   }).then(function(body){
@@ -225,6 +229,11 @@ function resolveOne(src,tmdbId,mediaType,season,episode,sess){
     headers:h,
     body:JSON.stringify(payload)
   }),16000,src.label+" resolve").then(function(r){
+    try{
+      var names=[];
+      if(r.headers&&r.headers.forEach)r.headers.forEach(function(v,k){names.push(k);});
+      console.log("[Noctra/StreamVault] "+src.label+" resolveHeaderKeys="+names.join(","));
+    }catch(_){}
     return r.json().catch(function(){return{};}).then(function(j){
       if(!r.ok||j.success===false||!j.result)throw new Error(j.error||("HTTP "+r.status));
       var x=j.result||{};

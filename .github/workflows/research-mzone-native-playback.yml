@@ -57,7 +57,7 @@ jobs:
             const u=new URL(url),ts=Date.now(),nonce=crypto.getRandomValues(new Uint8Array(18));
             const hash=await crypto.subtle.digest('SHA-256',plainBytes);
             const msg=['mzone-proof-v4',s.sessionId,method.toUpperCase(),u.pathname+u.search,b64url(hash),String(ts),b64url(nonce)].join('\n');
-            const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},s.signKey,enc.encode(msg));
+            const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},s.signKey.privateKey,enc.encode(msg));
             return {'X-MZone-Proof-Version':'4','X-MZone-Proof-Timestamp':String(ts),'X-MZone-Proof-Nonce':b64url(nonce),'X-MZone-Proof':b64url(sig)};
           }
           async function encryptBody(s,url,plain){

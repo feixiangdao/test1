@@ -1309,12 +1309,8 @@ function searchAndCandidateProbe() {
             var dht="DH "+String(dh.status)+" J"+dh.json+" L"+dh.len+" K"+dh.keys+" MEDIA"+dh.media;
             rows.push({name:dht,title:dht,url:dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
 
-            dh.preview.slice(0,3).forEach(function(k,idx) {
-              var t="FILE"+String(idx+1)+" · "+clean(k).slice(0,76);
-              rows.push({name:t,title:t,url:dh.url+"#file-"+String(idx+1),quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
-            });
             (dh.values || []).slice(0,3).forEach(function(v,idx) {
-              var t="VAL"+String(idx+1)+" · "+clean(v).slice(0,100);
+              var t="VAL"+String(idx+1)+" · "+clean(v).slice(0,118);
               rows.push({name:t,title:t,url:dh.url+"#val-"+String(idx+1),quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
             });
 
@@ -1327,10 +1323,16 @@ function searchAndCandidateProbe() {
             } else {
               interesting.slice(0,3).forEach(function(j,idx) {
                 var t="JS"+String(idx+1)+" "+String(j.status)+" ["+(j.flags||[]).join(",")+"] L"+String(j.len);
-                if (j.snippet) t += " · "+j.snippet.slice(0,110);
+                if (j.snippet) t += " · "+j.snippet.slice(0,118);
                 rows.push({name:t,title:t,url:j.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
               });
             }
+
+            dh.preview.slice(0,2).forEach(function(k,idx) {
+              var t="FILE"+String(idx+1)+" · "+clean(k).slice(0,76);
+              rows.push({name:t,title:t,url:dh.url+"#file-"+String(idx+1),quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+            });
+
             return rows;
           });
         });

@@ -1,17 +1,17 @@
 {
   "name": "CinemaCity Download Lab",
-  "version": "1.6.0",
-  "description": "CinemaCity Download Lab 1.6.0. Same URL and scraper ID. DUI6 inventories download-related helper/orchestration functions and click selectors in same-origin scripts to locate the code that supplies makeDownloadHref(base,...).",
+  "version": "1.7.0",
+  "description": "CinemaCity Download Lab 1.7.0. DUI7 dumps the bodies and call sites of the download orchestration functions (getProtectedDownloadTarget / parseFileSet / startDownload / getSelectedQualityIndex / currentFileSet) so the base URL and video/audio source can be read without repeating the DUI6 inventory sweep.",
   "scrapers": [
     {
-      "id": "cinemacity-downloadlab-100",
-      "name": "CinemaCity Download Lab v1.6.0",
-      "description": "DUI6: identify the official download orchestration function/click selector that supplies the base URL to makeDownloadHref.",
-      "version": "1.6.0",
+      "id": "cinemacity-downloadlab-170",
+      "name": "CinemaCity Download Lab v1.7.0",
+      "description": "DUI7: dump download orchestration function bodies and makeDownloadHref call sites to reveal the base-URL and video/audio selection path.",
+      "version": "1.7.0",
       "supportedTypes": [
         "movie"
       ],
-      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/0efd8fd3b892a3989cffd3b0a464f7ba94cadb62/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab.js",
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/PLACEHOLDER_COMMIT/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab.js",
       "enabled": true,
       "formats": [
         "m3u8",

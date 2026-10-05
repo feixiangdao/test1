@@ -2880,11 +2880,14 @@ function functionSlice(js, fnName) {
 function callSites(js, fnName) {
   var text=clean(js);
   if (!fnName || fnName === "?") return [];
-  var re=new RegExp("\\b" + fnName.replace(/[$]/g,"\\$&") + "\\s*\\(([^)]]{0,600})\\)","ig");
+  // Match "fnName( ... )" with a bounded single-level argument list, and skip
+  // the function's own definition ("function fnName(").
+  var re=new RegExp("(^|[^.\\w$])" + fnName.replace(/[$]/g,"\\$&") + "\\s*\\(([^()]{0,600})\\)","ig");
   var out=[],m;
   while((m=re.exec(text))!==null) {
-    var args=clean(m[1]).replace(/\s+/g," ");
-    if (out.indexOf(args)<0) out.push(args);
+    if (/function\s+$/.test(text.slice(0, m.index + m[1].length))) continue;
+    var args=clean(m[2]).replace(/\s+/g," ");
+    if (args && out.indexOf(args)<0) out.push(args);
     if(out.length>=4) break;
   }
   return out;
@@ -3185,6 +3188,97 @@ function externalScriptInventory(html, pageUrl) {
   return out.slice(0,20);
 }
 
+// DUI7: dump the actual bodies of the orchestration functions so the call chain
+// and the base/audio source can be read offline. Kept as compact one-liners so
+// they survive the diagnostic row format.
+var ORCH_TARGETS = [
+  "getProtectedDownloadTarget",
+  "parseFileSet",
+  "startDownload",
+  "getSelectedQualityIndex",
+  "currentFileSet",
+  "makeDownloadHref",
+  "loadSizeMap",
+  "getTotalSize"
+];
+
+function tidyBody(src) {
+  return clean(src)
+    .replace(/\s+/g, " ")
+    .replace(/ \/\/[^"']{0,200}/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function bodyDigest(src, fnName, limit) {
+  var body = functionSlice(src, fnName);
+  if (!body) return fnName + "=ABSENT";
+  return fnName + "{" + tidyBody(body).slice(0, limit || 900) + "}";
+}
+
+function callSiteDigest(src, fnName) {
+  var sites = callSites(src, fnName);
+  if (!sites || !sites.length) return fnName + "()=<none>";
+  return fnName + "(" + sites.join(" ~ ").slice(0, 700) + ")";
+}
+
+function orchestrationSourceProbe(html, pageUrl) {
+  var scripts = externalScriptInventory(html, pageUrl);
+  if (!scripts.length) return Promise.resolve([]);
+  var h = baseHeaders(pageUrl || BASE + "/", true); h["Accept"] = "*/*";
+  return Promise.all(scripts.map(function(u) {
+    return fetch(u, { headers: h }).then(function(r) {
+      return r.text().then(function(js) {
+        if (!/makeDownloadHref|loadSizeMap|download/i.test(js)) return null;
+        return { url: u, name: basenameOfUrl(u), js: js };
+      });
+    }).catch(function() { return null; });
+  })).then(function(rows) {
+    return (rows || []).filter(Boolean);
+  });
+}
+
+function orchestrationBodies(html, pageUrl) {
+  return orchestrationSourceProbe(html, pageUrl).then(function(files) {
+    var rows = [];
+    files.forEach(function(f) {
+      var js = f.js;
+      var hit = ORCH_TARGETS.filter(function(n) {
+        return functionSlice(js, n).length > 0;
+      });
+      if (!hit.length) return;
+
+      // Row A: the stack selector chain + helper inventories (compact).
+      rows.push("DUI7 " + f.name +
+        " STACK=" + hit.join(",") +
+        " CLK=" + delegatedClickSelectors(js) +
+        " SEL=" + selectorContexts(js));
+
+      // Row B: makeDownloadHref call sites — this answers "who calls it".
+      rows.push("DUI7 " + f.name + " CALLS " +
+        callSiteDigest(js, "makeDownloadHref") + " | " +
+        callSiteDigest(js, "getProtectedDownloadTarget") + " | " +
+        callSiteDigest(js, "startDownload"));
+
+      // Row C..: bodies of the most important targets.
+      var want = ["getProtectedDownloadTarget", "parseFileSet", "startDownload", "getSelectedQualityIndex"];
+      want.forEach(function(n) {
+        if (functionSlice(js, n).length > 0) {
+          rows.push("DUI7 " + f.name + " BODY " + bodyDigest(js, n, 1400));
+        }
+      });
+
+      // Row D: the file/audio source — currentFileSet state + loadSizeMap body.
+      ["currentFileSet", "loadSizeMap"].forEach(function(n) {
+        if (functionSlice(js, n).length > 0) {
+          rows.push("DUI7 " + f.name + " SRC " + bodyDigest(js, n, 900));
+        }
+      });
+    });
+    return rows.slice(0, 14);
+  });
+}
+
 function orchestrationProbe(html,pageUrl) {
   var scripts=externalScriptInventory(html,pageUrl);
   if(!scripts.length) return Promise.resolve("none");
@@ -3211,12 +3305,14 @@ function officialDownloadDiagnostic(item, detailHtml, newsId) {
   return Promise.all([
     downloadScriptProbe(detailHtml || "", item.url),
     inlineAndHelperProbe(detailHtml || "", item.url),
-    orchestrationProbe(detailHtml || "", item.url)
+    orchestrationProbe(detailHtml || "", item.url),
+    orchestrationBodies(detailHtml || "", item.url)
   ]).then(function(all){
     var js=all[0]||{summary:"none",deep:"none",semantic:"none"};
     var w=all[1]||{calls:"none",inline:"none",attrs:"none",returns:"none"};
     var orch=all[2]||"none";
-    return diagnosticRow(
+    var bodies=all[3]||[];
+    var head = diagnosticRow(
       "DUI6 H1080=" + String(mp.has1080) +
       " CORE=" + js.deep +
       " SEM=" + js.semantic +
@@ -3225,6 +3321,7 @@ function officialDownloadDiagnostic(item, detailHtml, newsId) {
       " ORCH=" + orch +
       " ID" + String(newsId)
     );
+    return [head].concat(bodies.map(function(b){ return diagnosticRow(b); }));
   });
 }
 
@@ -3256,7 +3353,8 @@ function watchStreamsForMeta(meta) {
           return expandHlsMasterVariants(fromPlayer[0], item.url).then(function(masterRows) {
             var rows = dedupeStreams(fromPlayer.concat(masterRows || []));
             return officialDownloadDiagnostic(item, detail.html || "", newsId).then(function(diag) {
-              var finalRows = rows.concat(diag ? [diag] : []);
+              var diagRows = diag ? (diag.length ? diag : [diag]) : [];
+              var finalRows = rows.concat(diagRows);
               FAST_CACHE.streams[streamKey] = {
                 expires: Date.now() + 5 * 60 * 1000,
                 rows: finalRows
@@ -3267,7 +3365,8 @@ function watchStreamsForMeta(meta) {
         }
 
         return officialDownloadDiagnostic(item, detail.html || "", newsId).then(function(diag) {
-          var finalRows = fromPlayer.concat(diag ? [diag] : []);
+          var diagRows = diag ? (diag.length ? diag : [diag]) : [];
+          var finalRows = fromPlayer.concat(diagRows);
           FAST_CACHE.streams[streamKey] = {
             expires: Date.now() + 5 * 60 * 1000,
             rows: finalRows

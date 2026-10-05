@@ -1,0 +1,113 @@
+name: Research MZone native playback
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-mzone-native-playback.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe v4 native preparation
+        run: |
+          node - <<'NODE'
+          const BASE='https://api.m-zone.org';
+          const ORIGIN='https://noctratv.com';
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
+          const enc=new TextEncoder(),dec=new TextDecoder();
+          const MAGIC=new Uint8Array([77,90,51,1]);
+
+          function b64url(bytes){return Buffer.from(new Uint8Array(bytes)).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+          function fromB64url(s){s=String(s||'').replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return new Uint8Array(Buffer.from(s,'base64'));}
+          function cookieFrom(r){const s=r.headers.get('set-cookie')||'';return s.split(',').map(x=>x.split(';')[0].trim()).filter(Boolean).join('; ');}
+          function cat(...xs){let n=0;xs.forEach(x=>n+=x.length);const o=new Uint8Array(n);let p=0;xs.forEach(x=>{o.set(x,p);p+=x.length});return o;}
+
+          async function session(){
+            const cr=await fetch(BASE+'/api/player/v2/challenge',{headers:{'User-Agent':UA,Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/'}});
+            const ch=await cr.json(),c1=cookieFrom(cr);
+            const signKey=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);
+            const signPub=await crypto.subtle.exportKey('jwk',signKey.publicKey);
+            const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},signKey.privateKey,enc.encode(ch.challengeId+'.'+ch.nonce+'.'+ch.issuedAt));
+            const ecdh=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},false,['deriveBits']);
+            const ecdhPub=await crypto.subtle.exportKey('jwk',ecdh.publicKey);
+            const payload={
+              challengeId:ch.challengeId,nonce:ch.nonce,publicKey:signPub,signature:b64url(sig),
+              fingerprint:{webdriver:false,languages:['en-US','en'],plugins:5,hardwareConcurrency:8,deviceMemory:8,maxTouchPoints:5,platform:'Android',brands:[{brand:'Chromium',version:'140'},{brand:'Google Chrome',version:'140'}],mobile:true,timezone:'Asia/Shanghai',screen:{width:1080,height:2400,colorDepth:24,pixelRatio:2.75},visibilityState:'visible'},
+              embedded:false,embedOrigin:'',sandboxed:false,turnstileToken:'',
+              supportsEncryptedTransport:true,supportsEncryptedCapabilities:true,transportPublicKey:ecdhPub,
+              playerVersion:'mplayer-web-v2',playbackSessionVersion:2,capabilities:['hls','dash','codec-avc']
+            };
+            const sr=await fetch(BASE+'/api/player/v2/session',{method:'POST',headers:{'User-Agent':UA,'Content-Type':'application/json',Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/',...(c1?{Cookie:c1}:{})},body:JSON.stringify(payload)});
+            const sj=await sr.json();
+            if(!sr.ok||!sj.token)throw new Error(sj.error||'session failed');
+            const serverPub=await crypto.subtle.importKey('jwk',sj.transport.serverPublicKey,{name:'ECDH',namedCurve:'P-256'},false,[]);
+            const bits=await crypto.subtle.deriveBits({name:'ECDH',public:serverPub},ecdh.privateKey,256);
+            const hk=await crypto.subtle.importKey('raw',bits,'HKDF',false,['deriveKey']);
+            const transportKey=await crypto.subtle.deriveKey({name:'HKDF',hash:'SHA-256',salt:fromB64url(sj.transport.salt),info:enc.encode('mzone-playback-v3:'+sj.sessionId)},hk,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+            return {token:sj.token,sessionId:sj.sessionId,cookie:[c1,cookieFrom(sr)].filter(Boolean).join('; '),signKey,transportKey};
+          }
+          function pathOf(url){return new URL(url).pathname;}
+          async function proof(url,s,method,plainBytes){
+            const u=new URL(url),ts=Date.now(),nonce=crypto.getRandomValues(new Uint8Array(18));
+            const hash=await crypto.subtle.digest('SHA-256',plainBytes);
+            const msg=['mzone-proof-v4',s.sessionId,method.toUpperCase(),u.pathname+u.search,b64url(hash),String(ts),b64url(nonce)].join('\n');
+            const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},s.signKey,enc.encode(msg));
+            return {'X-MZone-Proof-Version':'4','X-MZone-Proof-Timestamp':String(ts),'X-MZone-Proof-Nonce':b64url(nonce),'X-MZone-Proof':b64url(sig)};
+          }
+          async function encryptBody(s,url,plain){
+            const iv=crypto.getRandomValues(new Uint8Array(12));
+            const aad=enc.encode(s.sessionId+'|request|'+pathOf(url));
+            const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:aad,tagLength:128},s.transportKey,plain);
+            return cat(MAGIC,iv,new Uint8Array(ct));
+          }
+          async function decryptResponse(s,url,buf){
+            const a=new Uint8Array(buf);
+            if(a.length<32||!MAGIC.every((v,i)=>a[i]===v))return dec.decode(a);
+            const iv=a.slice(4,16),ct=a.slice(16);
+            const aad=enc.encode(s.sessionId+'|response|'+pathOf(url));
+            const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv,additionalData:aad,tagLength:128},s.transportKey,ct);
+            return dec.decode(pt);
+          }
+          async function resolveSilver(s){
+            const rr=await fetch(BASE+'/mplayer/site-streamvault-silver/resolve',{method:'POST',headers:{'User-Agent':UA,'Content-Type':'application/json',Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/','X-MZone-Playback-Lease':s.token,'X-MZone-Transport':'3',...(s.cookie?{Cookie:s.cookie}:{})},body:JSON.stringify({codecCapabilities:{},type:'movie',tmdbId:'238'})});
+            const j=await rr.json(),r=j.result||{},url=r.url||r.playlist||r.file||'';
+            console.log('RESOLVE '+rr.status+' '+(url?new URL(url).pathname:''));
+            if(!url)throw new Error(j.error||'no url');
+            return url;
+          }
+          async function nativePrepare(pUrl,s){
+            const url=BASE+'/api/player/v4/native';
+            const body=JSON.stringify({url:pUrl});
+            const plain=enc.encode(body);
+            const ph=await proof(url,s,'POST',plain);
+            const encrypted=await encryptBody(s,url,plain);
+            const r=await fetch(url,{method:'POST',headers:{'User-Agent':UA,Accept:'application/json','Content-Type':'application/vnd.mzone.v3+octet-stream','X-MZone-Playback-Lease':s.token,'X-MZone-Transport':'3','X-MZone-Encrypted-Accept':'3',...(s.cookie?{Cookie:s.cookie}:{}),...ph},body:encrypted});
+            const raw=await r.arrayBuffer();
+            const text=await decryptResponse(s,url,raw);
+            let j={};try{j=JSON.parse(text)}catch{}
+            const out=j.url||'';
+            let host='',path='',keys=[];
+            try{const u=new URL(out);host=u.hostname;path=u.pathname;keys=[...u.searchParams.keys()]}catch{}
+            console.log('NATIVE status='+r.status+' success='+!!j.success+' error='+(j.error||'')+' host='+host+' path='+path+' queryKeys='+keys.join(','));
+            if(!r.ok||!out)throw new Error(j.error||'native failed');
+            return out;
+          }
+          async function probeNative(url){
+            const r=await fetch(url,{headers:{'User-Agent':UA}});
+            const ct=r.headers.get('content-type')||'';
+            const body=await r.text().catch(()=> '');
+            console.log('NATIVE_DIRECT status='+r.status+' ct='+ct+' prefix='+body.slice(0,90).replace(/\s+/g,' '));
+          }
+          (async()=>{
+            const s=await session();
+            const p=await resolveSilver(s);
+            const native=await nativePrepare(p,s);
+            await probeNative(native);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

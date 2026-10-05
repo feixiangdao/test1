@@ -1,0 +1,54 @@
+name: Research MZone HLS proxy
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-mzone-proxy.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect current Noctra bundle
+        run: |
+          node - <<'NODE'
+          const urls=[
+            'https://noctratv.com/assets/pStreamBackend-BO-fiiV-.js',
+            'https://noctratv.com/assets/index-B_JGO8C1.js',
+            'https://noctratv.com/assets/vortexApiSource-B-QupYve.js'
+          ];
+          const needles=[
+            'm3u8-proxy',
+            'playbackSessionId',
+            'runtimeSessionId',
+            'X-MZone-Playback-Lease',
+            'createM3U8ProxyUrl',
+            'getM3U8ProxyUrl',
+            'updateM3U8ProxyUrl',
+            'mzone-playback-v3:',
+            '/api/player/v4/',
+            '/api/player/v2/'
+          ];
+          (async()=>{
+            for(const url of urls){
+              const r=await fetch(url);
+              const s=await r.text();
+              console.log('\nASSET '+url+' bytes='+s.length);
+              for(const needle of needles){
+                let from=0,n=0;
+                while((from=s.indexOf(needle,from))>=0 && n<8){
+                  n++;
+                  const lo=Math.max(0,from-5000),hi=Math.min(s.length,from+9000);
+                  console.log('\n=== '+needle+' #'+n+' @'+from+' ===');
+                  console.log(s.slice(lo,hi));
+                  from+=needle.length;
+                }
+              }
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

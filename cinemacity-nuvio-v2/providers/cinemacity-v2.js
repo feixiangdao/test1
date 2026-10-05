@@ -15,6 +15,12 @@ var BASE = "https://cinemacity.cc";
 var TMDB_BASE = "https://api.themoviedb.org/3";
 var TMDB_KEY = "68e094699525b18a70bab2f86b1fa706";
 var DEFAULT_UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36";
+var FAST_CACHE = {
+  meta: {},
+  item: {},
+  streams: {}
+};
+
 
 function clean(v) {
   return v == null ? "" : String(v).trim();
@@ -191,6 +197,9 @@ function fetchAuthed(url, referer) {
 
 function tmdbMeta(tmdbId, mediaType) {
   var type = mediaType === "tv" ? "tv" : "movie";
+  var cacheKey = type + ":" + String(tmdbId);
+  if (FAST_CACHE.meta[cacheKey]) return Promise.resolve(FAST_CACHE.meta[cacheKey]);
+
   var url = TMDB_BASE + "/" + type + "/" + encodeURIComponent(String(tmdbId)) +
     "?api_key=" + encodeURIComponent(TMDB_KEY) + "&language=en-US";
   return fetch(url, { headers: jsonHeaders("https://www.themoviedb.org/") })
@@ -202,11 +211,13 @@ function tmdbMeta(tmdbId, mediaType) {
       var title = clean(type === "movie" ? d.title : d.name);
       var original = clean(type === "movie" ? d.original_title : d.original_name);
       var date = clean(type === "movie" ? d.release_date : d.first_air_date);
-      return {
+      var meta = {
         title: title || original,
         originalTitle: original,
         year: firstYear(date)
       };
+      FAST_CACHE.meta[cacheKey] = meta;
+      return meta;
     });
 }
 
@@ -1775,7 +1786,7 @@ function searchAndCandidateProbe() {
               }
               if (goodHls) {
                 var hs = hlsProbeStream(goodHls, item.url);
-                var hr = "CC66 USE_HLS " + goodHls.label + compactCode(goodHls) +
+                var hr = "CC67 USE_HLS " + goodHls.label + compactCode(goodHls) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return hs ? [diagnosticRow(hr), hs] : [diagnosticRow(hr)];
               }
@@ -1784,7 +1795,7 @@ function searchAndCandidateProbe() {
               // return those direct streams.
               var directRows = directStreamsFromRoutes(alts);
               if (directRows.length) {
-                var dr = "CC66 USE_DIRECT N" + String(directRows.length) +
+                var dr = "CC67 USE_DIRECT N" + String(directRows.length) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return [diagnosticRow(dr)].concat(directRows);
               }
@@ -1807,7 +1818,7 @@ function searchAndCandidateProbe() {
                   "/R" + compactCode(hlsMap.R);
 
                 if (ds) {
-                  var ok = "CC66 USE_DL " + String(f.status || 0) +
+                  var ok = "CC67 USE_DL " + String(f.status || 0) +
                     " R" + String(f.rangeOk || 0) +
                     " T" + String(f.ftyp || 0) +
                     " ID" + String(newsId) + " DH" + String(dh.media || 0);
@@ -1815,7 +1826,7 @@ function searchAndCandidateProbe() {
                 }
 
                 var m = dp && dp.manual ? dp.manual : {};
-                var fail = "CC66 O" + compactCode(hlsMap.O) +
+                var fail = "CC67 O" + compactCode(hlsMap.O) +
                   " L" + compactCode(hlsMap.L) +
                   " R" + compactCode(hlsMap.R) +
                   " M" + String(m.status || 0) +
@@ -1948,7 +1959,7 @@ function extractCatalogUrls(xml) {
 
 function catalogSearchItem(meta) {
   var page = 1;
-  var maxPages = 8;
+  var maxPages = 4;
   var bases = [
     BASE,
     "https://cc.leanhhu061206.workers.dev"
@@ -1990,14 +2001,13 @@ function catalogSearchItem(meta) {
       return Promise.reject(new Error("CinemaCity catalog no strict match"));
     }
     var p = page++;
-    return fetchPage(bases[0], p).then(function(originUrls) {
-      var hit = pick(originUrls);
+    return Promise.all([
+      fetchPage(bases[0], p),
+      fetchPage(bases[1], p)
+    ]).then(function(groups) {
+      var hit = pick(groups[0]) || pick(groups[1]);
       if (hit) return hit;
-      return fetchPage(bases[1], p).then(function(workerUrls) {
-        var hit2 = pick(workerUrls);
-        if (hit2) return hit2;
-        return next();
-      });
+      return next();
     });
   }
 
@@ -2054,6 +2064,12 @@ function getSessionHash() {
 }
 
 function searchCinemaCityItem(meta) {
+  var known = knownCinemaCityItem(meta);
+  if (known) {
+    console.log("[CinemaCity] fast known-title " + known.url);
+    return Promise.resolve({ item:known, hash:"" });
+  }
+
   var queries = [];
   [meta && meta.title, meta && meta.originalTitle].forEach(function(q) {
     q = clean(q);
@@ -2061,39 +2077,41 @@ function searchCinemaCityItem(meta) {
   });
   if (!queries.length) return Promise.reject(new Error("CinemaCity search title missing"));
 
-  return getSessionHash().then(function(hash) {
-    var known = knownCinemaCityItem(meta);
-    if (known) {
-      console.log("[CinemaCity] known-title fallback " + known.url);
-      return { item:known, hash:hash };
-    }
+  var cacheKey = normalizeTitle(meta.title || meta.originalTitle || "") + "|" + clean(meta.year);
+  if (FAST_CACHE.item[cacheKey]) {
+    return Promise.resolve({ item:FAST_CACHE.item[cacheKey], hash:"" });
+  }
 
-    function tryQuery(index) {
-      if (index >= queries.length) {
-        return catalogSearchItem(meta).then(function(catItem) {
-          console.log("[CinemaCity] catalog fallback matched " + catItem.url);
-          return { item:catItem, hash:hash };
-        });
-      }
+  function directSearch(query) {
+    var url = BASE + "/?do=search&subaction=search&search_start=0&full_search=0&story=" +
+      encodeURIComponent(query);
+    return fetch(url, { headers:browserNavHeaders(BASE + "/") }).then(function(r) {
+      if (!r.ok) throw new Error("CinemaCity search HTTP " + r.status);
+      return r.text().then(function(html) {
+        if (challengeHtml(html)) throw new Error("CinemaCity Cloudflare challenge");
+        var info = inspectSearchBody(html, query, meta.year || "");
+        var item = pickBestSearchItem(info, meta);
+        if (!item || !item.url) throw new Error("CinemaCity direct search miss");
+        FAST_CACHE.item[cacheKey] = item;
+        return item;
+      });
+    });
+  }
 
-      var query = queries[index];
-      return ajaxSearchProbe(
-        "DYNAMIC",
-        "/engine/mods/dle_search/ajax.php",
-        hash,
-        query,
-        "/",
-        meta.year || ""
-      ).then(function(x) {
-        var item = pickBestSearchItem(x.info, meta);
-        if (item && item.url) return { item:item, hash:hash };
-        return tryQuery(index + 1);
-      }).catch(function() {
-        return tryQuery(index + 1);
+  function tryQuery(i) {
+    if (i >= queries.length) {
+      return catalogSearchItem(meta).then(function(item) {
+        FAST_CACHE.item[cacheKey] = item;
+        return item;
       });
     }
+    return directSearch(queries[i]).catch(function() {
+      return tryQuery(i + 1);
+    });
+  }
 
-    return tryQuery(0);
+  return tryQuery(0).then(function(item) {
+    return { item:item, hash:"" };
   });
 }
 
@@ -2388,7 +2406,7 @@ function playerScriptDiagnostic(html, newsId) {
   var fileLen = clean(payload.rawFile).length;
   var typ = Array.isArray(payload.fileData) ? "A" : (typeof payload.fileData === "object" && payload.fileData ? "O" : "S");
   var us = /\.urlset\/master\.m3u8/i.test(clean(pickMovieFileValue(payload.fileData))) ? 1 : 0;
-  return "CC66 PLAYER A" + String(atobCount) +
+  return "CC67 PLAYER A" + String(atobCount) +
     " F" + String(fileLen) +
     " T" + typ +
     " U" + String(us) +
@@ -2396,6 +2414,13 @@ function playerScriptDiagnostic(html, newsId) {
 }
 
 function watchStreamsForMeta(meta) {
+  var streamKey = normalizeTitle((meta && (meta.title || meta.originalTitle)) || "") + "|" + clean(meta && meta.year);
+  var cached = FAST_CACHE.streams[streamKey];
+  if (cached && cached.expires > Date.now() && cached.rows && cached.rows.length) {
+    console.log("[CinemaCity] stream cache hit " + streamKey);
+    return Promise.resolve(cached.rows);
+  }
+
   return searchCinemaCityItem(meta).then(function(found) {
     var item = found.item;
     var newsId = parseNewsId(item.url);
@@ -2406,6 +2431,10 @@ function watchStreamsForMeta(meta) {
       var fromPlayer = fileSetStreams(payload.fileData, item.url);
       if (fromPlayer.length) {
         console.log("[CinemaCity] PlayerJS streams=" + fromPlayer.length + " news_id=" + newsId);
+        FAST_CACHE.streams[streamKey] = {
+          expires: Date.now() + 5 * 60 * 1000,
+          rows: fromPlayer
+        };
         return fromPlayer;
       }
 

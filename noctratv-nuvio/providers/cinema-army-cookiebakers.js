@@ -5,6 +5,8 @@
 var BASE="https://api.m-zone.org";
 var ORIGIN="https://noctratv.com";
 var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
+var SIGN_PKCS8_B64="MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgIplYleE/mv91CSI8wJp6Hn4LtP+o6n/YMBYtH81LO4OhRANCAAQyV0or3KiQJO7qleShBraA6vr8uDyXN/lTKhbdWzyehg23qETv4Qgaq7rL72/ik2fB6TE0ddoPGlQd0G92qkK4";
+var SIGN_PUBLIC_JWK={"kty":"EC","crv":"P-256","x":"MldKK9yokCTu6pXkoQa2gOr6_Lg8lzf5UyoW3Vs8noY","y":"DbeoRO_hCBqrusvvb-KTZ8HpMTR12g8aVB3Qb3aqQrg","ext":true,"key_ops":["verify"]};
 var SESSION=null;
 var SESSION_PROMISE=null;
 
@@ -36,6 +38,50 @@ function fingerprint(){
     screen:{width:1080,height:2400,colorDepth:24,pixelRatio:2.75},
     visibilityState:"visible"
   };
+}
+
+function b64bytes(s){
+  s=String(s||"").replace(/\s+/g,"");
+  var bin=atob(s),out=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);
+  return out;
+}
+function derToRawEcdsa(sig){
+  var a=sig instanceof Uint8Array?sig:new Uint8Array(sig||0);
+  if(a.length===64)return a;
+  if(a.length<8||a[0]!==0x30)throw new Error("unexpected ECDSA signature format");
+  var p=1,len=a[p++];
+  if(len&0x80){
+    var n=len&0x7f;len=0;
+    for(var z=0;z<n;z++)len=(len<<8)|a[p++];
+  }
+  if(a[p++]!==0x02)throw new Error("bad ECDSA r");
+  var rl=a[p++],r=a.slice(p,p+rl);p+=rl;
+  if(a[p++]!==0x02)throw new Error("bad ECDSA s");
+  var sl=a[p++],s=a.slice(p,p+sl);
+  while(r.length>32&&r[0]===0)r=r.slice(1);
+  while(s.length>32&&s[0]===0)s=s.slice(1);
+  if(r.length>32||s.length>32)throw new Error("ECDSA component too long");
+  var out=new Uint8Array(64);
+  out.set(r,32-r.length);out.set(s,64-s.length);
+  return out;
+}
+function signChallengeText(text){
+  return globalThis.crypto.subtle.importKey(
+    "pkcs8",
+    b64bytes(SIGN_PKCS8_B64),
+    {name:"ECDSA",namedCurve:"P-256"},
+    false,
+    ["sign"]
+  ).then(function(key){
+    return globalThis.crypto.subtle.sign(
+      {name:"ECDSA",hash:"SHA-256"},
+      key,
+      new TextEncoder().encode(text)
+    );
+  }).then(function(sig){
+    return b64url(derToRawEcdsa(new Uint8Array(sig)));
+  });
 }
 function headers(extra){
   var h={
@@ -80,23 +126,12 @@ function sessionValid(s){
 function createSession(){
   return challenge().then(function(ch){
     if(!ch||!ch.challengeId||!ch.nonce||!ch.issuedAt)throw new Error("invalid challenge");
-    return globalThis.crypto.subtle.generateKey(
-      {name:"ECDSA",namedCurve:"P-256"},false,["sign","verify"]
-    ).then(function(signKey){
-      return Promise.all([
-        globalThis.crypto.subtle.exportKey("jwk",signKey.publicKey),
-        globalThis.crypto.subtle.sign(
-          {name:"ECDSA",hash:"SHA-256"},
-          signKey.privateKey,
-          new TextEncoder().encode(ch.challengeId+"."+ch.nonce+"."+ch.issuedAt)
-        )
-      ]).then(function(parts){
-        return{
-          ch:ch,
-          publicKey:parts[0],
-          signature:b64url(new Uint8Array(parts[1]))
-        };
-      });
+    return signChallengeText(ch.challengeId+"."+ch.nonce+"."+ch.issuedAt).then(function(signature){
+      return{
+        ch:ch,
+        publicKey:SIGN_PUBLIC_JWK,
+        signature:signature
+      };
     });
   }).then(function(x){
     var payload={

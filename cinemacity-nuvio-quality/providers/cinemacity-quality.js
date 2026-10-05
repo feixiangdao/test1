@@ -214,7 +214,8 @@ function tmdbMeta(tmdbId, mediaType) {
       var meta = {
         title: title || original,
         originalTitle: original,
-        year: firstYear(date)
+        year: firstYear(date),
+        imdbId: clean(d.imdb_id || "")
       };
       FAST_CACHE.meta[cacheKey] = meta;
       return meta;
@@ -1786,7 +1787,7 @@ function searchAndCandidateProbe() {
               }
               if (goodHls) {
                 var hs = hlsProbeStream(goodHls, item.url);
-                var hr = "CC74 USE_HLS " + goodHls.label + compactCode(goodHls) +
+                var hr = "CC75 USE_HLS " + goodHls.label + compactCode(goodHls) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return hs ? [diagnosticRow(hr), hs] : [diagnosticRow(hr)];
               }
@@ -1795,7 +1796,7 @@ function searchAndCandidateProbe() {
               // return those direct streams.
               var directRows = directStreamsFromRoutes(alts);
               if (directRows.length) {
-                var dr = "CC74 USE_DIRECT N" + String(directRows.length) +
+                var dr = "CC75 USE_DIRECT N" + String(directRows.length) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return [diagnosticRow(dr)].concat(directRows);
               }
@@ -1818,7 +1819,7 @@ function searchAndCandidateProbe() {
                   "/R" + compactCode(hlsMap.R);
 
                 if (ds) {
-                  var ok = "CC74 USE_DL " + String(f.status || 0) +
+                  var ok = "CC75 USE_DL " + String(f.status || 0) +
                     " R" + String(f.rangeOk || 0) +
                     " T" + String(f.ftyp || 0) +
                     " ID" + String(newsId) + " DH" + String(dh.media || 0);
@@ -1826,7 +1827,7 @@ function searchAndCandidateProbe() {
                 }
 
                 var m = dp && dp.manual ? dp.manual : {};
-                var fail = "CC74 O" + compactCode(hlsMap.O) +
+                var fail = "CC75 O" + compactCode(hlsMap.O) +
                   " L" + compactCode(hlsMap.L) +
                   " R" + compactCode(hlsMap.R) +
                   " M" + String(m.status || 0) +
@@ -1986,7 +1987,7 @@ function catalogSearchItem(meta) {
         best = u;
       }
     });
-    if (!best || bestScore < 12) return null;
+    if (!best || bestScore < 8) return null;
     var ident = catalogUrlIdentity(best);
     return {
       url:best,
@@ -2071,7 +2072,7 @@ function searchCinemaCityItem(meta) {
   }
 
   var queries = [];
-  [meta && meta.title, meta && meta.originalTitle].forEach(function(q) {
+  [meta && meta.imdbId, meta && meta.title, meta && meta.originalTitle].forEach(function(q) {
     q = clean(q);
     if (q && queries.indexOf(q) < 0) queries.push(q);
   });
@@ -2091,6 +2092,13 @@ function searchCinemaCityItem(meta) {
         if (challengeHtml(html)) throw new Error("CinemaCity Cloudflare challenge");
         var info = inspectSearchBody(html, query, meta.year || "");
         var item = pickBestSearchItem(info, meta);
+
+        // CinemaCity supports searching by IMDb id. When that route returns a
+        // single detail item, it is more reliable than title-slug matching.
+        if ((!item || !item.url) && /^tt\d+$/i.test(query) && info.items && info.items.length === 1) {
+          item = info.items[0];
+        }
+
         if (!item || !item.url) throw new Error("CinemaCity direct search miss");
         FAST_CACHE.item[cacheKey] = item;
         return item;
@@ -2588,7 +2596,7 @@ function playerScriptDiagnostic(html, newsId) {
   var fileLen = clean(payload.rawFile).length;
   var typ = Array.isArray(payload.fileData) ? "A" : (typeof payload.fileData === "object" && payload.fileData ? "O" : "S");
   var us = /\.urlset\/master\.m3u8/i.test(clean(pickMovieFileValue(payload.fileData))) ? 1 : 0;
-  return "CC74 PLAYER A" + String(atobCount) +
+  return "CC75 PLAYER A" + String(atobCount) +
     " F" + String(fileLen) +
     " T" + typ +
     " U" + String(us) +

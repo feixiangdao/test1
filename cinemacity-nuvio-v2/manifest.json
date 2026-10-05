@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.3.3",
-  "description": "CinemaCity V2 multi-search diagnostic. Tests four DLE search request formats and selects only a strict The Matrix (1999) match.",
+  "version": "0.3.4",
+  "description": "CinemaCity V2 live AJAX-search diagnostic. Extracts dle_hash from an authenticated seed page, then tests the site's /engine/mods/dle_search/ajax.php and lazydev-compatible endpoint.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "CinemaCity multi-search diagnostic. A/B/C/D test different DLE request forms; N=count, M=match, S=score, H=hash.",
-      "version": "0.3.3",
+      "description": "CinemaCity live AJAX diagnostic. SEED obtains dle_hash; MODS/LAZY run real quick-search; M=1 means The Matrix (1999) matched.",
+      "version": "0.3.4",
       "supportedTypes": [
         "movie"
       ],

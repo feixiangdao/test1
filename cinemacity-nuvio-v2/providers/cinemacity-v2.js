@@ -1608,6 +1608,73 @@ function compactCode(x) {
   return code;
 }
 
+
+function playbackHeaders(url, referer, xhr) {
+  var h = {
+    "User-Agent": userAgent(),
+    "Referer": referer || (BASE + "/"),
+    "Origin": BASE
+  };
+  if (isCinemaCityHost(url) && cookieValue()) h["Cookie"] = cookieValue();
+  if (xhr) h["X-Requested-With"] = "XMLHttpRequest";
+  return h;
+}
+
+function diagnosticRow(report) {
+  return {
+    name:report,
+    title:report,
+    url:BASE + "/#" + encodeURIComponent(report),
+    quality:"DIAG",
+    type:"diagnostic",
+    provider:"cinemacity-v2-login"
+  };
+}
+
+function hlsProbeStream(probe, referer) {
+  if (!probe || probe.m3u !== 1) return null;
+  var url = clean(probe.finalUrl || probe.url);
+  if (!url) return null;
+  return {
+    name:"CinemaCity · Auto · HLS",
+    title:"CinemaCity · Auto · HLS",
+    url:url,
+    quality:"Auto",
+    type:"hls",
+    provider:"cinemacity-v2-login",
+    headers:playbackHeaders(url, referer, false),
+    subtitles:[]
+  };
+}
+
+function downloadProbeStream(dp, referer) {
+  var f = dp && dp.follow ? dp.follow : null;
+  if (!f || f.ok !== 1) return null;
+  var url = clean(f.finalUrl || (dp && dp.url) || "");
+  if (!url) return null;
+  return {
+    name:"CinemaCity · Auto · MP4",
+    title:"CinemaCity · Auto · MP4",
+    url:url,
+    quality:"Auto",
+    type:"mp4",
+    provider:"cinemacity-v2-login",
+    headers:playbackHeaders(url, referer, isCinemaCityHost(url)),
+    subtitles:[]
+  };
+}
+
+function directStreamsFromRoutes(routes) {
+  var rows = [];
+  (routes || []).forEach(function(route) {
+    if (!route || route.status !== 200 || route.cf || !route.html) return;
+    var base = clean(route.finalUrl || route.url || BASE + "/");
+    var subs = extractSubtitles(route.html, base);
+    rows = rows.concat(extractDirectMedia(route.html, base, subs));
+  });
+  return dedupeStreams(rows).slice(0, 4);
+}
+
 function searchAndCandidateProbe() {
   var bootstrapUrl = BASE + "/index.php?do=search";
   var headers = baseHeaders(BASE + "/", true);
@@ -1626,7 +1693,7 @@ function searchAndCandidateProbe() {
       var hash = boot.hash || "";
 
       if (!hash) {
-        var fail = "CCDIAG v0.5.0 K0 NEXT=COOKIE_OR_HASH";
+        var fail = "CCDIAG v0.5.1 K0 NEXT=COOKIE_OR_HASH";
         return [{
           name:fail,title:fail,
           url:BASE+"/#"+encodeURIComponent(fail),
@@ -1638,7 +1705,7 @@ function searchAndCandidateProbe() {
         .then(function(x) {
           var item = (x.info.items || [])[0] || null;
           if (!item || !item.url) {
-            var fail = "CCDIAG v0.5.0 K1 Q0 NEXT=SEARCH";
+            var fail = "CCDIAG v0.5.1 K1 Q0 NEXT=SEARCH";
             return [{
               name:fail,title:fail,
               url:BASE+"/#"+encodeURIComponent(fail),
@@ -1648,7 +1715,7 @@ function searchAndCandidateProbe() {
 
           var newsId = parseNewsId(item.url);
           if (!newsId) {
-            var fail = "CCDIAG v0.5.0 K1 Q1 ID0 NEXT=NEWSID";
+            var fail = "CCDIAG v0.5.1 K1 Q1 ID0 NEXT=NEWSID";
             return [{
               name:fail,title:fail,
               url:BASE+"/#"+encodeURIComponent(fail),
@@ -1689,47 +1756,69 @@ function searchAndCandidateProbe() {
             return Promise.all(hlsBases.map(function(pair) {
               return hlsCandidateProbe(pair[0], pair[1], keys, item.url);
             })).then(function(hls) {
-              var altMap = {};
-              alts.forEach(function(a){ altMap[a.label] = a; });
               var hlsMap = {};
               hls.forEach(function(a){ hlsMap[a.label] = a; });
 
-              var anyAltUsable = alts.some(function(a) {
-                return a.status === 200 && !a.cf && (a.atob > 0 || a.files > 0 || a.direct > 0);
+              // 1) If any reconstructed master playlist really returned #EXTM3U,
+              // return it as an actual playable stream instead of only reporting it.
+              var goodHls = null;
+              for (var i=0;i<hls.length;i++) {
+                if (hls[i] && hls[i].m3u === 1) {
+                  goodHls = hls[i];
+                  break;
+                }
+              }
+              if (goodHls) {
+                var hs = hlsProbeStream(goodHls, item.url);
+                var hr = "CC51 USE_HLS " + goodHls.label + compactCode(goodHls) +
+                  " ID" + String(newsId) + " DH" + String(dh.media || 0);
+                return hs ? [diagnosticRow(hr), hs] : [diagnosticRow(hr)];
+              }
+
+              // 2) If an alternate detail route exposes a direct HLS/MP4/MPD,
+              // return those direct streams.
+              var directRows = directStreamsFromRoutes(alts);
+              if (directRows.length) {
+                var dr = "CC51 USE_DIRECT N" + String(directRows.length) +
+                  " ID" + String(newsId) + " DH" + String(dh.media || 0);
+                return [diagnosticRow(dr)].concat(directRows);
+              }
+
+              // 3) Fall back to CinemaCity's authenticated DH download endpoint.
+              // Probe only a tiny range first; return it only when the response
+              // is confirmed to be media.
+              var video = "";
+              var audio = "";
+              for (var k=0;k<keys.length;k++) {
+                if (!video && /\.mp4(?:$|[?#])/i.test(keys[k])) video = keys[k];
+                if (!audio && /\.m4a(?:$|[?#])/i.test(keys[k])) audio = keys[k];
+              }
+
+              return dhDownloadProbe(video, audio, hash, item.url).then(function(dp) {
+                var ds = downloadProbeStream(dp, item.url);
+                var f = dp && dp.follow ? dp.follow : {};
+                var hcodes = "O" + compactCode(hlsMap.O) +
+                  "/L" + compactCode(hlsMap.L) +
+                  "/R" + compactCode(hlsMap.R);
+
+                if (ds) {
+                  var ok = "CC51 USE_DL " + String(f.status || 0) +
+                    " ID" + String(newsId) + " DH" + String(dh.media || 0);
+                  return [diagnosticRow(ok), ds];
+                }
+
+                var fail = "CC51 NO_STREAM H=" + hcodes +
+                  " D" + String(f.status || 0) +
+                  " ID" + String(newsId) + " DH" + String(dh.media || 0);
+                return [diagnosticRow(fail)];
               });
-              var anyHls = hls.some(function(a){ return a.m3u === 1; });
-
-              var next = anyAltUsable ? "PARSE_DETAIL" :
-                         anyHls ? "USE_HLS" :
-                         (dh.media || 0) > 0 ? "DETAIL_PROXY" : "NO_MEDIA";
-
-              var report =
-                "CCDIAG v0.5.0 K1 Q1 ID" + String(newsId) +
-                " DH" + String(dh.media || 0) +
-                " ALT=P" + compactCode(altMap.P) +
-                "/N" + compactCode(altMap.N) +
-                "/F" + compactCode(altMap.F) +
-                "/R" + compactCode(altMap.R) +
-                " HLS=O" + compactCode(hlsMap.O) +
-                "/L" + compactCode(hlsMap.L) +
-                "/R" + compactCode(hlsMap.R) +
-                " NEXT=" + next;
-
-              return [{
-                name:report,
-                title:report,
-                url:BASE + "/#" + encodeURIComponent(report),
-                quality:"DIAG",
-                type:"diagnostic",
-                provider:"cinemacity-v2-login"
-              }];
             });
           });
         });
     });
   }).catch(function(e) {
     var msg=e&&e.message?e.message:String(e||"error");
-    var report="CCDIAG v0.5.0 ERR="+msg.slice(0,60);
+    var report="CCDIAG v0.5.1 ERR="+msg.slice(0,60);
     return [{
       name:report,title:report,
       url:BASE+"/#"+encodeURIComponent(report),

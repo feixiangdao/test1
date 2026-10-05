@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - 'noctratv-nuvio/research-source-aliases.js'
+      - 'noctratv-nuvio/research-tokyo-backends.js'
       - '.github/workflows/research-noctra-aliases.yml'
 
 jobs:

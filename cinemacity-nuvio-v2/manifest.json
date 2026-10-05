@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.6.2",
-  "description": "CinemaCity V2 dynamic resolver with stable session-hash bootstrap and direct fallback for titles that exist on the site but fail CinemaCity search.",
+  "version": "0.6.3",
+  "description": "CinemaCity V2 Watch Online resolver. Uses the user's local authenticated session to inspect detail/playlist/player pages and returns actual HLS/DASH/MP4 media instead of the buffering download endpoint.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "Dynamic movie resolver. Uses a stable authenticated hash, DLE search/catalog fallback, and confirmed direct-title fallback before resolving DH variants.",
-      "version": "0.6.2",
+      "description": "Watch Online resolver. Normal playback now inspects CinemaCity playlist/player wiring with the local session; DH download pseudo-streams are no longer returned.",
+      "version": "0.6.3",
       "supportedTypes": [
         "movie"
       ],

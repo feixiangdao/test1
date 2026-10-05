@@ -2392,7 +2392,7 @@ function urlsetQualityVariants(raw, pageUrl) {
     if (!emittedVideo) chosen.unshift(video);
 
     var variantUrl = prefix + chosen.join(",") + ",.urlset/master.m3u8" + after;
-    var label = "CinemaCity Download Lab · " + q + " · HLS";
+    var label = "CinemaCity Download Lab v1.1.2 · " + q + " · HLS";
     rows.push({
       name:label,
       title:label,
@@ -2422,7 +2422,7 @@ function fileSetStreams(fileData, pageUrl) {
   if (!raw) return [];
 
   if (/^https?:\/\//i.test(raw) && /\.urlset\/master\.m3u8(?:$|[?#])/i.test(raw)) {
-    var autoLabel = "CinemaCity Download Lab · Auto · HLS";
+    var autoLabel = "CinemaCity Download Lab v1.1.2 · Auto · HLS";
     var rows = [{
       name:autoLabel,
       title:autoLabel,
@@ -2459,7 +2459,7 @@ function fileSetStreams(fileData, pageUrl) {
     var kind = watchCandidateKind(u);
     if (kind !== "hls" && kind !== "dash" && kind !== "mp4") return;
 
-    var label = "CinemaCity Download Lab · " + (q || "Auto") + " · " + kind.toUpperCase();
+    var label = "CinemaCity Download Lab v1.1.2 · " + (q || "Auto") + " · " + kind.toUpperCase();
     out.push({
       name:label,
       title:label,
@@ -2538,7 +2538,7 @@ function expandHlsMasterVariants(autoStream, pageUrl) {
         var codecs = hlsAttr(line, "CODECS");
         var muxedAudio = !audioGroup && /mp4a|aac|ac-3|ec-3|opus/i.test(codecs);
 
-        var label = "CinemaCity Download Lab · " + q + " · HLS";
+        var label = "CinemaCity Download Lab v1.1.2 · " + q + " · HLS";
         if (hasExternalAudio && audioGroup && !muxedAudio) label += " · TEST";
 
         rows.push({

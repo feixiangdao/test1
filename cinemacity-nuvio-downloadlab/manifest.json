@@ -1,17 +1,17 @@
 {
   "name": "CinemaCity Download Lab",
-  "version": "1.1.0",
-  "description": "CinemaCity Download Lab 1.1.0 keeps the same install URL and scraper ID, while adding official-download UI reverse engineering on top of the confirmed working v0.7.3 playback path.",
+  "version": "1.1.1",
+  "description": "CinemaCity Download Lab 1.1.1. Same install URL and scraper ID; provider code is pinned to an immutable GitHub commit URL to avoid stale provider caching.",
   "scrapers": [
     {
       "id": "cinemacity-downloadlab-100",
       "name": "CinemaCity Download Lab",
-      "description": "Same Download Lab install address, now with DUI diagnostics for official 1080p download markup and same-origin JavaScript wiring.",
-      "version": "1.1.0",
+      "description": "Official-download UI diagnostic build. Same settings ID; provider code pinned to commit 4f730311.",
+      "version": "1.1.1",
       "supportedTypes": [
         "movie"
       ],
-      "filename": "providers/cinemacity-downloadlab.js",
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/4f73031153a1ccfeaa93f08ae5473cc18b18922c/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab.js",
       "enabled": true,
       "formats": [
         "m3u8",

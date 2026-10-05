@@ -61,11 +61,11 @@ jobs:
           # Build candidate libs.js URLs from what we saw in the HTML, plus fallbacks.
           : > /tmp/libs_candidates.txt
           grep -oiE '([A-Za-z0-9_./-]*libs\.js)' "$OUT/detail.html" 2>/dev/null | sort -u >> /tmp/libs_candidates.txt || true
-          cat >> /tmp/libs_candidates.txt <<'CAND'
-/templates/cinemacity/js/libs.js
-/templates/CinemaCity/js/libs.js
-/js/libs.js
-CAND
+          printf '%s\n' \
+            '/templates/cinemacity/js/libs.js' \
+            '/templates/CinemaCity/js/libs.js' \
+            '/js/libs.js' \
+            >> /tmp/libs_candidates.txt
 
           echo
           echo "## libs.js fetch attempts" >> "$OUT/REPORT.md"

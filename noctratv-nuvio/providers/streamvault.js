@@ -71,7 +71,12 @@ function challenge(){
     headers:headers()
   }),8000,"challenge").then(function(r){
     if(!r.ok)throw new Error("challenge HTTP "+r.status);
-    return r.json();
+    var sc=clean(r.headers&&r.headers.get?r.headers.get("set-cookie"):"");
+    var cookie=sc?sc.split(",").map(function(x){return x.split(";")[0].trim();}).filter(Boolean).join("; "):"";
+    return r.json().then(function(j){
+      if(j&&typeof j==="object")j.__cookie=cookie;
+      return j;
+    });
   });
 }
 function sessionValid(s){
@@ -119,7 +124,7 @@ function createSession(){
     return withTimeout(fetch(BASE+"/api/player/v2/session",{
       method:"POST",
       cache:"no-store",
-      headers:headers({"Content-Type":"application/json"}),
+      headers:headers(Object.assign({"Content-Type":"application/json"},x.ch.__cookie?{"Cookie":x.ch.__cookie}:{})),
       body:JSON.stringify(payload)
     }),10000,"session").then(function(r){
       return r.json().catch(function(){return{};}).then(function(j){
@@ -131,10 +136,17 @@ function createSession(){
         if(!r.ok||!j||j.success===false||!j.token||!j.sessionId||!j.expiresAt){
           throw new Error(clean(j&&j.error)||("session HTTP "+r.status));
         }
+        var sc2=clean(r.headers&&r.headers.get?r.headers.get("set-cookie"):"");
+        var cookie=x.ch.__cookie||"";
+        if(sc2){
+          var c2=sc2.split(",").map(function(v){return v.split(";")[0].trim();}).filter(Boolean).join("; ");
+          if(c2)cookie=cookie?(cookie+"; "+c2):c2;
+        }
         return{
           token:String(j.token),
           sessionId:String(j.sessionId),
-          expiresAt:Number(j.expiresAt)
+          expiresAt:Number(j.expiresAt),
+          cookie:cookie
         };
       });
     });
@@ -206,6 +218,7 @@ function resolveOne(src,tmdbId,mediaType,season,episode,sess){
     "Content-Type":"application/json",
     "X-MZone-Playback-Lease":sess.token
   });
+  if(sess.cookie)h["Cookie"]=sess.cookie;
   return withTimeout(fetch(BASE+"/mplayer/"+src.id+"/resolve",{
     method:"POST",
     cache:"no-store",
@@ -230,7 +243,10 @@ function resolveOne(src,tmdbId,mediaType,season,episode,sess){
       if(typ!=="mp4")typ="hls";
       var mediaHeaders={};
       if(x.headers&&typeof x.headers==="object")Object.keys(x.headers).forEach(function(k){mediaHeaders[k]=String(x.headers[k]);});
-      if(/^https?:\/\/[^/]*m-zone\.org\//i.test(u))mediaHeaders["X-MZone-Playback-Lease"]=sess.token;
+      if(/^https?:\/\/[^/]*m-zone\.org\//i.test(u)){
+        mediaHeaders["X-MZone-Playback-Lease"]=sess.token;
+        if(sess.cookie)mediaHeaders["Cookie"]=sess.cookie;
+      }
       return validate(u,typ,mediaHeaders).then(function(v){
         if(!v)return null;
         var q=clean(x.maxHeight)?(Number(x.maxHeight)>=2160?"4K":String(x.maxHeight)+"p"):v.quality;

@@ -1404,6 +1404,23 @@ function publicFilesProbe(mediaKeys, referer) {
   return Promise.all(tasks);
 }
 
+function bytesPreview(buf) {
+  try {
+    var arr = new Uint8Array(buf || new ArrayBuffer(0));
+    var hex = [];
+    var ascii = "";
+    var n = Math.min(arr.length, 48);
+    for (var i=0;i<n;i++) {
+      var b = arr[i];
+      hex.push((b < 16 ? "0" : "") + b.toString(16));
+      ascii += (b >= 32 && b <= 126) ? String.fromCharCode(b) : ".";
+    }
+    return { hex:hex.join(" "), ascii:ascii };
+  } catch (_) {
+    return { hex:"", ascii:"" };
+  }
+}
+
 function dhDownloadProbe(videoPath, audioPath, hash, referer) {
   if (!videoPath) {
     return Promise.resolve({
@@ -1418,45 +1435,85 @@ function dhDownloadProbe(videoPath, audioPath, hash, referer) {
     "&user_hash=" + encodeURIComponent(hash || "");
 
   var headers = baseHeaders(referer || (BASE + "/"), true);
-  headers["Range"] = "bytes=0-1";
+  headers["Range"] = "bytes=0-63";
   headers["Accept"] = "*/*";
   headers["X-Requested-With"] = "XMLHttpRequest";
 
-  return fetch(url, { method:"GET", headers:headers }).then(function(r) {
-    var ct = "", cr = "", cl = "";
-    try { ct = r.headers && r.headers.get ? (r.headers.get("content-type") || "") : ""; } catch (_) {}
-    try { cr = r.headers && r.headers.get ? (r.headers.get("content-range") || "") : ""; } catch (_) {}
-    try { cl = r.headers && r.headers.get ? (r.headers.get("content-length") || "") : ""; } catch (_) {}
+  function readHeaders(r) {
+    var out = {ct:"",cr:"",cl:"",cd:"",loc:""};
+    try { out.ct = r.headers && r.headers.get ? (r.headers.get("content-type") || "") : ""; } catch (_) {}
+    try { out.cr = r.headers && r.headers.get ? (r.headers.get("content-range") || "") : ""; } catch (_) {}
+    try { out.cl = r.headers && r.headers.get ? (r.headers.get("content-length") || "") : ""; } catch (_) {}
+    try { out.cd = r.headers && r.headers.get ? (r.headers.get("content-disposition") || "") : ""; } catch (_) {}
+    try { out.loc = r.headers && r.headers.get ? (r.headers.get("location") || "") : ""; } catch (_) {}
+    return out;
+  }
+
+  var manualPromise = fetch(url, {
+    method:"GET",
+    headers:headers,
+    redirect:"manual"
+  }).then(function(r) {
+    var h = readHeaders(r);
+    var fu = "";
+    try { fu = r.url || ""; } catch (_) {}
+    return {
+      status:r.status,
+      loc:h.loc,
+      ct:h.ct,
+      cd:h.cd,
+      cr:h.cr,
+      len:h.cl,
+      finalUrl:fu
+    };
+  }).catch(function(e) {
+    return {status:0,loc:"",ct:"",cd:"",cr:"",len:"",finalUrl:"",error:e&&e.message?e.message:String(e||"error")};
+  });
+
+  var followPromise = fetch(url, {
+    method:"GET",
+    headers:headers
+  }).then(function(r) {
+    var h = readHeaders(r);
     var finalUrl = "";
     try { finalUrl = r.url || ""; } catch (_) {}
     var host = "";
     try { host = finalUrl ? new URL(finalUrl).host : ""; } catch (_) {}
 
-    return r.arrayBuffer ? r.arrayBuffer().then(function(buf) {
+    return r.arrayBuffer().then(function(buf) {
+      var pv = bytesPreview(buf);
+      var mediaCt = /^(video\/|audio\/|application\/(?:vnd\.apple\.mpegurl|x-mpegURL|octet-stream))/i.test(h.ct || "");
       return {
         status:r.status,
-        ct:ct,
-        cr:cr,
-        len:cl || String(buf ? buf.byteLength : 0),
+        ct:h.ct,
+        cr:h.cr,
+        len:h.cl || String(buf ? buf.byteLength : 0),
+        cd:h.cd,
         finalUrl:finalUrl,
         host:host,
-        ok:(r.status === 200 || r.status === 206) ? 1 : 0,
+        ok:((r.status === 200 || r.status === 206) && mediaCt) ? 1 : 0,
+        hex:pv.hex,
+        ascii:pv.ascii,
         url:url
       };
     }).catch(function() {
+      var mediaCt = /^(video\/|audio\/|application\/(?:vnd\.apple\.mpegurl|x-mpegURL|octet-stream))/i.test(h.ct || "");
       return {
-        status:r.status, ct:ct, cr:cr, len:cl, finalUrl:finalUrl, host:host,
-        ok:(r.status === 200 || r.status === 206) ? 1 : 0, url:url
+        status:r.status, ct:h.ct, cr:h.cr, len:h.cl, cd:h.cd,
+        finalUrl:finalUrl, host:host,
+        ok:((r.status === 200 || r.status === 206) && mediaCt) ? 1 : 0,
+        hex:"", ascii:"", url:url
       };
-    }) : Promise.resolve({
-      status:r.status, ct:ct, cr:cr, len:cl, finalUrl:finalUrl, host:host,
-      ok:(r.status === 200 || r.status === 206) ? 1 : 0, url:url
     });
   }).catch(function(e) {
     return {
-      status:0, ct:"", cr:"", len:"", finalUrl:"", host:"", ok:0, url:url,
+      status:0, ct:"", cr:"", len:"", cd:"", finalUrl:"", host:"", ok:0, hex:"", ascii:"", url:url,
       error:e&&e.message?e.message:String(e||"error")
     };
+  });
+
+  return Promise.all([manualPromise, followPromise]).then(function(all) {
+    return { manual:all[0], follow:all[1], url:url };
   });
 }
 
@@ -1516,14 +1573,26 @@ function searchAndCandidateProbe() {
             rows.push({name:pick,title:pick,url:dh.url+"#pick",quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
 
             return dhDownloadProbe(video, audio, hash, item.url).then(function(dp) {
-              var finalShort = dp.finalUrl ? clean(dp.finalUrl).slice(0,90) : "";
-              var t = "DOWNLOAD "+String(dp.status)+" OK"+String(dp.ok)+
-                " CT="+(dp.ct||"-")+
-                " CR="+(dp.cr||"-")+
-                " LEN="+(dp.len||"-")+
-                " HOST="+(dp.host||"-");
-              if (finalShort) t += " · " + finalShort;
-              rows.push({name:t,title:t,url:dp.url||dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+              var m = dp.manual || {};
+              var f = dp.follow || {};
+
+              var mt = "MANUAL "+String(m.status)+
+                " LOC="+(m.loc ? clean(m.loc).slice(0,80) : "-")+
+                " CT="+(m.ct||"-")+
+                " CD="+(m.cd ? clean(m.cd).slice(0,60) : "-");
+              rows.push({name:mt,title:mt,url:dp.url||dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+
+              var ft = "FOLLOW "+String(f.status)+" OK"+String(f.ok)+
+                " CT="+(f.ct||"-")+
+                " CR="+(f.cr||"-")+
+                " LEN="+(f.len||"-")+
+                " HOST="+(f.host||"-");
+              rows.push({name:ft,title:ft,url:dp.url||dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+
+              if (f.ascii || f.hex) {
+                var bt = "BODY ASCII="+(f.ascii||"-").slice(0,48)+" HEX="+(f.hex||"-").slice(0,120);
+                rows.push({name:bt,title:bt,url:dp.url||dh.url,quality:"DIAG",type:"diagnostic",provider:"cinemacity-v2-login"});
+              }
               return rows;
             });
           });

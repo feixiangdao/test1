@@ -1,0 +1,28 @@
+{
+  "name": "CinemaCity Quality Lab",
+  "version": "0.7.0",
+  "description": "Experimental CinemaCity quality selector. Keeps the working Auto HLS and reconstructs single-quality URLSET masters from PlayerJS component files without exposing bare video-only MP4 tracks.",
+  "scrapers": [
+    {
+      "id": "cinemacity-quality-070",
+      "name": "CinemaCity Quality · Login Session",
+      "description": "Experimental Auto + 1080p/720p/480p/360p URLSET HLS variants. Each quality keeps CinemaCity audio/support components in the reconstructed master.",
+      "version": "0.7.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/cinemacity-quality.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true,
+      "hasSettings": true
+    }
+  ]
+}

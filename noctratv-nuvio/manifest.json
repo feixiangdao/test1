@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.32.0",
+  "version": "4.33.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1198,15 +1198,15 @@
     {
       "id": "noctra-atlantic-artemis",
       "name": "NoctraTV · Atlantic · Artemis",
-      "description": "noctratv.com current Atlantic · Artemis menu source. Resolves Atlantic's current Helios backend (Moscow/Novo/Omsk), decrypts ns_ AES-256-GCM payload URLs locally, validates the HLS master and first media segment, and returns direct HLS with Atlantic playback headers. Research-disabled until live probe passes.",
-      "version": "1.0.0",
+      "description": "noctratv.com Atlantic · Artemis slot. Upstream now resolves through the current Helios family (Moscow/Novo/Omsk); decrypts hl_ AES-256-GCM payloads locally, validates final HLS media, and returns direct streams only. Enabled after focused CI verified 1080p for both movie and TV.",
+      "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
       "filename": "providers/atlantic-artemis.js",
-      "enabled": false,
+      "enabled": true,
       "formats": [
         "m3u8"
       ],

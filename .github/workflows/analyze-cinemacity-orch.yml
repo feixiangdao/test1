@@ -2,6 +2,11 @@ name: Analyze CinemaCity download orchestration (libs.js)
 
 on:
   workflow_dispatch:
+    inputs:
+      probe:
+        description: 'probe id'
+        required: false
+        default: 'orch'
   push:
     branches:
       - cinemacity-orch-analysis
@@ -153,11 +158,14 @@ CAND
           PY
 
       - name: Commit findings
+        if: always()
         shell: bash
         run: |
+          set +e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           rm -f research/cinemacity-orch/detail.html
-          git add research/cinemacity-orch
-          git commit -m "Capture CinemaCity libs.js orchestration analysis" || echo "nothing to commit"
-          git push
+          ls -la research/cinemacity-orch/ || true
+          git add research/cinemacity-orch || true
+          git commit -m "Capture CinemaCity libs.js orchestration analysis" || echo "NOTHING_TO_COMMIT"
+          git push origin HEAD:cinemacity-orch-analysis && echo "PUSH_OK" || echo "PUSH_FAILED"

@@ -1,0 +1,40 @@
+name: Test NoctraTV Atlantic
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'noctratv-nuvio/providers/atlantic-artemis.js'
+      - '.github/workflows/test-noctra-atlantic.yml'
+
+jobs:
+  atlantic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: node --check noctratv-nuvio/providers/atlantic-artemis.js
+      - name: Focused live probe
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          const p=require('./providers/atlantic-artemis.js');
+          async function run(label,args){
+            const rows=await Promise.race([
+              p.getStreams(...args),
+              new Promise(r=>setTimeout(()=>r([]),45000))
+            ]);
+            console.log(label+': streams='+(rows||[]).length);
+            (rows||[]).forEach((x,i)=>console.log('  '+(i+1)+'. '+x.name+' '+x.url));
+            return (rows||[]).length;
+          }
+          (async()=>{
+            const a=await run('Dune Part Two',[693134,'movie']);
+            const b=await run('Game of Thrones S01E01',[1399,'tv',1,1]);
+            if(a<1&&b<1)throw new Error('Atlantic Artemis returned zero streams for both focused samples');
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

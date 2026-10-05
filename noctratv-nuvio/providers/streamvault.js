@@ -245,6 +245,7 @@ function resolveOne(src,tmdbId,mediaType,season,episode,sess){
       var mediaHeaders={};
       if(x.headers&&typeof x.headers==="object")Object.keys(x.headers).forEach(function(k){mediaHeaders[k]=String(x.headers[k]);});
       if(/^https?:\/\/[^/]*m-zone\.org\//i.test(u)){
+        mediaHeaders["User-Agent"]=UA;
         mediaHeaders["X-MZone-Playback-Lease"]=sess.token;
         if(sess.cookie)mediaHeaders["Cookie"]=sess.cookie;
       }

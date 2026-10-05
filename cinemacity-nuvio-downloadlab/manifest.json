@@ -1,17 +1,17 @@
 {
   "name": "CinemaCity Download Lab",
-  "version": "1.1.2",
-  "description": "CinemaCity Download Lab 1.1.2. Same install URL and scraper ID; runtime labels include v1.1.2 so refreshed code is visually obvious.",
+  "version": "1.2.0",
+  "description": "CinemaCity Download Lab 1.2.0. Same install URL and scraper ID. Deep-inspects the site's own libs.js sizes/download call shape (method, endpoint family, parameters, response handling, and visible client-side entitlement checks) without attempting to bypass access controls.",
   "scrapers": [
     {
       "id": "cinemacity-downloadlab-100",
-      "name": "CinemaCity Download Lab v1.1.2",
-      "description": "Official-download UI diagnostic build. Same scraper ID/settings; refreshed runtime emits DUI diagnostics and v1.1.2 labels.",
-      "version": "1.1.2",
+      "name": "CinemaCity Download Lab v1.2.0",
+      "description": "DUI2 build: analyzes official libs.js sizes/download wiring and whether entitlement checks are client-side or server-side.",
+      "version": "1.2.0",
       "supportedTypes": [
         "movie"
       ],
-      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/9b039964449a00d92abeddf6624e1e3f386bf313/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab.js",
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/05644ce47f397c800be3838155837f4fd85777a5/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab.js",
       "enabled": true,
       "formats": [
         "m3u8",

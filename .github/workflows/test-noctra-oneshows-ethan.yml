@@ -1,0 +1,35 @@
+name: Test NoctraTV 1Shows Ethan
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'noctratv-nuvio/providers/oneshows-ethan.js'
+      - '.github/workflows/test-noctra-oneshows-ethan.yml'
+
+jobs:
+  ethan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: node --check noctratv-nuvio/providers/oneshows-ethan.js
+      - name: Ethan movie live probe
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          const p=require('./providers/oneshows-ethan.js');
+          (async()=>{
+            const rows=await Promise.race([
+              p.getStreams(238,'movie'),
+              new Promise(r=>setTimeout(()=>r([]),45000))
+            ]);
+            console.log('1Shows/Ethan movie: streams='+(rows||[]).length);
+            (rows||[]).slice(0,5).forEach((x,i)=>console.log('  '+(i+1)+'. '+x.name+' '+x.url));
+            if(!(rows||[]).length)process.exitCode=1;
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

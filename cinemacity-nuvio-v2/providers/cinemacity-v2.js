@@ -1775,7 +1775,7 @@ function searchAndCandidateProbe() {
               }
               if (goodHls) {
                 var hs = hlsProbeStream(goodHls, item.url);
-                var hr = "CC65 USE_HLS " + goodHls.label + compactCode(goodHls) +
+                var hr = "CC66 USE_HLS " + goodHls.label + compactCode(goodHls) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return hs ? [diagnosticRow(hr), hs] : [diagnosticRow(hr)];
               }
@@ -1784,7 +1784,7 @@ function searchAndCandidateProbe() {
               // return those direct streams.
               var directRows = directStreamsFromRoutes(alts);
               if (directRows.length) {
-                var dr = "CC65 USE_DIRECT N" + String(directRows.length) +
+                var dr = "CC66 USE_DIRECT N" + String(directRows.length) +
                   " ID" + String(newsId) + " DH" + String(dh.media || 0);
                 return [diagnosticRow(dr)].concat(directRows);
               }
@@ -1807,7 +1807,7 @@ function searchAndCandidateProbe() {
                   "/R" + compactCode(hlsMap.R);
 
                 if (ds) {
-                  var ok = "CC65 USE_DL " + String(f.status || 0) +
+                  var ok = "CC66 USE_DL " + String(f.status || 0) +
                     " R" + String(f.rangeOk || 0) +
                     " T" + String(f.ftyp || 0) +
                     " ID" + String(newsId) + " DH" + String(dh.media || 0);
@@ -1815,7 +1815,7 @@ function searchAndCandidateProbe() {
                 }
 
                 var m = dp && dp.manual ? dp.manual : {};
-                var fail = "CC65 O" + compactCode(hlsMap.O) +
+                var fail = "CC66 O" + compactCode(hlsMap.O) +
                   " L" + compactCode(hlsMap.L) +
                   " R" + compactCode(hlsMap.R) +
                   " M" + String(m.status || 0) +
@@ -2223,37 +2223,50 @@ function b64DecodeText(input) {
 
 function extractPlayerFilePayload(html) {
   var text = clean(html);
-  var re = /atob\s*\(\s*["']([A-Za-z0-9+/=]+)["']\s*\)/ig;
+  var re = /atob\s*\(\s*(['"])(.*?)\1\s*\)/ig;
   var m;
-  var decodedRows = [];
+  var decodedCount = 0;
 
   while ((m = re.exec(text)) !== null) {
-    var decoded = b64DecodeText(m[1]);
+    var decoded = b64DecodeText(m[2]);
     if (!decoded) continue;
-    decodedRows.push(decoded);
+    decodedCount++;
 
-    var fm = decoded.match(/\bfile\s*:\s*'([\s\S]*?)'\s*,\s*poster\b/i) ||
-             decoded.match(/\bfile\s*:\s*"([\s\S]*?)"\s*,\s*poster\b/i);
-    if (fm && clean(fm[1])) {
-      return {
-        rawFile:decodeEscapedUrl(fm[1]),
-        decoded:decoded
-      };
+    // Match either a quoted file string or a JSON-array file value.
+    var fm = decoded.match(/file\s*:\s*(['"])([\s\S]*?)\1/i) ||
+             decoded.match(/file\s*:\s*(\[[\s\S]*?\])/i) ||
+             decoded.match(/"file"\s*:\s*"([\s\S]*?)"/i);
+
+    if (!fm) continue;
+
+    var rawFile = fm[2] || fm[1] || "";
+    if (fm.length === 2) rawFile = fm[1] || "";
+    rawFile = decodeEscapedUrl(clean(rawFile));
+    if (!rawFile || rawFile.length < 5) continue;
+
+    var fileData = rawFile;
+
+    if (/^[\[{]/.test(rawFile)) {
+      try {
+        fileData = JSON.parse(rawFile.replace(/\\(.)/g, "$1"));
+      } catch (_) {
+        try { fileData = JSON.parse(rawFile); } catch (_) {}
+      }
     }
-  }
 
-  var inline = text.match(/\bfile\s*:\s*'([\s\S]*?)'\s*,\s*poster\b/i) ||
-               text.match(/\bfile\s*:\s*"([\s\S]*?)"\s*,\s*poster\b/i);
-  if (inline && clean(inline[1])) {
     return {
-      rawFile:decodeEscapedUrl(inline[1]),
-      decoded:""
+      rawFile:rawFile,
+      fileData:fileData,
+      decoded:decoded,
+      decodedCount:decodedCount
     };
   }
 
   return {
     rawFile:"",
-    decoded:decodedRows.length ? decodedRows[0] : ""
+    fileData:null,
+    decoded:"",
+    decodedCount:decodedCount
   };
 }
 
@@ -2280,22 +2293,43 @@ function resolveCinemaMediaUrl(base, path) {
   return BASE + "/" + p.replace(/^\/+/, "");
 }
 
-function fileSetStreams(rawFile, pageUrl) {
-  var raw = decodeEscapedUrl(clean(rawFile));
+function pickMovieFileValue(fileData) {
+  if (!fileData) return "";
+
+  if (typeof fileData === "string") return clean(fileData);
+
+  if (Array.isArray(fileData)) {
+    var obj = null;
+    for (var i=0;i<fileData.length;i++) {
+      var x = fileData[i];
+      if (x && typeof x === "object" && !x.folder && x.file) {
+        obj = x;
+        break;
+      }
+    }
+    if (!obj && fileData.length) obj = fileData[0];
+    if (obj && typeof obj === "object" && obj.file) return clean(obj.file);
+    if (typeof obj === "string") return clean(obj);
+  }
+
+  if (typeof fileData === "object" && fileData.file) return clean(fileData.file);
+
+  return "";
+}
+
+function fileSetStreams(fileData, pageUrl) {
+  var raw = decodeEscapedUrl(pickMovieFileValue(fileData));
   if (!raw) return [];
 
-  // IMPORTANT: CinemaCity/PlayerJS may store the real HLS master as one URL whose
-  // path intentionally contains commas. Never split this form.
-  if (/^https?:\/\//i.test(raw) &&
-      (/\.urlset\/master\.m3u8(?:$|[?#])/i.test(raw) ||
-       /\.m3u8(?:$|[?#])/i.test(raw))) {
-    var q0 = qualityOf(raw, raw);
-    var label0 = "CinemaCity Watch · " + q0 + " · HLS";
+  // CinemaCity's real watch URL can itself contain commas as part of the
+  // Akamai-style URLSET master. Preserve the ENTIRE string.
+  if (/^https?:\/\//i.test(raw) && /\.urlset\/master\.m3u8(?:$|[?#])/i.test(raw)) {
+    var label0 = "CinemaCity Watch · Auto · HLS";
     return [{
       name:label0,
       title:label0,
       url:raw,
-      quality:q0,
+      quality:"Auto",
       type:"hls",
       provider:"cinemacity-v2-login",
       headers:watchPlaybackHeaders(pageUrl),
@@ -2303,35 +2337,31 @@ function fileSetStreams(rawFile, pageUrl) {
     }];
   }
 
-  var parts = raw.split(",").map(function(x){ return clean(x); }).filter(Boolean);
-  if (!parts.length) return [];
-
-  var mediaPattern = /\.(?:mp4|m4a|m3u8|mpd)(?:$|[?#])/i;
-  var first = parts[0];
-  var base = mediaPattern.test(first) ? pageUrl : first;
-  var rels = (base === first) ? parts.slice(1) : parts.slice(0);
-
-  // Only emit actual adaptive manifests from split file sets.
-  // Raw MP4/M4A entries are component files used by the URLSET packager and
-  // are not standalone CinemaCity watch streams.
+  // Some PlayerJS configs encode labelled sources like [1080p]URL,[720p]URL.
   var out = [], seen = {};
-  rels.forEach(function(rel) {
-    if (!/\.m3u8(?:$|[?#])/i.test(rel) &&
-        !/\.mpd(?:$|[?#])/i.test(rel) &&
-        !/\.urlset\/master\.m3u8(?:$|[?#])/i.test(rel)) return;
+  var parts = raw.indexOf("[") >= 0 ? raw.split(",") : [raw];
 
-    var u = resolveCinemaMediaUrl(base, rel);
-    if (!u || seen[u]) return;
+  parts.forEach(function(part) {
+    var p = clean(part);
+    if (!p) return;
+
+    var m = p.match(/^\[(.*?)\](.*)$/);
+    var q = m ? clean(m[1]) : qualityOf(p, p);
+    var u = m ? clean(m[2]) : p;
+    u = resolveCinemaMediaUrl(pageUrl, u);
+
+    if (!/^https?:\/\//i.test(u) || seen[u]) return;
     seen[u] = 1;
 
-    var kind = /\.mpd(?:$|[?#])/i.test(u) ? "dash" : "hls";
-    var q = qualityOf(u, rel);
-    var label = "CinemaCity Watch · " + q + " · " + kind.toUpperCase();
+    var kind = watchCandidateKind(u);
+    if (kind !== "hls" && kind !== "dash" && kind !== "mp4") return;
+
+    var label = "CinemaCity Watch · " + (q || "Auto") + " · " + kind.toUpperCase();
     out.push({
       name:label,
       title:label,
       url:u,
-      quality:q,
+      quality:q || "Auto",
       type:kind,
       provider:"cinemacity-v2-login",
       headers:watchPlaybackHeaders(pageUrl),
@@ -2356,8 +2386,12 @@ function playerScriptDiagnostic(html, newsId) {
   var payload = extractPlayerFilePayload(html || "");
   var atobCount = (clean(html).match(/atob\s*\(/ig) || []).length;
   var fileLen = clean(payload.rawFile).length;
-  return "CC65 PLAYER A" + String(atobCount) +
+  var typ = Array.isArray(payload.fileData) ? "A" : (typeof payload.fileData === "object" && payload.fileData ? "O" : "S");
+  var us = /\.urlset\/master\.m3u8/i.test(clean(pickMovieFileValue(payload.fileData))) ? 1 : 0;
+  return "CC66 PLAYER A" + String(atobCount) +
     " F" + String(fileLen) +
+    " T" + typ +
+    " U" + String(us) +
     " ID" + String(newsId);
 }
 
@@ -2369,7 +2403,7 @@ function watchStreamsForMeta(meta) {
 
     return detailProbe(item.url, BASE + "/").then(function(detail) {
       var payload = extractPlayerFilePayload(detail.html || "");
-      var fromPlayer = fileSetStreams(payload.rawFile, item.url);
+      var fromPlayer = fileSetStreams(payload.fileData, item.url);
       if (fromPlayer.length) {
         console.log("[CinemaCity] PlayerJS streams=" + fromPlayer.length + " news_id=" + newsId);
         return fromPlayer;

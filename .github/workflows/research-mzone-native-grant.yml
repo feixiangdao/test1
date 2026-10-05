@@ -1,0 +1,48 @@
+name: Research MZone native grant
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-mzone-native-grant.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect native grant lifecycle
+        run: |
+          node - <<'NODE'
+          const url='https://noctratv.com/assets/index-BrYFkm8g.js';
+          const needles=[
+            'Native playback grant was rejected',
+            '/api/player/v4/native',
+            'native',
+            'acquire',
+            'release',
+            'activate',
+            'previousLease',
+            'api/player/v2/',
+            'prepareNative',
+            'native playback'
+          ];
+          (async()=>{
+            const r=await fetch(url);
+            const s=await r.text();
+            console.log('ASSET bytes='+s.length);
+            for(const needle of needles){
+              let pos=0,n=0;
+              while((pos=s.indexOf(needle,pos))>=0 && n<20){
+                n++;
+                const lo=Math.max(0,pos-4200),hi=Math.min(s.length,pos+7200);
+                console.log('\n=== '+needle+' #'+n+' @'+pos+' ===');
+                console.log(s.slice(lo,hi));
+                pos+=needle.length;
+              }
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

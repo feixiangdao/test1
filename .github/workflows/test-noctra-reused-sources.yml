@@ -1,0 +1,53 @@
+name: Test NoctraTV Reused Sources
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'noctratv-nuvio/providers/nextbox-vaplayer.js'
+      - 'noctratv-nuvio/providers/popwatch-fsharetv.js'
+      - 'noctratv-nuvio/manifest.json'
+      - '.github/workflows/test-noctra-reused-sources.yml'
+
+jobs:
+  reused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: |
+          node --check noctratv-nuvio/providers/nextbox-vaplayer.js
+          node --check noctratv-nuvio/providers/popwatch-fsharetv.js
+      - name: Focused live probe
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          async function timeout(p,ms,label){
+            return new Promise(resolve=>{
+              let done=false;
+              const t=setTimeout(()=>{if(done)return;done=true;console.log(label+' timeout');resolve([])},ms);
+              Promise.resolve(p).then(v=>{if(done)return;done=true;clearTimeout(t);resolve(v)}).catch(e=>{if(done)return;done=true;clearTimeout(t);console.log(label+' error '+(e&&e.message?e.message:e));resolve([])});
+            });
+          }
+          async function run(file,label,cases){
+            const p=require('./providers/'+file);
+            for(const [name,args] of cases){
+              const rows=await timeout(p.getStreams(...args),45000,label+' '+name);
+              console.log(label+' '+name+': streams='+(rows||[]).length);
+              (rows||[]).slice(0,5).forEach((x,i)=>console.log('  '+(i+1)+'. '+x.name+' '+x.url));
+            }
+          }
+          (async()=>{
+            await run('nextbox-vaplayer.js','Nextbox/VaPlayer',[
+              ['movie',[238,'movie']],
+              ['tv',[1399,'tv',1,1]]
+            ]);
+            await run('popwatch-fsharetv.js','PopWatch/FshareTV',[
+              ['movie',[238,'movie']]
+            ]);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

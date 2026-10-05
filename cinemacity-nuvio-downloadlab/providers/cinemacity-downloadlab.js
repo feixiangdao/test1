@@ -2727,82 +2727,101 @@ function hdDownloadEntitlementProbe(item, detailHtml, newsId) {
 }
 
 
-function downloadQualityFromPath(path) {
-  var s = clean(path);
-  if (/2160|4k|uhd/i.test(s)) return "4K";
-  if (/1440/i.test(s)) return "1440p";
-  if (/1080/i.test(s)) return "1080p";
-  if (/720/i.test(s)) return "720p";
-  if (/480/i.test(s)) return "480p";
-  if (/360/i.test(s)) return "360p";
-  return "HD";
+function basenameOfUrl(u) {
+  var s = clean(u).split("?")[0];
+  var p = s.lastIndexOf("/");
+  return p >= 0 ? s.slice(p+1) : s;
 }
 
-function downloadLabLinks(fileData, pageUrl) {
-  var raw = decodeEscapedUrl(pickMovieFileValue(fileData));
-  if (!/^https?:\/\//i.test(raw)) return [];
+function downloadMarkupProbe(html) {
+  var s = clean(html);
+  var lower = s.toLowerCase();
+  var flags = [];
+  [
+    ["HREF1080",/href\s*=\s*["'][^"']*1080/i],
+    ["DATAFILE",/data-file\s*=/i],
+    ["DATAVIDEO",/data-video\s*=/i],
+    ["DATAAUDIO",/data-audio\s*=/i],
+    ["DATAURL",/data-url\s*=/i],
+    ["ONCLICK",/onclick\s*=/i],
+    ["FORM",/<form\b/i],
+    ["DH",/mod=dh/i],
+    ["SIZES",/action=sizes/i],
+    ["DOWNLOAD",/action=download/i]
+  ].forEach(function(x){ if (x[1].test(s)) flags.push(x[0]); });
 
-  var parts = raw.split(",").map(function(x){ return clean(x); }).filter(Boolean);
-  var videos = parts.filter(function(p){ return /\.mp4(?:$|[?#])/i.test(p); });
-  var audios = parts.filter(function(p){ return /\.m4a(?:$|[?#])/i.test(p); });
+  var idx = lower.indexOf("1080p");
+  var attrs = [];
+  if (idx >= 0) {
+    var frag = s.slice(Math.max(0,idx-900), Math.min(s.length,idx+900));
+    var tagRe = /<(?:a|button|input|select|option|form)\b[^>]*>/ig;
+    var m;
+    while ((m = tagRe.exec(frag)) !== null) {
+      var tag = m[0];
+      if (!/1080|download|video|audio|quality|file/i.test(tag)) continue;
+      var ar = /\s([a-zA-Z_:][a-zA-Z0-9_:.-]*)\s*=/g, am;
+      while ((am = ar.exec(tag)) !== null) {
+        var k = am[1].toLowerCase();
+        if (attrs.indexOf(k) < 0) attrs.push(k);
+      }
+    }
+  }
 
-  if (!videos.length || !audios.length) return [];
+  return {
+    flags:flags.join("+") || "0",
+    attrs:attrs.slice(0,12).join(",") || "none",
+    has1080:idx >= 0 ? 1 : 0
+  };
+}
 
-  videos.sort(function(a,b){ return mediaQualityRank(b) - mediaQualityRank(a); });
+function downloadScriptProbe(html, pageUrl) {
+  var srcs = [];
+  var seen = {};
+  var re = /<script\b[^>]*src\s*=\s*["']([^"']+)["']/ig, m;
+  while ((m = re.exec(clean(html))) !== null) {
+    var u = resolveUrl(m[1], pageUrl || (BASE + "/"));
+    if (!u || seen[u] || !isCinemaCityHost(u)) continue;
+    seen[u] = 1;
+    srcs.push(u);
+    if (srcs.length >= 16) break;
+  }
+  if (!srcs.length) return Promise.resolve("none");
 
-  // Prefer one audio track exactly like the public CloudStream implementation.
-  var audio = audios[0];
-  var rows = [];
-  var seenQ = {};
-
-  videos.forEach(function(video) {
-    var q = downloadQualityFromPath(video);
-    if (seenQ[q]) return;
-    seenQ[q] = 1;
-
-    // Exact pattern used by public CinemaCity CloudStream implementations:
-    // <full PlayerJS file string>?action=download&video=<component>&audio=<component>&name=<file>
-    var sep = raw.indexOf("?") >= 0 ? "&" : "?";
-    var dl = raw + sep +
-      "action=download" +
-      "&video=" + encodeURIComponent(video) +
-      "&audio=" + encodeURIComponent(audio) +
-      "&name=" + encodeURIComponent("CinemaCity." + q + ".mp4");
-
-    var label = "CinemaCity Download · " + q + " · MP4 · TEST";
-    rows.push({
-      name:label,
-      title:label,
-      url:dl,
-      quality:q,
-      type:"mp4",
-      provider:"cinemacity-downloadlab-100",
-      headers:watchPlaybackHeaders(pageUrl),
-      subtitles:[]
-    });
+  return Promise.all(srcs.map(function(u){
+    var h = baseHeaders(pageUrl || (BASE + "/"), true);
+    h["Accept"] = "*/*";
+    return fetch(u,{headers:h}).then(function(r){
+      return r.text().then(function(js){
+        var f=[];
+        if (/mod=dh/i.test(js)) f.push("DH");
+        if (/action=sizes/i.test(js)) f.push("SZ");
+        if (/action=download/i.test(js)) f.push("DL");
+        if (/dle_login_hash|user_hash/i.test(js)) f.push("HASH");
+        if (/news_id/i.test(js)) f.push("NID");
+        if (/data-video|video\s*[:=]/i.test(js)) f.push("VID");
+        if (/data-audio|audio\s*[:=]/i.test(js)) f.push("AUD");
+        if (/download/i.test(js)) f.push("D");
+        return f.length ? basenameOfUrl(u)+":"+f.join("+") : "";
+      });
+    }).catch(function(){ return ""; });
+  })).then(function(rows){
+    rows=(rows||[]).filter(Boolean);
+    return rows.slice(0,5).join("|") || "none";
   });
-
-  return rows.slice(0,4);
 }
 
-function downloadLabDiag(fileData) {
-  var raw = decodeEscapedUrl(pickMovieFileValue(fileData));
-  var parts = raw ? raw.split(",").map(function(x){ return clean(x); }).filter(Boolean) : [];
-  var videos = parts.filter(function(p){ return /\.mp4(?:$|[?#])/i.test(p); });
-  var audios = parts.filter(function(p){ return /\.m4a(?:$|[?#])/i.test(p); });
-  var qs = [];
-  videos.forEach(function(v){
-    var q = downloadQualityFromPath(v);
-    if (qs.indexOf(q) < 0) qs.push(q);
+function officialDownloadDiagnostic(item, detailHtml, newsId) {
+  var mp = downloadMarkupProbe(detailHtml || "");
+  return downloadScriptProbe(detailHtml || "", item.url).then(function(js){
+    return diagnosticRow(
+      "DUI H1080=" + String(mp.has1080) +
+      " M=" + mp.flags +
+      " A=" + mp.attrs +
+      " JS=" + js +
+      " ID" + String(newsId)
+    );
   });
-  return diagnosticRow(
-    "DLLAB V" + String(videos.length) +
-    " A" + String(audios.length) +
-    " Q=" + (qs.join(",") || "none") +
-    " L" + String(raw.length)
-  );
 }
-
 
 function watchStreamsForMeta(meta) {
   var streamKey = normalizeTitle((meta && (meta.title || meta.originalTitle)) || "") + "|" + clean(meta && meta.year);
@@ -2828,28 +2847,28 @@ function watchStreamsForMeta(meta) {
           fromPlayer[0].type === "hls" &&
           String(fromPlayer[0].quality || "").toLowerCase() === "auto";
 
-        var dlRows = downloadLabLinks(payload.fileData, item.url);
-        var dlDiag = downloadLabDiag(payload.fileData);
-
         if (autoOnly) {
           return expandHlsMasterVariants(fromPlayer[0], item.url).then(function(masterRows) {
-            var rows = dedupeStreams(fromPlayer.concat(masterRows || []).concat(dlRows || []));
-            var finalRows = rows.concat(dlDiag ? [dlDiag] : []);
-            FAST_CACHE.streams[streamKey] = {
-              expires: Date.now() + 5 * 60 * 1000,
-              rows: finalRows
-            };
-            return finalRows;
+            var rows = dedupeStreams(fromPlayer.concat(masterRows || []));
+            return officialDownloadDiagnostic(item, detail.html || "", newsId).then(function(diag) {
+              var finalRows = rows.concat(diag ? [diag] : []);
+              FAST_CACHE.streams[streamKey] = {
+                expires: Date.now() + 5 * 60 * 1000,
+                rows: finalRows
+              };
+              return finalRows;
+            });
           });
         }
 
-        var finalRows = dedupeStreams(fromPlayer.concat(dlRows || []));
-        if (dlDiag) finalRows.push(dlDiag);
-        FAST_CACHE.streams[streamKey] = {
-          expires: Date.now() + 5 * 60 * 1000,
-          rows: finalRows
-        };
-        return finalRows;
+        return officialDownloadDiagnostic(item, detail.html || "", newsId).then(function(diag) {
+          var finalRows = fromPlayer.concat(diag ? [diag] : []);
+          FAST_CACHE.streams[streamKey] = {
+            expires: Date.now() + 5 * 60 * 1000,
+            rows: finalRows
+          };
+          return finalRows;
+        });
       }
 
       var uniq = extractWatchCandidates(detail.html || "", item.url);

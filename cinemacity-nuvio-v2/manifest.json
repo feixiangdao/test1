@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.5.1",
-  "description": "CinemaCity V2 auto-play diagnostic. Test Provider now returns a real HLS/direct/DH stream when a probe proves it is playable; otherwise it returns one short decisive status row.",
+  "version": "0.5.2",
+  "description": "CinemaCity V2 released-title auto-play probe. Uses a currently live WEB-DL item for Test Provider, then tries verified HLS, direct media and authenticated DH download.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "Auto-play diagnostic. Run Test Provider once; a verified HLS/direct/DH candidate is returned as a real stream, otherwise one short status row explains the failure.",
-      "version": "0.5.1",
+      "description": "Released-title playback probe. Test Provider uses a live CinemaCity WEB-DL item and returns a verified HLS/direct/DH stream when possible.",
+      "version": "0.5.2",
       "supportedTypes": [
         "movie"
       ],

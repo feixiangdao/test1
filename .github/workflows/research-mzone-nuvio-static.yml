@@ -1,0 +1,129 @@
+name: Research MZone Nuvio static keys
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-mzone-nuvio-static.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe static-key enhanced session
+        run: |
+          node - <<'NODE'
+          const BASE='https://api.m-zone.org';
+          const ORIGIN='https://noctratv.com';
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
+          const enc=new TextEncoder();
+
+          const SIGN_PKCS8_B64='MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgIplYleE/mv91CSI8wJp6Hn4LtP+o6n/YMBYtH81LO4OhRANCAAQyV0or3KiQJO7qleShBraA6vr8uDyXN/lTKhbdWzyehg23qETv4Qgaq7rL72/ik2fB6TE0ddoPGlQd0G92qkK4';
+          const SIGN_PUBLIC_JWK={"kty":"EC","crv":"P-256","x":"MldKK9yokCTu6pXkoQa2gOr6_Lg8lzf5UyoW3Vs8noY","y":"DbeoRO_hCBqrusvvb-KTZ8HpMTR12g8aVB3Qb3aqQrg","ext":true,"key_ops":["verify"]};
+          const ECDH_PUBLIC_JWK={"kty":"EC","crv":"P-256","x":"7sYGloN7R4NyKG3rh9WxwlLeDOvwZWdotCrAqh8DUgg","y":"ZZCHKyH21psODMxjoE1REGvpBjmpRgta9tY-OgUN-vI","ext":true,"key_ops":[]};
+
+          function b64url(bytes){
+            return Buffer.from(new Uint8Array(bytes)).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+          }
+          function cookieFrom(res){
+            const sc=res.headers.get('set-cookie')||'';
+            return sc.split(',').map(x=>x.split(';')[0].trim()).filter(Boolean).join('; ');
+          }
+          function pkcs8Bytes(){
+            return new Uint8Array(Buffer.from(SIGN_PKCS8_B64,'base64'));
+          }
+          function derToRaw(sig){
+            const a=new Uint8Array(sig);
+            if(a.length===64)return a;
+            if(a[0]!==0x30)throw new Error('unexpected ECDSA signature format len='+a.length);
+            let p=1;
+            let seqLen=a[p++];
+            if(seqLen&0x80){const n=seqLen&0x7f;seqLen=0;for(let i=0;i<n;i++)seqLen=(seqLen<<8)|a[p++];}
+            if(a[p++]!==0x02)throw new Error('bad DER r');
+            let rl=a[p++],r=a.slice(p,p+rl);p+=rl;
+            if(a[p++]!==0x02)throw new Error('bad DER s');
+            let sl=a[p++],s=a.slice(p,p+sl);
+            while(r.length>32&&r[0]===0)r=r.slice(1);
+            while(s.length>32&&s[0]===0)s=s.slice(1);
+            const out=new Uint8Array(64);
+            out.set(r,32-r.length);out.set(s,64-s.length);return out;
+          }
+          async function signRaw(key,data){
+            const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key,data);
+            return derToRaw(sig);
+          }
+          async function makeSession(){
+            const signKey=await crypto.subtle.importKey(
+              'pkcs8',pkcs8Bytes(),{name:'ECDSA',namedCurve:'P-256'},false,['sign']
+            );
+            const cr=await fetch(BASE+'/api/player/v2/challenge',{
+              headers:{'User-Agent':UA,Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/'}
+            });
+            const ch=await cr.json();
+            const c1=cookieFrom(cr);
+            const sig=await signRaw(signKey,enc.encode(ch.challengeId+'.'+ch.nonce+'.'+ch.issuedAt));
+
+            const payload={
+              challengeId:ch.challengeId,nonce:ch.nonce,
+              publicKey:SIGN_PUBLIC_JWK,signature:b64url(sig),
+              fingerprint:{
+                webdriver:false,languages:['en-US','en'],plugins:5,hardwareConcurrency:8,deviceMemory:8,
+                maxTouchPoints:5,platform:'Android',
+                brands:[{brand:'Chromium',version:'140'},{brand:'Google Chrome',version:'140'}],
+                mobile:true,timezone:'Asia/Shanghai',
+                screen:{width:1080,height:2400,colorDepth:24,pixelRatio:2.75},visibilityState:'visible'
+              },
+              embedded:false,embedOrigin:'',sandboxed:false,turnstileToken:'',
+              supportsEncryptedTransport:true,
+              supportsEncryptedCapabilities:true,
+              transportPublicKey:ECDH_PUBLIC_JWK,
+              playerVersion:'mplayer-web-v2',playbackSessionVersion:2,
+              capabilities:['hls','dash','codec-avc']
+            };
+            const sr=await fetch(BASE+'/api/player/v2/session',{
+              method:'POST',
+              headers:{'User-Agent':UA,'Content-Type':'application/json',Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/',...(c1?{Cookie:c1}:{})},
+              body:JSON.stringify(payload)
+            });
+            const sj=await sr.json().catch(()=>({}));
+            const cookie=[c1,cookieFrom(sr)].filter(Boolean).join('; ');
+            console.log('SESSION status='+sr.status+' success='+!!sj.success+
+              ' transport='+(sj.transport&&sj.transport.version||'')+
+              ' cap='+(sj.capabilities&&sj.capabilities.version||'')+
+              ' error='+(sj.error||''));
+            if(!sr.ok||!sj.token)throw new Error(sj.error||'session failed');
+            return {token:sj.token,sessionId:sj.sessionId,cookie,signKey,transportVersion:sj.transport&&sj.transport.version||0,capabilityVersion:sj.capabilities&&sj.capabilities.version||0};
+          }
+          async function proof(url,s){
+            const u=new URL(url),ts=Date.now(),nonce=crypto.getRandomValues(new Uint8Array(18));
+            const emptyHash=await crypto.subtle.digest('SHA-256',new Uint8Array());
+            const msg=['mzone-proof-v4',s.sessionId,'GET',u.pathname+u.search,b64url(emptyHash),String(ts),b64url(nonce)].join('\n');
+            const sig=await signRaw(s.signKey,enc.encode(msg));
+            return {'X-MZone-Proof-Version':'4','X-MZone-Proof-Timestamp':String(ts),'X-MZone-Proof-Nonce':b64url(nonce),'X-MZone-Proof':b64url(sig)};
+          }
+          async function resolveSilver(s){
+            const rr=await fetch(BASE+'/mplayer/site-streamvault-silver/resolve',{
+              method:'POST',
+              headers:{'User-Agent':UA,'Content-Type':'application/json',Accept:'application/json',Origin:ORIGIN,Referer:ORIGIN+'/','X-MZone-Playback-Lease':s.token,'X-MZone-Transport':'3',...(s.cookie?{Cookie:s.cookie}:{})},
+              body:JSON.stringify({codecCapabilities:{},type:'movie',tmdbId:'238'})
+            });
+            const j=await rr.json().catch(()=>({}));
+            const r=j.result||{},url=r.url||r.playlist||r.file||'';
+            console.log('RESOLVE status='+rr.status+' success='+!!j.success+' host='+(url?new URL(url).hostname:'')+' path='+(url?new URL(url).pathname:''));
+            if(!url)throw new Error(j.error||'no URL');
+            return url;
+          }
+          (async()=>{
+            const s=await makeSession();
+            const url=await resolveSilver(s);
+            const ph=await proof(url,s);
+            const r=await fetch(url,{headers:{'User-Agent':UA,'X-MZone-Playback-Lease':s.token,'X-MZone-Transport':'3',...(s.cookie?{Cookie:s.cookie}:{}),...ph}});
+            const body=await r.text().catch(()=> '');
+            console.log('STATIC_GET status='+r.status+' ct='+(r.headers.get('content-type')||'')+' prefix='+body.slice(0,80).replace(/\s+/g,' '));
+            if(r.status!==200||!body.startsWith('#EXTM3U'))throw new Error('static-key proxy failed');
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

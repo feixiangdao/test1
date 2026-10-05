@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Local V2",
-  "version": "0.4.5",
-  "description": "CinemaCity V2 composite-HLS probe. Reconstructs the known .urlset/master.m3u8 shape from all DH media keys and tests origin plus historical proxy bases with tiny range requests.",
+  "version": "0.4.6",
+  "description": "CinemaCity V2 corrected composite-HLS probe. Fixes an accidental duplicate insertion of every DH media key that doubled 23 entries into 46 and malformed the reconstructed .urlset/master.m3u8 URL.",
   "scrapers": [
     {
       "id": "cinemacity-v2-login",
       "name": "CinemaCity V2 · Login Session",
-      "description": "Composite HLS diagnostic. ORIGIN/APPBETA/LEAN/REALBESTIA rows report whether the reconstructed public_files URL returns an #EXTM3U playlist.",
-      "version": "0.4.5",
+      "description": "Corrected HLS reconstruction. DH media keys are deduplicated while preserving server order before probing ORIGIN/APPBETA/LEAN/REALBESTIA.",
+      "version": "0.4.6",
       "supportedTypes": [
         "movie"
       ],

@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Quality Lab",
-  "version": "0.7.6",
-  "description": "CinemaCity Quality Lab search rollback: restores the exact title/original-title lookup behavior from the last known-working v0.7.4, while keeping the newer HDPROBE3 diagnostics.",
+  "version": "0.7.7",
+  "description": "CinemaCity Quality Lab rollback build. Provider logic is restored exactly to the last user-confirmed working v0.7.3 implementation; only the visible version is bumped so Nuvio reloads it.",
   "scrapers": [
     {
       "id": "cinemacity-quality-070",
       "name": "CinemaCity Quality · Login Session",
-      "description": "Restores the proven title-first CinemaCity lookup path. IMDb-first lookup was removed because it caused previously working titles such as Unabomber to fall through to catalog no-match.",
-      "version": "0.7.6",
+      "description": "Exact rollback to the working v0.7.3 provider logic. Later HDPROBE3/search experiments are removed from this stable build.",
+      "version": "0.7.7",
       "supportedTypes": [
         "movie"
       ],

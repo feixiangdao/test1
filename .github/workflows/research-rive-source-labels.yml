@@ -1,0 +1,35 @@
+name: Research Rive source labels
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-rive-source-labels.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe Rive labels
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          const p=require('./providers/rive.js');
+          async function one(name,args){
+            const rows=await p.getStreams(...args);
+            console.log(name+' streams='+(rows||[]).length);
+            (rows||[]).forEach((x,i)=>{
+              let host='';try{host=new URL(x.url).hostname}catch{}
+              console.log((i+1)+'. title='+x.title+' quality='+x.quality+' host='+host);
+            });
+          }
+          (async()=>{
+            await one('movie',[238,'movie']);
+            await one('tv',[1399,'tv',1,1]);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

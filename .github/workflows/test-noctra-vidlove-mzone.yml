@@ -1,0 +1,51 @@
+name: Test NoctraTV VidLove MZone
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/test-noctra-vidlove-mzone.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe exact Noctra VidLove source IDs
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          let s=fs.readFileSync('./providers/tokyo.js','utf8');
+          s=s.replace(/var ALIASES=\[[\s\S]*?\];/,
+          `var ALIASES=[
+            {id:"site-vidlove-moviebox",label:"moviebox",lang:"multi"},
+            {id:"site-vidlove-vidapi",label:"vidapi",lang:"multi"},
+            {id:"site-vidlove-warden",label:"warden",lang:"multi"}
+          ];`);
+          s=s.replace(/provider:"noctra-tokyo"/g,'provider:"noctra-vidlove-mzone"');
+          s=s.replace(/NoctraTV · Tokyo · /g,'NoctraTV · VidLove · ');
+          s=s.replace(/\[Noctra\/Tokyo\]/g,'[Noctra/VidLove]');
+          s+='\nmodule.exports.__probe=getStreams;\n';
+          fs.writeFileSync('/tmp/vidlove-probe.cjs',s);
+          const p=require('/tmp/vidlove-probe.cjs');
+          async function run(name,args){
+            const rows=await Promise.race([
+              Promise.resolve(p.getStreams(...args)),
+              new Promise(r=>setTimeout(()=>r([]),45000))
+            ]);
+            console.log(name+': streams='+(rows||[]).length);
+            for(const x of (rows||[]).slice(0,10)){
+              let host='';try{host=new URL(x.url).hostname}catch{}
+              console.log('  '+x.name+' q='+x.quality+' host='+host);
+            }
+          }
+          (async()=>{
+            await run('movie',[238,'movie']);
+            await run('tv',[1399,'tv',1,1]);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

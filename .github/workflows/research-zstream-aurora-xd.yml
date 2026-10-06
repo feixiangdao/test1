@@ -1,0 +1,37 @@
+name: Research ZStream Aurora xd decoder
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-aurora-xd.yml'
+
+jobs:
+  probe:
+    runs-on: macos-latest
+    timeout-minutes: 4
+    steps:
+      - name: Dump xd decoder
+        run: |
+          set -e
+          curl -L --fail --retry 2 -o /tmp/ZStreamNativeSources 'https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources'
+          nm -nm /tmp/ZStreamNativeSources | grep '__ZL2xdPKhmh' || true
+          ADDR=$(nm -nm /tmp/ZStreamNativeSources | awk '/__ZL2xdPKhmh/{print $1; exit}')
+          echo "XD_ADDR=$ADDR"
+          otool -tvV /tmp/ZStreamNativeSources > /tmp/dis.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          lines=Path('/tmp/dis.txt').read_text(errors='ignore').splitlines()
+          idx=next((i for i,x in enumerate(lines) if '__ZL2xdPKhmh:' in x),None)
+          print('XD_IDX',idx)
+          if idx is not None:
+              for line in lines[idx:idx+220]:
+                  print(line)
+          print('\n=== S_K_TOKEN bytes ===')
+          data=Path('/tmp/ZStreamNativeSources').read_bytes()
+          off=0x130c56
+          raw=data[off:off+0x40]
+          print(raw.hex())
+          print(list(raw[:32]))
+          PY

@@ -1,0 +1,27 @@
+name: Research ZStream binary strings
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-binary.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Download ZStream native framework
+        run: |
+          curl -L --fail --retry 2             -o /tmp/ZStreamNativeSources             'https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources'
+          file /tmp/ZStreamNativeSources
+          ls -lh /tmp/ZStreamNativeSources
+      - name: Extract resolver strings
+        run: |
+          strings -a -n 5 /tmp/ZStreamNativeSources > /tmp/zstrings.txt
+          echo '=== resolver names ==='
+          grep -iE 'apollo|vienna|chase|stellar|aphrodite|nesterov|tokyo|velora|artemis|aspera|aurora|fontaine' /tmp/zstrings.txt | head -n 500 || true
+          echo '=== urls/domains ==='
+          grep -Eo 'https?://[^[:space:]"]+' /tmp/zstrings.txt | sed 's/[),;].*$//' | sort -u | head -n 500 || true
+          echo '=== api-ish paths ==='
+          grep -iE '/api/|/movie/|/tv/|/sources|resolve|stream|embed|graphql|tmdb|imdb' /tmp/zstrings.txt | head -n 1200 || true

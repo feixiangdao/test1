@@ -1,0 +1,59 @@
+name: Research ZStream Aspera direct MP4
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-aspera-direct.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe VidLink direct candidates
+        run: |
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+          async function one(tmdb,type,season,episode){
+            const er=await fetch('https://enc-dec.app/api/enc-vidlink?text='+encodeURIComponent(String(tmdb)),{
+              headers:{'User-Agent':UA,'Accept':'application/json'}
+            });
+            const ej=await er.json();
+            const enc=ej.result;
+            let u='https://vidlink.pro/api/b/'+(type==='tv'?'tv/':'movie/')+encodeURIComponent(enc);
+            if(type==='tv')u+='/'+season+'/'+episode;
+            u+='?multiLang=0';
+            const r=await fetch(u,{headers:{
+              'User-Agent':UA,'Origin':'https://vidlink.pro','Referer':'https://vidlink.pro/','Accept':'application/json'
+            }});
+            const j=await r.json();
+            const st=j.stream||(j.result&&j.result.stream)||{};
+            const q=st.qualities||{};
+            let pick=null;
+            for(const k of ['1080','1080p','720','720p','480','480p','360','360p']){
+              const x=q[k];
+              if(x){pick=typeof x==='string'?{url:x,quality:k}:{...x,quality:k};break;}
+            }
+            if(!pick&&st.url)pick={url:st.url,quality:st.quality||'auto'};
+            if(!pick){console.log(type+' no candidate');return;}
+            const x=new URL(pick.url);
+            console.log(type+' candidate quality='+pick.quality+' host='+x.hostname+' path='+x.pathname);
+            const rr=await fetch(pick.url,{headers:{
+              'User-Agent':UA,
+              'Referer':'https://vidlink.pro/',
+              'Origin':'https://vidlink.pro',
+              'Range':'bytes=0-4095'
+            }});
+            console.log(type+' direct status='+rr.status+' type='+(rr.headers.get('content-type')||'')+' len='+(rr.headers.get('content-length')||''));
+            const b=await rr.arrayBuffer();
+            console.log(type+' bytes='+b.byteLength);
+          }
+          (async()=>{
+            await one(238,'movie');
+            await one(1399,'tv',1,1);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

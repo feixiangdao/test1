@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.45.0",
+  "version": "4.46.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -168,6 +168,27 @@
         "multi"
       ],
       "limited": true
+    },
+    {
+      "id": "noctra-rive-citadel",
+      "name": "NoctraTV · Rive · Citadel",
+      "description": "Current NoctraTV Rive Citadel source. Uses the public RiveStream scraper API and returns direct media only. Enabled after focused movie/TV verification with current 1080p/720p variants.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/rive-citadel.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
     },
     {
       "id": "noctra-framex-vidcore",

@@ -1,0 +1,38 @@
+name: Research VidLove current resolver
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-vidlove-current.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Decode public VidLove provider
+        run: |
+          set -e
+          curl -L --fail --retry 2             -o /tmp/vidlove.js             'https://raw.githubusercontent.com/NuvioPlugin/All-in-One-Nuvio/main/providers/vidlove.js'
+          cat >> /tmp/vidlove.js <<'NODE'
+          
+          ;(function(){
+            try{
+              console.log('VIDLOVE_BASE_URL='+BASE_URL);
+              console.log('VIDLOVE_REFERER='+REFERER);
+              console.log('VIDLOVE_PROVIDERS='+JSON.stringify(PROVIDERS));
+              console.log('VIDLOVE_DEFAULT_HEADERS='+JSON.stringify(DEFAULT_HEADERS));
+              for(const p of PROVIDERS){
+                try{
+                  console.log('URL movie '+p+' '+buildEndpointUrl('movie','238',p,null,null));
+                  console.log('URL tv '+p+' '+buildEndpointUrl('tv','1399',p,1,1));
+                }catch(e){console.log('URLERR '+p+' '+e.message)}
+              }
+            }catch(e){console.log('DECODEERR '+e.stack)}
+          })();
+          NODE
+          node /tmp/vidlove.js

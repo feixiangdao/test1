@@ -1,0 +1,39 @@
+name: Research Cineflix narrow
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-cineflix-narrow.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Extract only Cineflix/fstream implementation neighborhoods
+        run: |
+          node - <<'NODE'
+          const U='https://noctratv.com/assets/index-B_JGO8C1.js';
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+          (async()=>{
+            const r=await fetch(U,{headers:{'User-Agent':UA,'Accept':'application/javascript,*/*'}});
+            if(!r.ok)throw new Error('HTTP '+r.status);
+            const s=await r.text(), low=s.toLowerCase();
+            const keys=['fstream','cineflix','castellano','subbed','latino'];
+            console.log('bytes='+s.length);
+            for(const key of keys){
+              let at=0,n=0;
+              while((at=low.indexOf(key,at))>=0&&n<50){
+                n++;
+                const lo=Math.max(0,at-1800),hi=Math.min(s.length,at+3600);
+                const frag=s.slice(lo,hi).replace(/\s+/g,' ');
+                if(/me\(\{id:|fetcher\(|proxiedFetcher\(|https?:\/\//i.test(frag)){
+                  console.log('\n=== '+key+' #'+n+' @'+at+' ===');
+                  console.log(frag);
+                }
+                at+=key.length;
+              }
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

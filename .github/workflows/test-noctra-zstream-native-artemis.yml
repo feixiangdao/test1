@@ -19,6 +19,14 @@ jobs:
           node-version: '22'
       - name: Syntax
         run: node --check noctratv-nuvio/providers/zstream-native-artemis.js
+      - name: Fontaine network diagnostics
+        run: |
+          echo '=== DNS ==='
+          dscacheutil -q host -a name artemis.fontaine.lol 2>/dev/null || getent ahosts artemis.fontaine.lol || true
+          echo '=== CURL IPv4 ==='
+          curl -4 -I -v --max-time 12 https://artemis.fontaine.lol/ 2>&1 | tail -80 || true
+          echo '=== CURL IPv6 ==='
+          curl -6 -I -v --max-time 12 https://artemis.fontaine.lol/ 2>&1 | tail -80 || true
       - name: Focused live probe
         working-directory: noctratv-nuvio
         run: |

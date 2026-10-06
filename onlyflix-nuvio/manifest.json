@@ -1,13 +1,13 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.4.0",
-  "description": "Independent OnlyFlix provider for Nuvio with four current OnlyFlix upstream sources: CDNM, VidAPI, NontonGo and VidFast. Source names are used because webpage server numbers shift by title.",
+  "version": "0.4.1",
+  "description": "Independent OnlyFlix provider for Nuvio with four current upstream sources: CDNM, VidAPI, NontonGo and VidFast. NontonGo candidates are live-probed and source names are used because webpage server numbers shift by title.",
   "scrapers": [
     {
       "id": "onlyflix-cdnm",
       "name": "OnlyFlix · CDNM",
-      "description": "CDNM source. Resolves IMDb-backed PlayerJS streams through the dedicated resolver and returns direct HLS qualities up to 1080p when available.",
-      "version": "0.4.0",
+      "description": "CDNM source with automatic TMDB→IMDb mapping; returns direct PlayerJS HLS qualities up to 1080p when available.",
+      "version": "0.4.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -27,7 +27,7 @@
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
       "description": "VidAPI source through the dedicated OnlyFlix resolver; returns direct HLS.",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -46,8 +46,8 @@
     {
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · NontonGo",
-      "description": "NontonGo/Soap2Day source using the current multisourcesoap endpoint; returns multiple direct HLS candidates.",
-      "version": "0.4.0",
+      "description": "NontonGo/Soap2Day source using the current multisourcesoap endpoint; failed candidates are filtered and live HLS/MP4 streams are typed correctly.",
+      "version": "0.4.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -56,7 +56,8 @@
       "filename": "providers/onlyflix-nontongo.js",
       "enabled": true,
       "formats": [
-        "m3u8"
+        "m3u8",
+        "mp4"
       ],
       "contentLanguage": [
         "multi"
@@ -67,7 +68,7 @@
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
       "description": "VidFast source through the dedicated OnlyFlix resolver; returns direct HLS.",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",

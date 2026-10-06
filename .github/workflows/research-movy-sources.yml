@@ -1,0 +1,40 @@
+name: Research Movy sources
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-movy-sources.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Read current Movy source labels
+        run: |
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/143 Mobile Safari/537.36';
+          async function one(url,name){
+            const r=await fetch(url,{headers:{
+              'User-Agent':UA,
+              'Accept':'application/json, text/plain, */*',
+              'Referer':'https://vidcore.org/'
+            }});
+            console.log(name+' HTTP '+r.status);
+            const j=await r.json().catch(()=>({}));
+            const rows=Array.isArray(j.sources)?j.sources:[];
+            console.log(name+' count='+rows.length);
+            rows.forEach((x,i)=>{
+              let host='';try{host=new URL(x.url).hostname}catch{}
+              console.log((i+1)+'. label='+(x.label||'')+' provider='+(x.provider||'')+' quality='+(x.quality||'')+' host='+host);
+            });
+          }
+          (async()=>{
+            await one('https://vidrack.created.app/api/sources/movy?id=238','movie');
+            await one('https://vidrack.created.app/api/sources/movy?id=1399&type=tv&season=1&episode=1','tv');
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

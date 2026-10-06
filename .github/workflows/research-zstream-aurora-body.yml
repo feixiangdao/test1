@@ -1,0 +1,55 @@
+name: Research ZStream Aurora body literals
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-aurora-body.yml'
+
+jobs:
+  probe:
+    runs-on: macos-latest
+    timeout-minutes: 5
+    steps:
+      - name: Extract Aurora resolver literals
+        run: |
+          set -e
+          curl -L --fail --retry 2 -o /tmp/ZStreamNativeSources 'https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources'
+          otool -tvV /tmp/ZStreamNativeSources > /tmp/dis.txt
+          strings -a -t x /tmp/ZStreamNativeSources > /tmp/strings.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          dis=Path('/tmp/dis.txt').read_text(errors='ignore').splitlines()
+          strs=Path('/tmp/strings.txt').read_text(errors='ignore').splitlines()
+          smap={}
+          for line in strs:
+              m=re.match(r'\s*([0-9a-fA-F]+)\s+(.*)$',line)
+              if m:
+                  smap[int(m.group(1),16)]=m.group(2)
+          start=next(i for i,x in enumerate(dis) if x.startswith('0000000000021628'))
+          end=next((i for i,x in enumerate(dis[start+1:],start+1) if x.startswith('0000000000027938')), min(len(dis),start+5000))
+          body=dis[start:end]
+          print('BODY_LINES',len(body))
+          # Print every instruction that otool resolves to a literal pool string.
+          for i,line in enumerate(body):
+              if 'literal pool for:' in line:
+                  print(f'{i:04d} {line}')
+          print('\n=== nearby calls + literals ===')
+          for i,line in enumerate(body):
+              if ('_http_' in line.lower() or 'curl' in line.lower() or 'Cookie' in line or
+                  'HMAC' in line or 'SHA' in line or 'base64' in line.lower() or
+                  'AES' in line or 'json' in line.lower() or 'qval' in line or 'xdPKhmh' in line):
+                  for z in body[max(0,i-8):min(len(body),i+14)]:
+                      print(z)
+                  print('---')
+          print('\n=== ADRP/ADD string candidates around Aurora cstring region ===')
+          for i,line in enumerate(body):
+              m=re.match(r'([0-9a-f]{16}).*add\s+x\d+, x\d+, #0x([0-9a-f]+)',line)
+              if not m: continue
+              # otool already annotates known literal strings; keep unannotated offsets near cstrings too
+              if 'literal pool for:' in line:
+                  continue
+              if i>0 and 'adrp' in body[i-1] and '; 0x16e000' in body[i-1]:
+                  print(body[i-1]); print(line)
+          PY

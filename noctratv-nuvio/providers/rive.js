@@ -4,7 +4,7 @@
 var API = "https://scrapper.rivestream.app";
 var FRONT = "https://www.rivestream.app";
 var UA = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/137 Mobile Safari/537.36";
-var FALLBACK = ["apex","pulse","solstice","quasar","primevids","flowcast","citadel","guru","asiacloud","horizon","hindicast"];
+var FALLBACK = ["apex","pulse","solstice","quasar","primevids","flowcast","guru","asiacloud","horizon","hindicast"];
 
 function clean(v) { return v == null ? "" : String(v).trim(); }
 function headers() {
@@ -29,7 +29,7 @@ function getProviders() {
         if (typeof x === "string") return clean(x);
         if (x && typeof x === "object") return clean(x.id || x.name || x.provider || x.slug);
         return "";
-      }).filter(Boolean);
+      }).filter(function(x){return !!x && x!=="citadel";});
       return a.length ? a : FALLBACK;
     })
     .catch(function(){ return FALLBACK; });

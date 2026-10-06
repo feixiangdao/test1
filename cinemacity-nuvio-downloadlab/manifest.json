@@ -1,17 +1,17 @@
 {
   "name": "CinemaCity Download Lab",
-  "version": "1.8.0",
-  "description": "CinemaCity Download Lab 1.8.0. DUI7BUILD diagnostics. Scraper id and manifest path stay stable so Nuvio keeps your saved Session Cookie - only the provider code is refreshed. DUI7 dumps the bodies and call sites of the download orchestration functions (getProtectedDownloadTarget / parseFileSet / startDownload / getSelectedQualityIndex / currentFileSet) so the base URL and video/audio source can be read without repeating the DUI6 inventory sweep.",
+  "version": "1.9.0",
+  "description": "CinemaCity Download Lab 1.9.0. Adds an adb logcat exfil channel (tag CCDUMP) that streams the full libs.js download-orchestration source off the device as numbered chunks, plus full chunked DUI8B diagnostic rows as a screenshot fallback. Scraper id and manifest path stay stable so Nuvio keeps your saved Session Cookie.",
   "scrapers": [
     {
       "id": "cinemacity-downloadlab-170",
-      "name": "CinemaCity Download Lab v1.8.0",
-      "description": "DUI7BUILD=7.1.0. Dumps download orchestration function bodies and makeDownloadHref call sites, plus a SCAN row explaining fetch outcomes.",
-      "version": "1.8.0",
+      "name": "CinemaCity Download Lab v1.9.0",
+      "description": "DUI8BUILD=8.0.0. Dumps full download orchestration function bodies to logcat (grep CCDUMP) and as chunked DUI8B rows, plus a SIZES index row.",
+      "version": "1.9.0",
       "supportedTypes": [
         "movie"
       ],
-      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/e4d078ff10d5b27d1e78afa0ed3857a6ceb89bca/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab-180.js",
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/f5002dad32dec9e09ebfe5c35cf4fbf7a0b94011/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab-181.js",
       "enabled": true,
       "formats": [
         "m3u8",

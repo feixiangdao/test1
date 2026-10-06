@@ -72,7 +72,8 @@ function mp4Dimensions(buf){
 function qualityDetail(v){
   return v.width&&v.height?v.quality+" ("+v.width+"×"+v.height+")":v.quality;
 }
-\nfunction qnum(q){var s=String(q||"").toLowerCase();if(/4k|2160/.test(s))return 2160;var m=s.match(/(\d{3,4})/);return m?parseInt(m[1],10):0;}
+
+function qnum(q){var s=String(q||"").toLowerCase();if(/4k|2160/.test(s))return 2160;var m=s.match(/(\d{3,4})/);return m?parseInt(m[1],10):0;}
 function token(page){
   var s=String(page||""),m;
   m=s.match(/\\\"(?:en|token)\\\":\\\"(.*?)\\\"/);if(m)return m[1];

@@ -1,0 +1,41 @@
+name: Test NoctraTV Novera VidKing
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'noctratv-nuvio/providers/novera-vidking.js'
+      - '.github/workflows/test-noctra-novera-vidking.yml'
+
+jobs:
+  novera:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: node --check noctratv-nuvio/providers/novera-vidking.js
+      - name: Focused live probe
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          async function timeout(p,ms,label){
+            return new Promise(resolve=>{
+              let done=false;
+              const t=setTimeout(()=>{if(done)return;done=true;console.log(label+' timeout');resolve([])},ms);
+              Promise.resolve(p).then(v=>{if(done)return;done=true;clearTimeout(t);resolve(v)})
+                .catch(e=>{if(done)return;done=true;clearTimeout(t);console.log(label+' error '+(e&&e.message?e.message:e));resolve([])});
+            });
+          }
+          (async()=>{
+            const p=require('./providers/novera-vidking.js');
+            for(const [name,args] of [['movie',[238,'movie']],['tv',[1399,'tv',1,1]]]){
+              const rows=await timeout(p.getStreams(...args),50000,'Novera '+name);
+              console.log('Novera '+name+' streams='+(rows||[]).length);
+              (rows||[]).slice(0,10).forEach((x,i)=>console.log('  '+(i+1)+'. '+x.title+' '+x.url));
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

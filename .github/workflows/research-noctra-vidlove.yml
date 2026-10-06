@@ -1,0 +1,71 @@
+name: Research NoctraTV VidLove
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-noctra-vidlove.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe current VidLove child sources
+        run: |
+          node - <<'NODE'
+          const BASE='https://ballerinacappuccinalovestungtungtungsahur.com';
+          const REFERER='https://player.vidlove.cc/';
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+          const H={
+            accept:'application/json',
+            'accept-language':'en-US,en;q=0.9',
+            Referer:REFERER,
+            'User-Agent':UA
+          };
+          const S=['moviebox','vidapi','warden'];
+          async function one(kind,id,season,episode,source){
+            const q=new URLSearchParams({id:String(id),mode:'json',sources:source,hevc:'1'});
+            if(kind==='tv'){q.set('season',String(season));q.set('episode',String(episode));}
+            const u=BASE+'/'+kind+'?'+q;
+            const t0=Date.now();
+            const r=await fetch(u,{headers:H});
+            const txt=await r.text();
+            let j={};try{j=JSON.parse(txt)}catch{}
+            const src=j&&j.source||{};
+            const qs=Array.isArray(src.qualities)?src.qualities:[];
+            const urls=[];
+            for(const x of qs){
+              if(x&&x.url){try{urls.push({q:x.quality||'',host:new URL(x.url).hostname,url:x.url})}catch{}}
+            }
+            if(src.url){try{urls.push({q:src.quality||'',host:new URL(src.url).hostname,url:src.url})}catch{}}
+            console.log(JSON.stringify({
+              kind,source,status:r.status,ms:Date.now()-t0,
+              topKeys:Object.keys(j||{}),
+              sourceKeys:Object.keys(src||{}),
+              provider:src.provider||src.name||'',
+              urls:urls.map(x=>({q:x.q,host:x.host}))
+            }));
+            for(const x of urls.slice(0,3)){
+              try{
+                const mr=await fetch(x.url,{headers:{'User-Agent':UA,Referer:REFERER,Origin:'https://player.vidlove.cc'}});
+                const ct=(mr.headers.get('content-type')||'').toLowerCase();
+                let ok=mr.ok;
+                let hls=false;
+                if(ok&&(/mpegurl|m3u8/.test(ct)||/\.m3u8(?:[?#]|$)/i.test(x.url))){
+                  const body=await mr.text(); hls=body.startsWith('#EXTM3U'); ok=ok&&hls;
+                }
+                console.log('MEDIA '+kind+' '+source+' q='+x.q+' host='+x.host+' status='+mr.status+' ct='+ct+' hls='+(hls?1:0)+' ok='+(ok?1:0));
+              }catch(e){console.log('MEDIAERR '+kind+' '+source+' '+e.message)}
+            }
+          }
+          (async()=>{
+            for(const s of S){
+              await one('movie',238,null,null,s);
+              await one('tv',1399,1,1,s);
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

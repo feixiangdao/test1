@@ -21,6 +21,21 @@ jobs:
           nm -nm /tmp/ZStreamNativeSources | grep 'S_K_TOKEN' || true
           xxd -g 1 -s 0x130c30 -l 0xc0 /tmp/ZStreamNativeSources || true
           otool -tvV /tmp/ZStreamNativeSources | grep -n -B12 -A20 '130c56\|0xc56' || true
+          echo '=== S_K_TOKEN xrefs ==='
+          otool -tvV /tmp/ZStreamNativeSources > /tmp/all-dis.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('/tmp/all-dis.txt').read_text(errors='ignore').splitlines()
+          for target in (0x34734,0x884ac):
+              print('\n### XREF',hex(target))
+              idx=next((i for i,x in enumerate(s) if x.startswith(f'{target:016x}')),None)
+              print('IDX',idx)
+              if idx is not None:
+                  for line in s[max(0,idx-100):idx+180]:
+                      print(line)
+          PY
+          echo '=== symbols around xrefs ==='
+          nm -nm /tmp/ZStreamNativeSources | awk '$1 >= "0000000000034000" && $1 <= "0000000000036000" {print} $1 >= "0000000000087000" && $1 <= "000000000008a000" {print}' || true
           echo '=== aurora xor constants 130700 ==='
           xxd -g 1 -s 0x130700 -l 0x80 /tmp/ZStreamNativeSources || true
           echo '=== aurora raw constants ==='

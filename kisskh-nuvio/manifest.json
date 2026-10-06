@@ -1,7 +1,7 @@
 {
   "name": "KissKH Local",
   "version": "0.1.0",
-  "description": "Independent KissKH provider for Nuvio. Resolves TMDB metadata to KissKH episode IDs, generates current kkey tokens, and returns verified direct HLS/MP4/DASH media without iframe fallback.",
+  "description": "Independent KissKH provider for Nuvio. Resolves TMDB metadata to KissKH episode IDs, generates current kkey tokens locally with WebCrypto, and returns verified direct HLS/MP4/DASH media without iframe fallback.",
   "scrapers": [
     {
       "id": "kisskh-direct",

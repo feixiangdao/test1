@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.41.0",
+  "version": "4.42.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1309,6 +1309,26 @@
         "m3u8",
         "mp4",
         "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-zstream-native-artemis",
+      "name": "NoctraTV · ZStream Native · Artemis",
+      "description": "Research-only reconstruction of current ZStreamNativeSources ArtemisKeylessNative. Recreates its 90-second HMAC signatures, AES-GCM _pk envelope, sorted query signature, encrypted response, and verified HLS variants locally. Disabled until the NoctraTV Apollo/Vienna/Chase alias mapping is proven.",
+      "version": "0.1.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/zstream-native-artemis.js",
+      "enabled": false,
+      "formats": [
+        "m3u8"
       ],
       "contentLanguage": [
         "multi"

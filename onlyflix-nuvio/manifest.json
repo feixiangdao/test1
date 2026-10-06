@@ -1,13 +1,13 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.9.8",
-  "description": "OnlyFlix local build. NontonGo 0.9.8 rewrites the broken VidNest/Videasy HLS to direct media segments on-device and returns the highest-quality repaired stream first for faster playback.",
+  "version": "0.9.9",
+  "description": "OnlyFlix local diagnostic build. NontonGo 0.9.9 races Soap2Cloud, Videasy and VidNest and exposes exact failure stages instead of a generic no-stream row.",
   "scrapers": [
     {
       "id": "onlyflix-cdnm",
       "name": "OnlyFlix · CDNM",
       "description": "Pure local CDNM with device-side TMDB→IMDb lookup, PlayerJS #2 decoding and explicit 1080p/720p/480p/360p/240p variants when available.",
-      "version": "0.9.8",
+      "version": "0.9.9",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -27,7 +27,7 @@
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
       "description": "Pure local VidAPI/VAPlayer. Master HLS playlists are expanded into explicit resolution streams with actual pixel dimensions.",
-      "version": "0.9.8",
+      "version": "0.9.9",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -46,14 +46,14 @@
     {
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · NontonGo",
-      "description": "NontonGo local HLS repair: highest-quality VidNest/Videasy playlist is rewritten to direct media segment URLs and returned as an in-memory HLS playlist; diagnostic row remains on failure.",
-      "version": "0.9.8",
+      "description": "NontonGo detailed diagnostic resolver. Soap2Cloud, Videasy and VidNest are tried locally; if none produce a playable stream, exact failing stages are shown as diagnostic rows.",
+      "version": "0.9.9",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-nontongo-repair098.js",
+      "filename": "providers/onlyflix-nontongo-diagnostic099.js",
       "enabled": true,
       "formats": [
         "m3u8",
@@ -68,7 +68,7 @@
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
       "description": "Pure local VidFast using the direct VA upstream source=vidfast path. Master HLS playlists are expanded into explicit resolution streams. No helper resolver.",
-      "version": "0.9.8",
+      "version": "0.9.9",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",

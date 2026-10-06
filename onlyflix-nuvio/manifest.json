@@ -1,13 +1,33 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.3.1",
-  "description": "Independent OnlyFlix provider for Nuvio. Provider labels now use upstream source names because OnlyFlix server numbers shift when CDNM is available.",
+  "version": "0.4.0",
+  "description": "Independent OnlyFlix provider for Nuvio with four current OnlyFlix upstream sources: CDNM, VidAPI, NontonGo and VidFast. Source names are used because webpage server numbers shift by title.",
   "scrapers": [
+    {
+      "id": "onlyflix-cdnm",
+      "name": "OnlyFlix · CDNM",
+      "description": "CDNM source. Resolves IMDb-backed PlayerJS streams through the dedicated resolver and returns direct HLS qualities up to 1080p when available.",
+      "version": "0.4.0",
+      "author": "OnlyFlix Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/onlyflix-cdnm.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
     {
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
-      "description": "VidAPI source. On titles with CDNM this appears as webpage Server 2; without CDNM it appears as Server 1.",
-      "version": "0.3.1",
+      "description": "VidAPI source through the dedicated OnlyFlix resolver; returns direct HLS.",
+      "version": "0.4.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -26,18 +46,17 @@
     {
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · NontonGo",
-      "description": "NontonGo source. Temporarily disabled while direct extraction is being rebuilt.",
-      "version": "0.3.1",
+      "description": "NontonGo/Soap2Day source using the current multisourcesoap endpoint; returns multiple direct HLS candidates.",
+      "version": "0.4.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
       "filename": "providers/onlyflix-nontongo.js",
-      "enabled": false,
+      "enabled": true,
       "formats": [
-        "m3u8",
-        "mp4"
+        "m3u8"
       ],
       "contentLanguage": [
         "multi"
@@ -47,8 +66,8 @@
     {
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
-      "description": "VidFast source. On titles with CDNM this appears as webpage Server 4; without CDNM it appears as Server 3.",
-      "version": "0.3.1",
+      "description": "VidFast source through the dedicated OnlyFlix resolver; returns direct HLS.",
+      "version": "0.4.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -57,8 +76,7 @@
       "filename": "providers/onlyflix-vidfast.js",
       "enabled": true,
       "formats": [
-        "m3u8",
-        "mp4"
+        "m3u8"
       ],
       "contentLanguage": [
         "multi"

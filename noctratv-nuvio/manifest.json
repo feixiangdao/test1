@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.43.0",
+  "version": "4.44.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1228,6 +1228,27 @@
       "enabled": true,
       "formats": [
         "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-cinema-army-dcloud",
+      "name": "NoctraTV · Cinema.army · Dcloud",
+      "description": "Current Noctra Cinema.army Dcloud source using the same signed MZone playback-session flow as Cookiebakers. Returns validated direct media only.",
+      "version": "0.1.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/cinema-army-dcloud.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
       ],
       "contentLanguage": [
         "multi"

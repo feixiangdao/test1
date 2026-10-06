@@ -1,10 +1,69 @@
 {
-  "name":"OnlyFlix Local",
-  "version":"0.2.0",
-  "description":"Independent OnlyFlix provider for Nuvio. Implements the three current OnlyFlix top-level servers as separate scrapers.",
-  "scrapers":[
-    {"id":"onlyflix-vidapi","name":"OnlyFlix · Server 1 · VidAPI","description":"Direct VidAPI/StreamIMDb family resolver.","version":"0.2.0","author":"OnlyFlix Local","supportedTypes":["movie","tv"],"filename":"providers/onlyflix-vidapi.js","enabled":true,"formats":["m3u8"],"contentLanguage":["multi"],"limited":true},
-    {"id":"onlyflix-nontongo","name":"OnlyFlix · Server 2 · NontonGo","description":"Direct NontonGo sources-array resolver.","version":"0.2.0","author":"OnlyFlix Local","supportedTypes":["movie","tv"],"filename":"providers/onlyflix-nontongo.js","enabled":true,"formats":["m3u8","mp4"],"contentLanguage":["multi"],"limited":true},
-    {"id":"onlyflix-vidfast","name":"OnlyFlix · Server 3 · VidFast","description":"Direct VidFast resolver.","version":"0.2.0","author":"OnlyFlix Local","supportedTypes":["movie","tv"],"filename":"providers/onlyflix-vidfast.js","enabled":true,"formats":["m3u8","mp4"],"contentLanguage":["multi"],"limited":true}
+  "name": "OnlyFlix Local",
+  "version": "0.2.2",
+  "description": "Independent OnlyFlix provider for Nuvio. Server 1 and Server 3 use the current direct VAPlayer backend; Server 2 keeps the NontonGo direct extractor with bounded timeout because the current upstream is intermittently Cloudflare-blocked.",
+  "scrapers": [
+    {
+      "id": "onlyflix-vidapi",
+      "name": "OnlyFlix · Server 1 · VidAPI",
+      "description": "Current direct VAPlayer backend used by the OnlyFlix/VidAPI family; returns HLS immediately without browser/embed preflight.",
+      "version": "0.2.2",
+      "author": "OnlyFlix Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/onlyflix-vidapi.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
+    },
+    {
+      "id": "onlyflix-nontongo",
+      "name": "OnlyFlix · Server 2 · NontonGo",
+      "description": "Direct NontonGo sources-array resolver with bounded timeout; current upstream may return Cloudflare 403/502.",
+      "version": "0.2.2",
+      "author": "OnlyFlix Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/onlyflix-nontongo.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "onlyflix-vidfast",
+      "name": "OnlyFlix · Server 3 · VidFast",
+      "description": "Current VidFast path using the shared VAPlayer backend with source=vidfast; returns HLS immediately.",
+      "version": "0.2.2",
+      "author": "OnlyFlix Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/onlyflix-vidfast.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    }
   ]
 }

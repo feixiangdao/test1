@@ -1,0 +1,44 @@
+name: Test NoctraTV Bingr split
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'noctratv-nuvio/providers/bingr-aphelion.js'
+      - 'noctratv-nuvio/providers/bingr-bastion.js'
+      - 'noctratv-nuvio/manifest.json'
+      - '.github/workflows/test-noctra-bingr-split.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: |
+          node --check noctratv-nuvio/providers/bingr-aphelion.js
+          node --check noctratv-nuvio/providers/bingr-bastion.js
+      - name: Focused live probe
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          async function run(file,label){
+            const p=require('./providers/'+file);
+            for(const [name,args] of [['movie',[238,'movie']],['tv',[1399,'tv',1,1]]]){
+              const rows=await p.getStreams(...args);
+              console.log(label+' '+name+': streams='+(rows||[]).length);
+              (rows||[]).slice(0,4).forEach((x,i)=>{
+                let host='';try{host=new URL(x.url).hostname}catch{}
+                console.log('  '+(i+1)+'. '+x.name+' quality='+x.quality+' host='+host);
+              });
+            }
+          }
+          (async()=>{
+            await run('bingr-aphelion.js','Aphelion');
+            await run('bingr-bastion.js','Bastion');
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

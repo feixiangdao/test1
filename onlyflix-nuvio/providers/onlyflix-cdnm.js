@@ -114,7 +114,10 @@ function parseStreams(decoded,pageUrl){
 
 function pageUrl(base,imdb,mediaType,season,episode){
   var u=base+"/imdb/"+encodeURIComponent(imdb)+"/iframe";
-  var qs=[];
+  var qs=[
+    "translation_id=145",
+    "ftp_server_id=5"
+  ];
   if(mediaType==="tv"){
     qs.push("season="+encodeURIComponent(String(season||1)));
     qs.push("episode="+encodeURIComponent(String(episode||1)));

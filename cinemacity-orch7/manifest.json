@@ -1,0 +1,28 @@
+{
+  "name": "CinemaCity Orch7",
+  "version": "7.0.0",
+  "description": "CinemaCity Orch7 — fresh manifest path and scraper identity to bypass Nuvio provider-code caching. DUI7 dumps the bodies and call sites of the download orchestration functions (getProtectedDownloadTarget / parseFileSet / startDownload / getSelectedQualityIndex / currentFileSet) so the base URL and video/audio source can be read.",
+  "scrapers": [
+    {
+      "id": "cinemacity-orch7-700",
+      "name": "CinemaCity Orch7 v7.0.0",
+      "description": "DUI7: dump download orchestration function bodies and makeDownloadHref call sites to reveal the base-URL and video/audio selection path.",
+      "version": "7.0.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/PLACEHOLDER/cinemacity-orch7/providers/cinemacity-orch7.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true,
+      "hasSettings": true
+    }
+  ]
+}

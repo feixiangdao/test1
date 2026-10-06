@@ -18,6 +18,27 @@ var SOURCES=[
 ]
 
 function clean(v){return v==null?"":String(v).trim();}
+function safeShape(v,depth){
+  depth=depth||0;
+  if(depth>4)return"[depth]";
+  if(v==null||typeof v==="number"||typeof v==="boolean")return v;
+  if(typeof v==="string"){
+    var s=String(v);
+    if(s.length>160)s=s.slice(0,160)+"…";
+    if(/eyJ[a-zA-Z0-9_-]{20,}|[A-Fa-f0-9]{48,}|token|signature|cookie/i.test(s))return"[redacted]";
+    return s;
+  }
+  if(Array.isArray(v))return v.slice(0,12).map(function(x){return safeShape(x,depth+1);});
+  if(typeof v==="object"){
+    var o={};
+    Object.keys(v).slice(0,40).forEach(function(k){
+      if(/token|cookie|signature|secret|key/i.test(k))o[k]="[redacted]";
+      else o[k]=safeShape(v[k],depth+1);
+    });
+    return o;
+  }
+  return String(v);
+}
 function b64url(bytes){
   var a=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes||0),s="";
   for(var i=0;i<a.length;i++)s+=String.fromCharCode(a[i]);
@@ -271,11 +292,7 @@ function resolveOne(src,tmdbId,mediaType,season,episode,sess){
       if(!r.ok||j.success===false||!j.result){
         var ps=j&&j.playbackSecurity&&typeof j.playbackSecurity==="object"?j.playbackSecurity:{};
         console.log("[Noctra/ZStream/Aliases] "+src.label+
-          " playback dependency="+clean(ps.dependency)+
-          " provider="+clean(ps.provider)+
-          " service="+clean(ps.service)+
-          " mode="+clean(ps.mode)+
-          " reason="+clean(ps.reason));
+          " playbackSecurity="+JSON.stringify(safeShape(ps,0)));
         console.log("[Noctra/ZStream/Aliases] "+src.label+
           " resolve status="+r.status+
           " keys="+Object.keys(j||{}).join(",")+

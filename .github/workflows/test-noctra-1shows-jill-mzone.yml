@@ -1,0 +1,48 @@
+name: Test NoctraTV 1Shows Jill MZone
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/test-noctra-1shows-jill-mzone.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe Jill via current MZone flow
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          let s=fs.readFileSync('./providers/streamvault.js','utf8');
+          s=s.replace(/var SOURCES=\[[\s\S]*?\];/,
+          `var SOURCES=[
+            {id:"site-oneshows-jill",label:"Jill",movie:true,tv:false}
+          ];`);
+          s=s.replace(/NoctraTV · StreamVault · /g,'NoctraTV · 1Shows · ');
+          s=s.replace(/noctra-streamvault/g,'noctra-1shows-jill');
+          s=s.replace(/\[Noctra\/StreamVault\]/g,'[Noctra/1Shows/Jill]');
+          fs.writeFileSync('/tmp/jill.cjs',s);
+          const p=require('/tmp/jill.cjs');
+          async function run(label,args){
+            const rows=await Promise.race([
+              Promise.resolve(p.getStreams(...args)),
+              new Promise(r=>setTimeout(()=>r([]),45000))
+            ]).catch(e=>{console.log('ERR '+e.message);return[]});
+            console.log(label+': streams='+(rows||[]).length);
+            for(const x of (rows||[])){
+              let host='',path='';try{const u=new URL(x.url);host=u.hostname;path=u.pathname}catch{}
+              console.log('  '+x.name+' q='+x.quality+' type='+(x.type||'')+' host='+host+' path='+path);
+            }
+          }
+          (async()=>{
+            await run('Jill movie',[238,'movie']);
+            await run('Jill movie2',[550,'movie']);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

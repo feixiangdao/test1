@@ -1,7 +1,7 @@
 {
   "name": "CinemaCity Download Lab",
   "version": "1.8.0",
-  "description": "CinemaCity Download Lab 1.8.0. DUI7BUILD diagnostics in-place: same scraper id (settings kept), new provider filename. Reports SCAN inventory/fetch counts and orchestration function bodies so an empty result is always explained.",
+  "description": "CinemaCity Download Lab 1.8.0. DUI7BUILD diagnostics. Scraper id and manifest path stay stable so Nuvio keeps your saved Session Cookie - only the provider code is refreshed. DUI7 dumps the bodies and call sites of the download orchestration functions (getProtectedDownloadTarget / parseFileSet / startDownload / getSelectedQualityIndex / currentFileSet) so the base URL and video/audio source can be read without repeating the DUI6 inventory sweep.",
   "scrapers": [
     {
       "id": "cinemacity-downloadlab-170",
@@ -11,7 +11,7 @@
       "supportedTypes": [
         "movie"
       ],
-      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/946e8dfbeb8e7d5f4be84e377d7427de38d021a3/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab.js",
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/e4d078ff10d5b27d1e78afa0ed3857a6ceb89bca/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab-180.js",
       "enabled": true,
       "formats": [
         "m3u8",

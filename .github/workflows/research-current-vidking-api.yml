@@ -1,0 +1,50 @@
+name: Research current VidKing API
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-current-vidking-api.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect live VidKing bundles
+        run: |
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+          async function text(u){
+            const r=await fetch(u,{headers:{'User-Agent':UA,Accept:'text/html,application/javascript,*/*'}});
+            if(!r.ok)throw new Error(u+' HTTP '+r.status);
+            return r.text();
+          }
+          function abs(x,b){try{return new URL(x,b).href}catch{return''}}
+          (async()=>{
+            for(const page of ['https://www.vidking.net/','https://vidking.net/']){
+              let html;try{html=await text(page)}catch(e){console.log('PAGE ERR',page,e.message);continue}
+              console.log('PAGE',page,'bytes',html.length);
+              const scripts=[...html.matchAll(/<script[^>]+src=["']([^"']+\.js[^"']*)["']/ig)].map(m=>abs(m[1],page));
+              console.log('SCRIPTS',scripts.join(' | '));
+              for(const u of scripts){
+                let s;try{s=await text(u)}catch(e){console.log('SCRIPT ERR',u,e.message);continue}
+                console.log('\nASSET',u,'bytes',s.length);
+                const apis=[...new Set((s.match(/https:\/\/api\.[a-z0-9.-]+/ig)||[]))];
+                if(apis.length)console.log('API HOSTS',apis.join(' | '));
+                for(const nd of ['/seed?mediaId','sources-with-title','speedracelight','wingsdatabase','player.videasy','enc=2']){
+                  let p=0,n=0;
+                  while((p=s.indexOf(nd,p))>=0&&n<12){
+                    n++;
+                    console.log('\n===',nd,'#'+n,'@'+p,'===');
+                    console.log(s.slice(Math.max(0,p-2500),Math.min(s.length,p+6500)).replace(/\s+/g,' '));
+                    p+=nd.length;
+                  }
+                }
+              }
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

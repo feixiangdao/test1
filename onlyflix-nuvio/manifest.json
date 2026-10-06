@@ -1,13 +1,13 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.10.0",
-  "description": "OnlyFlix local build. NontonGo 0.10.0 strictly verifies HLS/MP4 down to the first media segment (and encryption key when present) before exposing a stream, eliminating unplayable Auto false positives.",
+  "version": "0.10.1",
+  "description": "OnlyFlix local build. NontonGo 0.10.1 repairs malformed Soap2Cloud TS playlists whose EXT-X-MAP incorrectly duplicates the first MPEG-TS media segment.",
   "scrapers": [
     {
       "id": "onlyflix-cdnm",
       "name": "OnlyFlix · CDNM",
       "description": "Pure local CDNM with device-side TMDB→IMDb lookup, PlayerJS #2 decoding and explicit 1080p/720p/480p/360p/240p variants when available.",
-      "version": "0.10.0",
+      "version": "0.10.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -27,7 +27,7 @@
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
       "description": "Pure local VidAPI/VAPlayer. Master HLS playlists are expanded into explicit resolution streams with actual pixel dimensions.",
-      "version": "0.10.0",
+      "version": "0.10.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -46,14 +46,14 @@
     {
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · NontonGo",
-      "description": "Strict local NontonGo resolver. Soap2Cloud, Videasy and VidNest candidates are only shown after master/variant/key/media-segment validation; failed routes become explicit diagnostics instead of Auto buffering entries.",
-      "version": "0.10.0",
+      "description": "Strict local NontonGo resolver. Verified Soap2Cloud TS playlists with an invalid EXT-X-MAP are rewritten on-device and returned as an in-memory HLS playlist before playback.",
+      "version": "0.10.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-nontongo-strict0100.js",
+      "filename": "providers/onlyflix-nontongo-mapfix0101.js",
       "enabled": true,
       "formats": [
         "m3u8",
@@ -68,7 +68,7 @@
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
       "description": "Pure local VidFast using the direct VA upstream source=vidfast path. Master HLS playlists are expanded into explicit resolution streams. No helper resolver.",
-      "version": "0.10.0",
+      "version": "0.10.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",

@@ -16,12 +16,12 @@ jobs:
         run: |
           node - <<'NODE'
           const fs=require('fs');
-          const URL='https://noctratv.com/assets/pStreamBackend-BO-fiiV-.js';
+          const BUNDLE_URL='https://noctratv.com/assets/pStreamBackend-BO-fiiV-.js';
           const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
           const norm=s=>String(s||'').toLowerCase()
             .replace(/noctratv/g,'').replace(/[^a-z0-9]+/g,' ').trim();
           (async()=>{
-            const r=await fetch(URL,{headers:{'User-Agent':UA,'Accept':'application/javascript,*/*'}});
+            const r=await fetch(BUNDLE_URL,{headers:{'User-Agent':UA,'Accept':'application/javascript,*/*'}});
             if(!r.ok)throw new Error('bundle HTTP '+r.status);
             const s=await r.text();
             const manifest=JSON.parse(fs.readFileSync('noctratv-nuvio/manifest.json','utf8'));

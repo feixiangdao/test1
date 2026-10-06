@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.38.0",
+  "version": "4.39.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -590,15 +590,15 @@
     {
       "id": "noctra-peestream-poseidon",
       "name": "NoctraTV · PeeStream · Poseidon",
-      "description": "noctratv.com Source: PeeStream · Poseidon. Uses providers.peestream.in SSE scrape pipeline with /api/search fallback and returns only direct Poseidon media.",
-      "version": "1.0.0",
+      "description": "noctratv.com Source: PeeStream · Poseidon. Uses providers.peestream.in SSE scrape pipeline with /api/search fallback and returns only direct Poseidon media. Enabled after live CI verified three movie streams and three TV streams.",
+      "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
       "filename": "providers/peestream-poseidon.js",
-      "enabled": false,
+      "enabled": true,
       "formats": [
         "m3u8",
         "mp4"

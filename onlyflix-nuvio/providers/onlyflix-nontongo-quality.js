@@ -82,31 +82,28 @@ function parseSources(html){
 function inspect(row,base){
   var raw=clean(row&&row.file);
   if(!/^https?:\/\//i.test(raw))return Promise.resolve([]);
-  var requestUrl=raw.split("#")[0],source=clean(row&&row.html)||"Soap2";
-  return fetch(requestUrl,{method:"GET",headers:{"User-Agent":UA,"Referer":base+"/","Accept":"*/*","Range":"bytes=0-65535"}})
-    .then(function(r){
-      if(!r.ok)return[];
-      var ct="";try{ct=clean(r.headers&&r.headers.get?r.headers.get("content-type"):"").toLowerCase();}catch(e){}
-      if(ct.indexOf("mpegurl")>=0||/\.m3u8(?:[?#]|$)/i.test(requestUrl)){
-        return r.text().then(function(txt){
-          var vars=parseMaster(txt,requestUrl);
-          if(vars.length)return vars.map(function(v){
-            var detail=qualityDetail(v),name="OnlyFlix · NontonGo · "+source+" · "+detail;
-            return{name:name,title:name,url:v.url,quality:v.quality,type:"hls",provider:"onlyflix-nontongo",headers:{"User-Agent":UA},subtitles:[]};
-          });
-          var name="OnlyFlix · NontonGo · "+source+" · HLS (Unknown)";
-          return[{name:name,title:name,url:raw,quality:"Unknown",type:"hls",provider:"onlyflix-nontongo",headers:{"User-Agent":UA},subtitles:[]}];
-        });
-      }
-      if(ct.indexOf("video/mp4")>=0){
-        return r.arrayBuffer().then(function(buf){
-          var d=mp4Dimensions(buf),q=d?stdQuality(d.width,d.height):"Unknown",detail=d?q+" ("+d.width+"×"+d.height+")":"MP4 (Unknown)";
-          var name="OnlyFlix · NontonGo · "+source+" · "+detail;
-          return[{name:name,title:name,url:requestUrl,quality:q,type:"mp4",provider:"onlyflix-nontongo",headers:{"User-Agent":UA},subtitles:[]}];
-        });
-      }
-      return[];
-    }).catch(function(){return[];});
+  var requestUrl=raw.split("#")[0],source=clean(row&&row.html)||"Soap2",headers={"User-Agent":UA,"Referer":base+"/","Accept":"*/*"};
+  return fetch(requestUrl,{method:"HEAD",headers:headers}).then(function(head){
+    if(!head.ok)return[];
+    var ct="";try{ct=clean(head.headers&&head.headers.get?head.headers.get("content-type"):"").toLowerCase();}catch(e){}
+    if(ct.indexOf("video/mp4")>=0){
+      var rh={"User-Agent":UA,"Referer":base+"/","Accept":"*/*","Range":"bytes=0-65535"};
+      return fetch(requestUrl,{headers:rh}).then(function(r){if(!r.ok)return[];return r.arrayBuffer();}).then(function(buf){
+        var d=mp4Dimensions(buf),q=d?stdQuality(d.width,d.height):"Unknown",detail=d?q+" ("+d.width+"×"+d.height+")":"MP4 (Unknown)";
+        var name="OnlyFlix · NontonGo · "+source+" · "+detail;
+        return[{name:name,title:name,url:requestUrl,quality:q,type:"mp4",provider:"onlyflix-nontongo",headers:{"User-Agent":UA},subtitles:[]}];
+      });
+    }
+    return fetch(requestUrl,{headers:headers}).then(function(r){if(!r.ok)return[];return r.text();}).then(function(txt){
+      var vars=parseMaster(txt,requestUrl);
+      if(vars.length)return vars.map(function(v){
+        var detail=qualityDetail(v),name="OnlyFlix · NontonGo · "+source+" · "+detail;
+        return{name:name,title:name,url:v.url,quality:v.quality,type:"hls",provider:"onlyflix-nontongo",headers:{"User-Agent":UA},subtitles:[]};
+      });
+      var name="OnlyFlix · NontonGo · "+source+" · HLS (Unknown)";
+      return[{name:name,title:name,url:raw,quality:"Unknown",type:"hls",provider:"onlyflix-nontongo",headers:{"User-Agent":UA},subtitles:[]}];
+    });
+  }).catch(function(){return[];});
 }
 function tryBase(i,id,type,s,e){
   if(i>=BASES.length)return Promise.resolve([]);

@@ -1,0 +1,30 @@
+name: Research ZStream Artemis constants
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-artemis-constants.yml'
+
+jobs:
+  probe:
+    runs-on: macos-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dump Artemis constants and host function
+        run: |
+          set -e
+          curl -L --fail --retry 2             -o /tmp/ZStreamNativeSources             'https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources'
+          otool -tvV /tmp/ZStreamNativeSources > /tmp/dis.txt
+          echo '=== host symbol ==='
+          nm -nm /tmp/ZStreamNativeSources | grep artemisKeylessHost || true
+          echo '=== host function body ==='
+          grep -n -A260 -B10 '^00000000000246a8' /tmp/dis.txt || true
+          echo '=== resolve start ==='
+          grep -n -A520 -B10 '^000000000001ee20' /tmp/dis.txt | head -560 || true
+          echo '=== literal bytes 0x130740..0x130860 ==='
+          xxd -g 1 -s 0x130740 -l 0x140 /tmp/ZStreamNativeSources || true
+          echo '=== printable strings offsets 0x130700..0x130900 ==='
+          strings -a -t x /tmp/ZStreamNativeSources | awk '$1 >= "130700" && $1 <= "130900" {print}'
+          echo '=== cstrings 16ecf0..16ef80 ==='
+          strings -a -t x /tmp/ZStreamNativeSources | awk '$1 >= "16ecf0" && $1 <= "16ef80" {print}'

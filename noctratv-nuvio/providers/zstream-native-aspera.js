@@ -104,6 +104,16 @@ function getStreams(tmdbId,mediaType,season,episode){
   }).then(function(r){if(!r.ok)throw new Error("VidLink HTTP "+r.status);return r.json();})
     .then(function(j){
       var rows=mediaRows(j);
+      rows.slice(0,8).forEach(function(x,idx){
+        try{
+          var u=new URL(x.url);
+          console.log("[Noctra/ZStream/Aspera] candidate "+idx+
+            " type="+x.type+
+            " quality="+x.quality+
+            " host="+u.hostname+
+            " path="+u.pathname);
+        }catch(_){}
+      });
       var out=[],i=0;
       function next(){
         if(i>=rows.length||out.length>=4)return Promise.resolve(out);

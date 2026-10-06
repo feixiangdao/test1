@@ -1,0 +1,50 @@
+name: Research ShowBox Standalone
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-showbox-standalone.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe ShowBox mapping and FebBox public share list
+        run: |
+          node - <<'NODE'
+          const MAP='https://id-mapping-api-showbox-proxy.hf.space';
+          async function probe(kind,id,s,e){
+            const q=new URLSearchParams({tmdbId:String(id),type:kind});
+            if(kind==='tv'){q.set('season',String(s));q.set('episode',String(e))}
+            const u=MAP+'/?'+q;
+            const r=await fetch(u,{headers:{'User-Agent':'Mozilla/5.0','Accept':'application/json,text/plain,*/*'}});
+            const t=await r.text();
+            console.log(kind+' map status='+r.status+' ct='+(r.headers.get('content-type')||'')+' body='+t.slice(0,800));
+            if(!r.ok)return;
+            let j;try{j=JSON.parse(t)}catch{return}
+            const stack=[j],urls=[];
+            while(stack.length){
+              const x=stack.pop();
+              if(typeof x==='string'){if(/^https?:\/\//.test(x))urls.push(x)}
+              else if(Array.isArray(x))stack.push(...x);
+              else if(x&&typeof x==='object')stack.push(...Object.values(x));
+            }
+            const feb=urls.find(x=>/febbox\.com/i.test(x));
+            console.log(kind+' febbox='+String(feb||''));
+            if(!feb)return;
+            const key=(feb.match(/(?:share_key=|\/share\/|\/f\/)([A-Za-z0-9_-]+)/i)||[])[1]||feb.split('/').filter(Boolean).pop();
+            if(!key)return;
+            const fr=await fetch('https://www.febbox.com/file/file_share_list?share_key='+encodeURIComponent(key),{headers:{'Accept-Language':'en','User-Agent':'Mozilla/5.0'}});
+            const ft=await fr.text();
+            console.log(kind+' sharelist status='+fr.status+' ct='+(fr.headers.get('content-type')||'')+' body='+ft.slice(0,500));
+          }
+          (async()=>{
+            await probe('movie',238);
+            await probe('tv',1399,1,1);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

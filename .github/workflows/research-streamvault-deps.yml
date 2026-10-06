@@ -1,0 +1,48 @@
+name: Research StreamVault dependencies
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-streamvault-deps.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Inspect current Noctra/MZone bundle around StreamVault aliases
+        run: |
+          node - <<'NODE'
+          const URLS=[
+            'https://noctratv.com/assets/pStreamBackend-BO-fiiV-.js',
+            'https://noctratv.com/assets/vortexApiSource-B-QupYve.js',
+            'https://noctratv.com/assets/index-B_JGO8C1.js'
+          ];
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+          async function txt(u){
+            const r=await fetch(u,{headers:{'User-Agent':UA,'Accept':'application/javascript,*/*'}});
+            if(!r.ok)throw new Error(u+' HTTP '+r.status);
+            return r.text();
+          }
+          (async()=>{
+            for(const u of URLS){
+              let s;try{s=await txt(u)}catch(e){console.log('ERR '+u+' '+e.message);continue}
+              console.log('\nASSET '+u+' bytes='+s.length);
+              for(const k of [
+                'site-streamvault-zoisite','site-streamvault-iron','site-streamvault-sunstone',
+                'streamvault','zoisite','sunstone','silver','iron',
+                'standalone dependency','dependency'
+              ]){
+                let from=0,n=0,low=s.toLowerCase(),key=k.toLowerCase();
+                while((from=low.indexOf(key,from))>=0&&n<12){
+                  n++;
+                  const lo=Math.max(0,from-5000),hi=Math.min(s.length,from+9000);
+                  console.log('\n=== '+k+' #'+n+' @'+from+' ===');
+                  console.log(s.slice(lo,hi).replace(/\s+/g,' '));
+                  from+=key.length;
+                }
+              }
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

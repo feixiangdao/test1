@@ -1,0 +1,39 @@
+name: Research 1Shows Jill
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-1shows-jill.yml'
+
+jobs:
+  decode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Decode current public 1Shows provider
+        run: |
+          set -e
+          curl -L --fail --retry 2             -o /tmp/1shows.js             'https://raw.githubusercontent.com/NuvioPlugin/All-in-One-Nuvio/main/providers/1shows.js'
+          cat >> /tmp/1shows.js <<'NODE'
+          
+          ;(function(){
+            try{
+              console.log('ONESH_SITE='+SITE_URL);
+              console.log('ONESH_API='+API_URL);
+              console.log('ONESH_HEADERS='+JSON.stringify(API_HEADERS));
+              for(let i=0x1cb;i<=0x285;i++){
+                try{
+                  const x=_0x5656(i);
+                  if(/jill|api|source|stream|download|server|search|movie|episode|show|player|embed|resolve/i.test(String(x))){
+                    console.log('STR '+i.toString(16)+' '+JSON.stringify(x));
+                  }
+                }catch(e){}
+              }
+            }catch(e){console.log('DECODEERR '+e.stack)}
+          })();
+          NODE
+          node /tmp/1shows.js

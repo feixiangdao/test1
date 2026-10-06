@@ -1,0 +1,41 @@
+name: Test NoctraTV 1Shows Ethan
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'noctratv-nuvio/providers/oneshows-ethan.js'
+      - '.github/workflows/test-noctra-oneshows.yml'
+
+jobs:
+  ethan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: node --check noctratv-nuvio/providers/oneshows-ethan.js
+      - name: Focused live probe
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          async function timeout(p,ms){
+            return new Promise(resolve=>{
+              let done=false;
+              const t=setTimeout(()=>{if(done)return;done=true;console.log('timeout');resolve([])},ms);
+              Promise.resolve(p).then(v=>{if(done)return;done=true;clearTimeout(t);resolve(v)})
+                .catch(e=>{if(done)return;done=true;clearTimeout(t);console.log('error '+(e&&e.message?e.message:e));resolve([])});
+            });
+          }
+          (async()=>{
+            const p=require('./providers/oneshows-ethan.js');
+            for(const id of [238,550,693134]){
+              const rows=await timeout(p.getStreams(id,'movie'),35000);
+              console.log('movie '+id+' streams='+(rows||[]).length);
+              (rows||[]).slice(0,4).forEach((x,i)=>console.log('  '+(i+1)+'. '+x.name+' '+x.url));
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

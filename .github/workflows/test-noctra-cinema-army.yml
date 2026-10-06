@@ -45,7 +45,6 @@ jobs:
             }
           }
           (async()=>{
-            await run('cinema-army-cookiebakers.js','Cookiebakers');
             await run('cinema-army-dcloud.js','Dcloud');
           })().catch(e=>{console.error(e);process.exitCode=1});
           NODE

@@ -24,6 +24,12 @@ Nuvio TMDB ID → TMDB 标题/年份 → KissKH Search → Drama Detail → Epis
 
 Provider 带一个可选 TMDB API Key 输入框。留空时使用公共备用 Key；公共 Key 被限流时可填自己的 TMDB v3 Key。
 
+## v0.2.0
+
+- 将 kkey 生成改为本地 WebCrypto 主路径，已与当前 Nuvio 社区算法和 enc-kisskh 输出逐字节对照一致；
+- 当前优先域名调整为 `kisskh.nl`，其余域名继续作为候选；
+- 减少对第三方 token 服务的依赖。
+
 ## v0.1.0
 
 首个独立版本。当前候选域名会在 `kisskh.co / kisskh.do / kisskh.is / kisskh.nl` 间尝试，避免单一域名切换导致插件整体失效。

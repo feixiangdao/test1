@@ -5,7 +5,10 @@
 var API="https://api.speedracelight.com";
 var TMDB="https://api.themoviedb.org/3";
 var TMDB_KEY="68e094699525b18a70bab2f86b1fa706";
-var PLAYER="https://www.vidking.net";
+var API_ORIGIN="https://www.cineby.at";
+var API_REFERER="https://www.cineby.at/";
+var MEDIA_ORIGIN="https://www.vidking.net";
+var MEDIA_REFERER="https://www.vidking.net/";
 var UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 var F=[1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580];
 var MAGIC=[109,118,109,49];
@@ -56,8 +59,9 @@ function decryptPayload(payload,seed,mediaId){
   for(i=0;i<MAGIC.length;i++)if(r[i]!==MAGIC[i])throw new Error("bad seed/payload");
   return utf8(r.subarray(MAGIC.length));
 }
-function headers(){return{"User-Agent":UA,"Referer":PLAYER+"/","Origin":PLAYER,"Accept":"application/json, text/plain, */*"};}
-function fetchJson(url,label){return fetch(url,{headers:headers()}).then(function(r){if(!r.ok)throw new Error((label||"HTTP")+" "+r.status);return r.json();});}
+function apiHeaders(){return{"User-Agent":UA,"Referer":API_REFERER,"Origin":API_ORIGIN,"Accept":"*/*","Accept-Language":"en-US,en;q=0.9"};}
+function mediaHeaders(){return{"User-Agent":UA,"Referer":MEDIA_REFERER,"Origin":MEDIA_ORIGIN};}
+function fetchJson(url,label){return fetch(url,{headers:apiHeaders()}).then(function(r){if(!r.ok)throw new Error((label||"HTTP")+" "+r.status);return r.json();});}
 function meta(id,type){
   var t=type==="tv"?"tv":"movie";
   return fetchJson(TMDB+"/"+t+"/"+encodeURIComponent(String(id))+"?api_key="+encodeURIComponent(TMDB_KEY)+"&append_to_response=external_ids","TMDB").then(function(d){
@@ -88,7 +92,7 @@ function providerUrl(id,m,season,episode,sd){
   return API+"/cdn/sources-with-title?"+q.join("&");
 }
 function fetchYoru(id,m,s,e,sd){
-  return fetch(providerUrl(id,m,s,e,sd),{headers:headers()}).then(function(r){if(!r.ok)throw new Error("Yoru HTTP "+r.status);return r.text();}).then(function(t){
+  return fetch(providerUrl(id,m,s,e,sd),{headers:apiHeaders()}).then(function(r){if(!r.ok)throw new Error("Yoru HTTP "+r.status);return r.text();}).then(function(t){
     var p=clean(t);if(p.charAt(0)==='"'&&p.charAt(p.length-1)==='"')p=JSON.parse(p);
     var dec=decryptPayload(p,sd,Number(id));
     return JSON.parse(dec);
@@ -106,7 +110,7 @@ function getStreams(tmdbId,mediaType,season,episode){
     a.forEach(function(x){
       var u=clean(x&&(x.url||x.file));if(!/^https?:\/\//i.test(u)||seen[u])return;seen[u]=1;
       var q=qlabel(x),name="NoctraTV · Novera · Videasy Yoru · "+q;
-      out.push({name:name,title:name,url:u,quality:q,provider:"noctra-novera-videasy-yoru",headers:{"User-Agent":UA,"Referer":PLAYER+"/","Origin":PLAYER},subtitles:[]});
+      out.push({name:name,title:name,url:u,quality:q,provider:"noctra-novera-videasy-yoru",headers:mediaHeaders(),subtitles:[]});
     });
     console.log("[Noctra/Novera/Videasy/Yoru] "+mediaType+" "+tmdbId+" streams="+out.length);
     return out;

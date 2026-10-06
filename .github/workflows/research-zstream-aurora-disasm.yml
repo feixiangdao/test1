@@ -17,6 +17,8 @@ jobs:
           curl -L --fail --retry 2 -o /tmp/ZStreamNativeSources 'https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources'
           nm -nm /tmp/ZStreamNativeSources | egrep 'auroraResolve|AuroraNative|zs_.*Resolve' || true
           strings -a -t x /tmp/ZStreamNativeSources | egrep -C 35 'AuroraNative|aurora\.fontaine\.lol|traffic\?ui=|shelf|slot|variant|tmdbId|title|year|token' || true
+          echo '=== aurora xor constants 130700 ==='
+          xxd -g 1 -s 0x130700 -l 0x80 /tmp/ZStreamNativeSources || true
           echo '=== aurora raw constants ==='
           xxd -g 1 -s 0x130880 -l 0x120 /tmp/ZStreamNativeSources || true
           echo '=== cstring around aurora constants ==='
@@ -31,4 +33,13 @@ jobs:
           if start is not None:
               for line in s[start:min(end or len(s),start+1800)]:
                   print(line)
+          print('AURORA_SECURITY_BLOCK')
+          for line in s:
+              if line.startswith('000000000002'):
+                  try:
+                      a=int(line[:16],16)
+                  except:
+                      continue
+                  if 0x21f50 <= a <= 0x227a0:
+                      print(line)
           PY

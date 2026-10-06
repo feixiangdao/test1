@@ -1,0 +1,48 @@
+name: Test NoctraTV ZStream Native Artemis
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'noctratv-nuvio/providers/zstream-native-artemis.js'
+      - 'noctratv-nuvio/manifest.json'
+      - '.github/workflows/test-noctra-zstream-native-artemis.yml'
+
+jobs:
+  artemis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: node --check noctratv-nuvio/providers/zstream-native-artemis.js
+      - name: Focused live probe
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          async function timeout(p,ms,label){
+            return new Promise(resolve=>{
+              let done=false;
+              const timer=setTimeout(()=>{if(done)return;done=true;console.log(label+' timeout');resolve([])},ms);
+              Promise.resolve(p).then(v=>{if(done)return;done=true;clearTimeout(timer);resolve(v)})
+                .catch(e=>{if(done)return;done=true;clearTimeout(timer);console.log(label+' error '+(e&&e.message?e.message:e));resolve([])});
+            });
+          }
+          (async()=>{
+            const p=require('./providers/zstream-native-artemis.js');
+            let total=0;
+            for(const [name,args] of [
+              ['movie',[238,'movie']],
+              ['tv',[1399,'tv',1,1]]
+            ]){
+              const rows=await timeout(p.getStreams(...args),45000,'Artemis '+name);
+              total+=(rows||[]).length;
+              console.log('Artemis '+name+': streams='+(rows||[]).length);
+              (rows||[]).slice(0,8).forEach((x,i)=>console.log('  '+(i+1)+'. '+x.name+' '+x.url));
+            }
+            if(total<1)throw new Error('Artemis returned zero streams for both focused samples');
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

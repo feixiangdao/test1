@@ -1,4 +1,5 @@
 name: Research missing Noctra aliases
+# trigger-note: refreshed alias probe
 
 on:
   workflow_dispatch:

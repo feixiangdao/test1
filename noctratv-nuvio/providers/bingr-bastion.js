@@ -106,7 +106,7 @@ function resolveOne(server,tmdbId,type,season,episode,d){
       return verify(src).then(function(v){
         if(!v)return null;
         var q=qlabel(src.quality||src.label||src.name,v.url);
-        var name="NoctraTV · Bingr · Bastion · "+server.name+" · "+q;
+        var name="NoctraTV · Bingr · Bastion · "+q;
         var subs=(j&&Array.isArray(j.subtitles)?j.subtitles:[]).filter(function(x){return x&&x.url}).slice(0,10).map(function(x){
           var lang=clean(x.lang||x.label)||"und";
           return{url:x.url,language:lang,name:(clean(x.label)||lang)+" [Bingr]"};

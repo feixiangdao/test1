@@ -1,0 +1,33 @@
+name: Research ZStream Fontaine native bootstrap
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-fontaine-bootstrap.yml'
+
+jobs:
+  probe:
+    runs-on: macos-latest
+    timeout-minutes: 5
+    steps:
+      - name: Disassemble Fontaine native bootstrap
+        run: |
+          set -e
+          curl -L --fail --retry 2 -o /tmp/ZStreamNativeSources 'https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources'
+          otool -tvV /tmp/ZStreamNativeSources > /tmp/dis.txt
+          echo '=== nativeResolve symbol ==='
+          nm -nm /tmp/ZStreamNativeSources | egrep 'zs_nativeResolve|nativeResolve:shelf:slot:type' || true
+          echo '=== nativeResolve body ==='
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('/tmp/dis.txt').read_text(errors='ignore').splitlines()
+          start=next((i for i,x in enumerate(s) if x.startswith('000000000001ee1c')),None)
+          end=next((i for i,x in enumerate(s) if start is not None and i>start and x.startswith('0000000000021628')),None)
+          print('NATIVE_BODY_LINES',start,end)
+          if start is not None:
+              for line in s[start:min(end or len(s),start+2200)]:
+                  print(line)
+          PY
+          echo '=== fontaine strings ==='
+          strings -a -t x /tmp/ZStreamNativeSources | egrep -C 45 'Fontaine|fontaine|shelf|slot|token|variant|credential|traffic|aurora\.fontaine|/search|/api/' || true

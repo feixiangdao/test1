@@ -1,0 +1,71 @@
+name: Test NoctraTV Novera Videasy
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'noctratv-nuvio/providers/novera-videasy-yoru.js'
+      - 'noctratv-nuvio/providers/novera-videasy-vyse.js'
+      - 'noctratv-nuvio/manifest.json'
+      - '.github/workflows/test-noctra-novera-videasy.yml'
+
+jobs:
+  novera-videasy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: |
+          node --check noctratv-nuvio/providers/novera-videasy-yoru.js
+          node --check noctratv-nuvio/providers/novera-videasy-vyse.js
+      - name: Focused live probe
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          async function fetchTimeout(url,opts,ms){
+            const c=new AbortController();
+            const t=setTimeout(()=>c.abort(),ms);
+            try{return await fetch(url,{...(opts||{}),signal:c.signal})}finally{clearTimeout(t)}
+          }
+          async function validate(x){
+            if(!x||!x.url)return {ok:false,reason:'missing-url'};
+            try{
+              const h=x.headers||{};
+              const r=await fetchTimeout(x.url,{headers:h},12000);
+              const ct=(r.headers.get('content-type')||'').toLowerCase();
+              if(!r.ok)return {ok:false,reason:'HTTP '+r.status,ct};
+              if(/\.m3u8(?:[?#]|$)/i.test(x.url)||ct.includes('mpegurl')){
+                const body=await r.text();
+                return {ok:body.startsWith('#EXTM3U'),reason:body.startsWith('#EXTM3U')?'HLS':'not-HLS',ct};
+              }
+              if(ct.includes('text/html')||ct.includes('application/json'))return {ok:false,reason:'not-media',ct};
+              return {ok:true,reason:'media',ct};
+            }catch(e){return {ok:false,reason:e&&e.message?e.message:String(e)}}
+          }
+          async function run(file,label){
+            const p=require('./providers/'+file);
+            for(const [name,args] of [
+              ['movie',[238,'movie']],
+              ['tv',[1399,'tv',1,1]]
+            ]){
+              const rows=await Promise.race([
+                Promise.resolve(p.getStreams(...args)),
+                new Promise(r=>setTimeout(()=>r([]),45000))
+              ]);
+              console.log(label+' '+name+': streams='+(rows||[]).length);
+              for(const [i,x] of (rows||[]).slice(0,8).entries()){
+                const v=await validate(x);
+                let host='';try{host=new URL(x.url).hostname}catch{}
+                console.log('  '+(i+1)+'. '+x.name+' host='+host+' validate='+JSON.stringify(v));
+              }
+            }
+          }
+          (async()=>{
+            await run('novera-videasy-yoru.js','Yoru');
+            await run('novera-videasy-vyse.js','Vyse');
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

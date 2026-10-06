@@ -1,0 +1,25 @@
+name: Research ZStream Aurora exact range
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-aurora-range.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Exact Aurora string range
+        run: |
+          curl -L --fail --retry 2             -o /tmp/ZStreamNativeSources             'https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources'
+          strings -a -n 2 /tmp/ZStreamNativeSources > /tmp/s.txt
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('/tmp/s.txt').read_text(errors='ignore').splitlines()
+          for a,b in [(26970,27220),(29220,29295)]:
+              print('\n=== RANGE',a,b,'===')
+              for i in range(a-1,min(b,len(s))):
+                  print(f'{i+1:7d} {s[i]}')
+          PY

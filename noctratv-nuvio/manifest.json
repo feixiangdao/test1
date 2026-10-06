@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.42.0",
+  "version": "4.43.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1329,6 +1329,28 @@
       "enabled": false,
       "formats": [
         "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-zstream-aliases",
+      "name": "NoctraTV · ZStream · Apollo / Vienna / Chase",
+      "description": "Exact Noctra/MZone source IDs for ZStream Apollo, Vienna and Chase. Uses the current signed playback-session flow and returns only validated direct media. Internal native mapping is delegated to the Noctra backend rather than guessed.",
+      "version": "0.1.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/zstream-aliases.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
       ],
       "contentLanguage": [
         "multi"

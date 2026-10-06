@@ -1,0 +1,60 @@
+name: Research ShowBox Media
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-showbox-media.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe current showbox.media chain
+        run: |
+          node - <<'NODE'
+          const BASE='https://showbox.media';
+          const H={'Accept':'application/json, text/html, */*','Accept-Language':'en','User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'};
+          function searchHref(html){
+            let m=String(html).match(/class="film-name[^"]*"[^>]*>\s*<a[^>]+href="([^"]+)"/i);
+            if(!m)m=String(html).match(/<a[^>]+href="([^"]+)"[^>]*class="[^"]*film-name[^"]*"/i);
+            return m&&m[1]||'';
+          }
+          function headingId(html){
+            const m=String(html).match(/class="heading-name[^"]*"[^>]*>[\s\S]*?<a[^>]+href="([^"]+)"/i);
+            if(!m)return '';
+            return m[1].split('/').filter(Boolean).pop()||'';
+          }
+          async function one(label,imdb,type){
+            const sr=await fetch(BASE+'/search?keyword='+encodeURIComponent(imdb),{headers:H});
+            const sh=await sr.text();
+            const href=searchHref(sh);
+            console.log(label+' search status='+sr.status+' href='+href);
+            if(!href)return;
+            const du=new URL(href,BASE).toString();
+            const dr=await fetch(du,{headers:H}); const dh=await dr.text();
+            const id=headingId(dh);
+            console.log(label+' detail status='+dr.status+' id='+id+' url='+du);
+            if(!id)return;
+            const lr=await fetch(BASE+'/index/share_link?id='+encodeURIComponent(id)+'&type='+type,{headers:H});
+            const lt=await lr.text();
+            console.log(label+' share status='+lr.status+' body='+lt.slice(0,700));
+            if(!lr.ok)return;
+            let j;try{j=JSON.parse(lt)}catch{return}
+            const link=j&&j.data&&j.data.link||'';
+            const key=link.split('/').filter(Boolean).pop()||'';
+            console.log(label+' shareLink='+link+' keyLen='+key.length);
+            if(!key)return;
+            const fr=await fetch('https://www.febbox.com/file/file_share_list?share_key='+encodeURIComponent(key),{headers:H});
+            const ft=await fr.text();
+            console.log(label+' filelist status='+fr.status+' body='+ft.slice(0,800));
+          }
+          (async()=>{
+            await one('movie','tt0068646',1);
+            await one('tv','tt0944947',2);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

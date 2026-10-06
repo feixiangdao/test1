@@ -1,0 +1,50 @@
+name: Test NoctraTV Cineflix
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/test-noctra-cineflix.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe Cineflix MZone sources
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          let s=fs.readFileSync('./providers/streamvault.js','utf8');
+          s=s.replace(/var SOURCES=\[[\s\S]*?\];/,
+          `var SOURCES=[
+            {id:"site-fstream-castellano",label:"Castellano",movie:true,tv:true},
+            {id:"site-fstream-latino",label:"Latino",movie:true,tv:true},
+            {id:"site-fstream-subbed",label:"Subbed",movie:true,tv:true}
+          ];`);
+          s=s.replace(/NoctraTV · StreamVault · /g,'NoctraTV · Cineflix · ');
+          s=s.replace(/noctra-streamvault/g,'noctra-cineflix');
+          s=s.replace(/\[Noctra\/StreamVault\]/g,'[Noctra/Cineflix]');
+          fs.writeFileSync('/tmp/cineflix.cjs',s);
+          const p=require('/tmp/cineflix.cjs');
+          async function run(label,args){
+            const rows=await Promise.race([
+              Promise.resolve(p.getStreams(...args)),
+              new Promise(r=>setTimeout(()=>r([]),55000))
+            ]).catch(e=>{console.log('ERR '+e.message);return[]});
+            console.log(label+': streams='+(rows||[]).length);
+            for(const x of (rows||[])){
+              let host='',path='';try{const u=new URL(x.url);host=u.hostname;path=u.pathname}catch{}
+              console.log('  '+x.name+' q='+x.quality+' type='+(x.type||'')+' host='+host+' path='+path);
+            }
+          }
+          (async()=>{
+            await run('Cineflix movie',[550,'movie']);
+            await run('Cineflix tv',[1399,'tv',1,1]);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

@@ -1,0 +1,59 @@
+name: Test NoctraTV PopWatch CineXtream
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/test-noctra-popwatch-cinextream.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe exact CineXtream MZone source IDs
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const base=fs.readFileSync('./providers/streamvault.js','utf8');
+          const sources=[
+            ['site-popwatch-cinextream-hable','Hable'],
+            ['site-popwatch-cinextream-nest','Nest'],
+            ['site-popwatch-cinextream-orion','Orion'],
+            ['site-popwatch-cinextream-light','Light'],
+            ['site-popwatch-cinextream-space','Space'],
+            ['site-popwatch-cinextream-luna','Luna'],
+            ['site-popwatch-cinextream-kuro','Kuro']
+          ];
+          async function runOne(id,label){
+            let s=base.replace(/var SOURCES=\[[\s\S]*?\];/,
+              'var SOURCES=[{id:'+JSON.stringify(id)+',label:'+JSON.stringify(label)+',movie:true,tv:true}];');
+            s=s.replace(/NoctraTV · StreamVault · /g,'NoctraTV · PopWatch · CineXtream · ');
+            s=s.replace(/noctra-streamvault/g,'noctra-popwatch-cinextream');
+            s=s.replace(/\[Noctra\/StreamVault\]/g,'[Noctra/PopWatch/CineXtream]');
+            const path='/tmp/cx-'+label+'.cjs';
+            fs.writeFileSync(path,s);
+            delete require.cache[require.resolve(path)];
+            const p=require(path);
+            const rows=await Promise.race([
+              Promise.resolve(p.getStreams(550,'movie')),
+              new Promise(r=>setTimeout(()=>r([]),22000))
+            ]).catch(e=>{console.log('ERR '+label+' '+e.message);return[]});
+            console.log(label+' movie: streams='+(rows||[]).length);
+            for(const x of (rows||[]).slice(0,5)){
+              let host='',pathname='';try{const u=new URL(x.url);host=u.hostname;pathname=u.pathname}catch{}
+              console.log('  '+x.name+' q='+x.quality+' type='+(x.type||'')+' host='+host+' path='+pathname);
+            }
+            return (rows||[]).length;
+          }
+          (async()=>{
+            let total=0;
+            for(const [id,label] of sources) total+=await runOne(id,label);
+            console.log('TOTAL_VALIDATED='+total);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

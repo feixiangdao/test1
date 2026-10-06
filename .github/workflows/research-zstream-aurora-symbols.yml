@@ -20,6 +20,12 @@ jobs:
           cat /tmp/nm.txt | xcrun swift-demangle | egrep -i 'Aurora|Fontaine|NativeSources|StreamSource|availableSources|credential|shelf|slot|variant|token' | head -1200 || true
           echo '=== raw swift mangled candidates ==='
           egrep '\$s.*(Aurora|NativeSources|Source)' /tmp/nm.txt | head -1000 || true
+          echo '=== exact AuroraSource mangled ==='
+          egrep '\$s20ZStreamNativeSources12AuroraSource' /tmp/nm.txt | head -1000 || true
+          echo '=== all ZStreamNativeSources Swift symbols demangled ==='
+          cat /tmp/nm.txt | xcrun swift-demangle | grep 'ZStreamNativeSources' | head -2500 || true
+          echo '=== protocol witness candidates ==='
+          cat /tmp/nm.txt | xcrun swift-demangle | egrep -i 'AuroraSource.*(resolve|StreamSource|sourceInfo|canHandle)|protocol witness.*AuroraSource|AuroraSource.*ZStreamCore' | head -1200 || true
           echo '=== reflection/strings ==='
           strings -a /tmp/ZStreamNativeSources | egrep -i -C 8 'Aurora|Fontaine|credential|shelf|slot|preferredVariant|variantId|token|availableSources' | head -1600 || true
           echo '=== offset neighborhood ==='

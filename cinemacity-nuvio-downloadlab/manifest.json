@@ -1,13 +1,13 @@
 {
   "name": "CinemaCity Download Lab",
-  "version": "1.7.0",
-  "description": "CinemaCity Download Lab 1.7.0. DUI7 dumps the bodies and call sites of the download orchestration functions (getProtectedDownloadTarget / parseFileSet / startDownload / getSelectedQualityIndex / currentFileSet) so the base URL and video/audio source can be read without repeating the DUI6 inventory sweep.",
+  "version": "1.8.0",
+  "description": "CinemaCity Download Lab 1.8.0. DUI7BUILD diagnostics in-place: same scraper id (settings kept), new provider filename. Reports SCAN inventory/fetch counts and orchestration function bodies so an empty result is always explained.",
   "scrapers": [
     {
       "id": "cinemacity-downloadlab-170",
-      "name": "CinemaCity Download Lab v1.7.0",
-      "description": "DUI7: dump download orchestration function bodies and makeDownloadHref call sites to reveal the base-URL and video/audio selection path.",
-      "version": "1.7.0",
+      "name": "CinemaCity Download Lab v1.8.0",
+      "description": "DUI7BUILD=7.1.0. Dumps download orchestration function bodies and makeDownloadHref call sites, plus a SCAN row explaining fetch outcomes.",
+      "version": "1.8.0",
       "supportedTypes": [
         "movie"
       ],

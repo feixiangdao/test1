@@ -3239,14 +3239,29 @@ function orchestrationSourceProbe(html, pageUrl) {
 }
 
 function orchestrationBodies(html, pageUrl) {
+  var inventory = externalScriptInventory(html, pageUrl);
   return orchestrationSourceProbe(html, pageUrl).then(function(files) {
     var rows = [];
+    // Report the fetch outcome for every same-origin script, so a fetch failure
+    // is never indistinguishable from a "no match" result.
+    rows.push("DUI7 SCAN inventory=" + String(inventory.length) +
+      " fetched=" + String(files.length) +
+      " ok=" + files.map(function(f) { return f.name; }).join(","));
+    if (!inventory.length) {
+      rows.push("DUI7 SCAN no same-origin <script src> found in detail HTML");
+    } else if (!files.length) {
+      rows.push("DUI7 SCAN fetched=0 — every script fetch failed or matched no keyword");
+    }
     files.forEach(function(f) {
       var js = f.js;
       var hit = ORCH_TARGETS.filter(function(n) {
         return functionSlice(js, n).length > 0;
       });
-      if (!hit.length) return;
+      if (!hit.length) {
+        rows.push("DUI7 " + f.name + " NOHIT len=" + String(js.length) +
+          " names=" + interestingFunctionNames(js));
+        return;
+      }
 
       // Row A: the stack selector chain + helper inventories (compact).
       rows.push("DUI7 " + f.name +
@@ -3306,21 +3321,35 @@ function officialDownloadDiagnostic(item, detailHtml, newsId) {
     downloadScriptProbe(detailHtml || "", item.url),
     inlineAndHelperProbe(detailHtml || "", item.url),
     orchestrationProbe(detailHtml || "", item.url),
-    orchestrationBodies(detailHtml || "", item.url)
+    orchestrationBodies(detailHtml || "", item.url).catch(function(e) {
+      return ["DUI7 FATAL orchestrationBodies threw: " + String((e && e.message) || e)];
+    }).catch(function(e) {
+      return ["DUI7 FATAL orchestrationBodies threw: " + String((e && e.message) || e)];
+    })
   ]).then(function(all){
     var js=all[0]||{summary:"none",deep:"none",semantic:"none"};
     var w=all[1]||{calls:"none",inline:"none",attrs:"none",returns:"none"};
     var orch=all[2]||"none";
-    var bodies=all[3]||[];
+    var     bodies=all[3]||[];
+    // Version marker so the running build is identifiable even when the
+    // orchestration dump yields nothing.
     var head = diagnosticRow(
+      "DUI7BUILD=7.1.0 " +
       "DUI6 H1080=" + String(mp.has1080) +
       " CORE=" + js.deep +
       " SEM=" + js.semantic +
       " CALL=" + w.calls +
       " RET=" + w.returns +
       " ORCH=" + orch +
+      " BODIES=" + String(bodies.length) +
       " ID" + String(newsId)
     );
+    if (!bodies.length) {
+      // Never silently produce nothing: say explicitly why the dump was empty.
+      var scripts = externalScriptInventory(detailHtml || "", item.url);
+      bodies.push("DUI7 EMPTY scripts=" + String(scripts.length) +
+        " names=" + scripts.slice(0, 6).map(basenameOfUrl).join(","));
+    }
     return [head].concat(bodies.map(function(b){ return diagnosticRow(b); }));
   });
 }

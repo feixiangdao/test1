@@ -1,4 +1,5 @@
 name: Research ZStream native mapping
+# alias-probe-revision: 2
 
 on:
   workflow_dispatch:
@@ -26,7 +27,8 @@ jobs:
             'asperaResolve','auroraResolve','magnoliaResolve',
             '123animehub.cc','api.wingsdatabase.com','db.wingsdatabase.com',
             'db.speedracelight.com','aurora.fontaine.lol',
-            'tokyo.fontaine.lol','enc-dec.app/api/enc-vidlink'
+            'tokyo.fontaine.lol','enc-dec.app/api/enc-vidlink',
+            'Apollo','Vienna','Chase','Velora','Yoru'
           ]
           for needle in needles:
               idx=[i for i,x in enumerate(lines) if needle.lower() in x.lower()]

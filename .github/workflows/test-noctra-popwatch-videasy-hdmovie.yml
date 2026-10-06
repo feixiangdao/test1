@@ -1,0 +1,44 @@
+name: Test NoctraTV PopWatch Videasy hdmovie
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/test-noctra-popwatch-videasy-hdmovie.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe exact hdmovie source
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          let s=fs.readFileSync('./providers/streamvault.js','utf8');
+          s=s.replace(/var SOURCES=\[[\s\S]*?\];/,
+          `var SOURCES=[
+            {id:"site-popwatch-videasy-hdmovie",label:"hdmovie",movie:false,tv:true}
+          ];`);
+          s=s.replace(/NoctraTV · StreamVault · /g,'NoctraTV · PopWatch · Videasy · ');
+          s=s.replace(/noctra-streamvault/g,'noctra-popwatch-videasy-hdmovie');
+          s=s.replace(/\[Noctra\/StreamVault\]/g,'[Noctra/PopWatch/Videasy/hdmovie]');
+          fs.writeFileSync('/tmp/hdmovie.cjs',s);
+          const p=require('/tmp/hdmovie.cjs');
+          (async()=>{
+            const rows=await Promise.race([
+              Promise.resolve(p.getStreams(1399,'tv',1,1)),
+              new Promise(r=>setTimeout(()=>r([]),45000))
+            ]).catch(e=>{console.log('ERR '+e.message);return[]});
+            console.log('hdmovie tv: streams='+(rows||[]).length);
+            for(const x of (rows||[])){
+              let host='',path='';try{const u=new URL(x.url);host=u.hostname;path=u.pathname}catch{}
+              console.log('  '+x.name+' q='+x.quality+' type='+(x.type||'')+' host='+host+' path='+path);
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

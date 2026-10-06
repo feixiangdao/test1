@@ -1,0 +1,94 @@
+name: Research Noctra MZone candidates
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-noctra-mzone-candidates.yml'
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: site-cinemaos-eos
+            label: CinemaOS_Eos
+            movie: true
+            tv: true
+          - id: site-cinemaos-helios
+            label: CinemaOS_Helios
+            movie: true
+            tv: true
+          - id: site-cinemaos-selene
+            label: CinemaOS_Selene
+            movie: true
+            tv: true
+          - id: site-cinemaos-z2
+            label: CinemaOS_Rive
+            movie: true
+            tv: true
+          - id: site-oneembed-emp
+            label: OneEmbed_EMP
+            movie: true
+            tv: true
+          - id: site-oneembed-main
+            label: OneEmbed_MAIN
+            movie: false
+            tv: true
+          - id: site-dulo-auto
+            label: Dulo_Auto
+            movie: true
+            tv: true
+          - id: site-bingr-corvus
+            label: Bingr_Corvus
+            movie: true
+            tv: true
+          - id: site-bingr-edmunds
+            label: Bingr_Edmunds
+            movie: true
+            tv: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe ${{ matrix.label }}
+        working-directory: noctratv-nuvio
+        env:
+          SOURCE_ID: ${{ matrix.id }}
+          LABEL: ${{ matrix.label }}
+          MOVIE: ${{ matrix.movie }}
+          TV: ${{ matrix.tv }}
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const id=process.env.SOURCE_ID,label=process.env.LABEL;
+          const movie=process.env.MOVIE==='true',tv=process.env.TV==='true';
+          let s=fs.readFileSync('./providers/streamvault.js','utf8');
+          s=s.replace(/var SOURCES=\[[\s\S]*?\];/,
+            'var SOURCES=[{id:'+JSON.stringify(id)+',label:'+JSON.stringify(label)+',movie:'+movie+',tv:'+tv+'}];');
+          s=s.replace(/NoctraTV · StreamVault · /g,'NoctraTV · Candidate · ');
+          s=s.replace(/noctra-streamvault/g,'noctra-candidate');
+          s=s.replace(/\[Noctra\/StreamVault\]/g,'[Noctra/Candidate]');
+          const path='/tmp/candidate.cjs';
+          fs.writeFileSync(path,s);
+          const p=require(path);
+          async function run(kind,args){
+            const rows=await Promise.race([
+              Promise.resolve(p.getStreams(...args)),
+              new Promise(r=>setTimeout(()=>r([]),40000))
+            ]).catch(e=>{console.log('ERR '+e.message);return[]});
+            console.log('RESULT '+label+' '+kind+' streams='+(rows||[]).length);
+            for(const x of (rows||[])){
+              let host='',pathname='';try{const u=new URL(x.url);host=u.hostname;pathname=u.pathname}catch{}
+              console.log('MEDIA '+label+' '+kind+' q='+x.quality+' type='+(x.type||'')+' host='+host+' path='+pathname);
+            }
+          }
+          (async()=>{
+            if(movie)await run('movie',[550,'movie']);
+            if(tv)await run('tv',[1399,'tv',1,1]);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

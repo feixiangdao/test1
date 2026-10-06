@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.48.0",
+  "version": "4.49.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -297,8 +297,8 @@
     {
       "id": "noctra-vidlove",
       "name": "NoctraTV · VidLove",
-      "description": "noctratv.com VidLove family: warden / vidapi / moviebox. Uses the current VidLove JSON API and returns direct HLS with embedded/verified manifests.",
-      "version": "1.0.0",
+      "description": "Current noctratv.com VidLove child sources: moviebox / vidapi / warden. Uses the signed MZone v2 playback-session flow locally, persists session cookies, appends mz_lease for MZone media proxies, and returns validated direct media only. Enabled after focused CI verified VidAPI at 1080p for movie and 720p for TV; unavailable children fail independently.",
+      "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",

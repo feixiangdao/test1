@@ -1,19 +1,19 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.8.0",
-  "description": "Pure-local OnlyFlix build for Nuvio. All four sources resolve on the Android device. No Vercel resolver or self-hosted cloud fallback is used.",
+  "version": "0.9.0",
+  "description": "Pure-local OnlyFlix build with explicit quality detection. HLS master playlists are expanded into real resolution variants; MP4 dimensions are probed from file metadata when available. No self-hosted cloud resolver.",
   "scrapers": [
     {
       "id": "onlyflix-cdnm",
       "name": "OnlyFlix · CDNM",
-      "description": "Pure local: device-side TMDB→IMDb lookup, PlayerJS #2 decoding and IP-bound HLS generation.",
-      "version": "0.8.0",
+      "description": "Pure local CDNM with device-side TMDB→IMDb lookup, PlayerJS #2 decoding and explicit 1080p/720p/480p/360p/240p variants when available.",
+      "version": "0.9.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-cdnm-purelocal.js",
+      "filename": "providers/onlyflix-cdnm-quality.js",
       "enabled": true,
       "formats": [
         "m3u8"
@@ -26,14 +26,14 @@
     {
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
-      "description": "Pure local: device directly calls the current VAPlayer/VidAPI upstream and returns direct HLS.",
-      "version": "0.8.0",
+      "description": "Pure local VidAPI/VAPlayer. Master HLS playlists are expanded into explicit resolution streams with actual pixel dimensions.",
+      "version": "0.9.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-vidapi-purelocal.js",
+      "filename": "providers/onlyflix-vidapi-quality.js",
       "enabled": true,
       "formats": [
         "m3u8"
@@ -46,14 +46,14 @@
     {
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · NontonGo",
-      "description": "Pure local: device parses multisourcesoap and probes candidate Soap2 nodes directly, with no cloud fallback.",
-      "version": "0.8.0",
+      "description": "Pure local NontonGo. Live Soap2 nodes are probed locally; HLS variants are expanded and MP4 dimensions are detected from local file metadata when possible.",
+      "version": "0.9.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-nontongo-purelocal.js",
+      "filename": "providers/onlyflix-nontongo-quality.js",
       "enabled": true,
       "formats": [
         "m3u8",
@@ -67,18 +67,17 @@
     {
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
-      "description": "Pure local: device tries the native VidFast token+enc/dec protocol, then the local VAPlayer source=vidfast path. No cloud fallback.",
-      "version": "0.8.0",
+      "description": "Pure local VidFast using the direct VA upstream source=vidfast path. Master HLS playlists are expanded into explicit resolution streams. No helper resolver.",
+      "version": "0.9.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-vidfast-purelocal.js",
+      "filename": "providers/onlyflix-vidfast-quality.js",
       "enabled": true,
       "formats": [
-        "m3u8",
-        "mp4"
+        "m3u8"
       ],
       "contentLanguage": [
         "multi"

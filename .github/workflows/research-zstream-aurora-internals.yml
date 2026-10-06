@@ -1,0 +1,31 @@
+name: Research ZStream Aurora internals
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-aurora-internals.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Inspect Aurora native strings
+        run: |
+          set -e
+          curl -L --fail --retry 2 -o /tmp/ZStreamNativeSources             'https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources'
+          strings -a -n 2 /tmp/ZStreamNativeSources > /tmp/s.txt
+          nl -ba /tmp/s.txt > /tmp/n.txt
+
+          echo '=== AURORA REGION 95480-95590 ==='
+          sed -n '95480,95590p' /tmp/n.txt
+
+          echo '=== AURORA TOKENS ==='
+          for k in 'AuroraNative' 'aurora.fontaine.lol' '/search?' 'name=' '&tmdbId=' '&type=' '&year=' '&season=' '&episode=' '&seasonId=' '&episodeId=' '&_pk=' '&z=' '&ui=' 'streams' 'subtitle_link'; do
+            echo "--- $k ---"
+            grep -in -C 25 "$k" /tmp/s.txt | head -n 180 || true
+          done
+
+          echo '=== CONSTANT-LIKE STRINGS NEAR AURORA ==='
+          sed -n '95520,95630p' /tmp/n.txt

@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.49.0",
+  "version": "4.50.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1435,6 +1435,26 @@
         "m3u8",
         "mp4",
         "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-1shows-jill",
+      "name": "NoctraTV · 1Shows · Jill",
+      "description": "Current noctratv.com 1Shows · Jill movie source. Uses the signed MZone v2 playback-session flow locally, persists cookies, appends mz_lease for media proxies, and returns validated direct media only. Focused verification produced a 1080p HLS stream for Fight Club; unsupported titles return zero honestly.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/1shows-jill.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
       ],
       "contentLanguage": [
         "multi"

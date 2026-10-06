@@ -1,29 +1,33 @@
-var BASES=["https://nontongo.win","https://www.nontongo.win"];
+var RESOLVER="https://onlyflix-resolver-feixiangdao.vercel.app/api/resolve";
 var UA="Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/137 Mobile Safari/537.36";
 function clean(v){return v==null?"":String(v).trim();}
-function timeout(ms){return new Promise(function(resolve){setTimeout(function(){resolve({__timeout:true});},ms);});}
-function timedFetch(url,opt,ms){return Promise.race([fetch(url,opt),timeout(ms||6500)]).then(function(r){if(r&&r.__timeout)throw new Error("timeout");return r;});}
-function rows(html,base){
- var m=String(html||"").match(/(?:const\s+sources\s*=|sources\s*:)\s*(\[[^\]]+\])/i); if(!m)return[];
- var a=[]; try{a=JSON.parse(m[1]);}catch(e){return[];}
- return a.map(function(s){var u=clean(s&&(s.file||s.src||s.url)); if(!/^https?:\/\//i.test(u))return null;
-   var q=clean(s.label||s.quality||"Auto"),name="OnlyFlix · Server 2 · NontonGo · "+q;
-   return{name:name,title:name,url:u,quality:q,provider:"onlyflix-nontongo",headers:{"User-Agent":UA,"Referer":base+"/"},subtitles:[]};
- }).filter(Boolean);
-}
-function page(base,id,type,s,e){return type==="tv"?base+"/stream/tv_upcloud/view1.php?id="+encodeURIComponent(id)+"&s="+encodeURIComponent(s||1)+"&e="+encodeURIComponent(e||1):base+"/stream/movie_upcloud/view1.php?id="+encodeURIComponent(id)+"&type=movie";}
-function tryBase(i,id,type,s,e){
- if(i>=BASES.length)return Promise.resolve([]);
- var b=BASES[i];
- return timedFetch(page(b,id,type,s,e),{headers:{"User-Agent":UA,"Referer":b+"/","Accept":"text/html,*/*"}},6500)
-  .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.text();})
-  .then(function(t){var x=rows(t,b);return x.length?x:tryBase(i+1,id,type,s,e);})
-  .catch(function(){return tryBase(i+1,id,type,s,e);});
-}
 function getStreams(tmdbId,mediaType,season,episode){
- if(!tmdbId)return Promise.resolve([]); if(mediaType==="tv"&&(!season||!episode))return Promise.resolve([]);
- return Promise.race([tryBase(0,tmdbId,mediaType,season,episode),timeout(14000)]).then(function(x){
-   if(x&&x.__timeout)return[]; console.log("[OnlyFlix/NontonGo] streams="+(x||[]).length); return x||[];
- }).catch(function(){return[];});
+  if(!tmdbId)return Promise.resolve([]);
+  if(mediaType==="tv"&&(!season||!episode))return Promise.resolve([]);
+  var u=RESOLVER+"?tmdb="+encodeURIComponent(String(tmdbId))+"&type="+encodeURIComponent(mediaType==="tv"?"tv":"movie");
+  if(mediaType==="tv")u+="&season="+encodeURIComponent(String(season||1))+"&episode="+encodeURIComponent(String(episode||1));
+  u+="&source=nontongo";
+  return fetch(u,{headers:{"Accept":"application/json","User-Agent":UA}})
+    .then(function(r){if(!r.ok)throw new Error("resolver HTTP "+r.status);return r.json();})
+    .then(function(j){
+      var rows=j&&Array.isArray(j.streams)?j.streams:[];
+      var subs=j&&Array.isArray(j.subtitles)?j.subtitles.filter(function(s){return s&&s.url;}).slice(0,8).map(function(s){
+        return{url:s.url,language:clean(s.lang||s.code||s.language)||"en",name:clean(s.label||s.lang||s.code||s.name)||"Subtitle"};
+      }):[];
+      var out=[],seen={};
+      rows.forEach(function(x,i){
+        var obj=x&&typeof x==="object"?x:null;
+        var url=clean(obj?obj.url:x);
+        if(!/^https?:\/\//i.test(url)||seen[url])return;
+        seen[url]=1;
+        var q=clean(obj&&(obj.quality||obj.label))||"Auto";
+        var suffix=clean(obj&&obj.name)||("HLS "+(i+1));
+        var name="OnlyFlix · NontonGo · "+suffix;
+        out.push({name:name,title:name,url:url,quality:q,type:"hls",provider:"onlyflix-nontongo",headers:{"User-Agent":UA},subtitles:subs});
+      });
+      console.log("[onlyflix-nontongo] resolver streams="+out.length);
+      return out;
+    })
+    .catch(function(e){console.error("[onlyflix-nontongo] "+(e&&e.message?e.message:e));return[];});
 }
 module.exports={getStreams:getStreams};

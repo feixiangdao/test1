@@ -1,0 +1,55 @@
+name: Research Magnolia Wings current API
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-magnolia-wings-current.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe current Wings Magnolia endpoints
+        run: |
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+          const BASE='https://api.wingsdatabase.com';
+          const DB='https://db.wingsdatabase.com';
+          const H={'User-Agent':UA,'Referer':'https://player.videasy.to/','Origin':'https://www.videasy.to','Accept':'application/json'};
+          async function one(id,type,s=1,e=1){
+            const meta=await fetch(DB+'/3/'+(type==='tv'?'tv':'movie')+'/'+id+'?append_to_response=external_ids&language=en',{headers:H});
+            console.log(type+' meta='+meta.status);
+            const mj=await meta.json();
+            const seed=await fetch(BASE+'/seed?mediaId='+id,{headers:H});
+            console.log(type+' seed='+seed.status);
+            const sj=await seed.json().catch(()=>({}));
+            console.log(type+' seedKeys='+Object.keys(sj).join(',')+' hasSeed='+(sj.seed?1:0));
+            if(!sj.seed)return;
+            const title=type==='tv'?(mj.name||mj.original_name):(mj.title||mj.original_title);
+            const date=type==='tv'?mj.first_air_date:mj.release_date;
+            const ext=mj.external_ids||{};
+            let q='title='+encodeURIComponent(title||'')+
+              '&mediaType='+type+
+              '&year='+encodeURIComponent((date||'').slice(0,4))+
+              '&episodeId='+(type==='tv'?e:1)+
+              '&seasonId='+(type==='tv'?s:1)+
+              '&tmdbId='+id+
+              '&imdbId='+encodeURIComponent(ext.imdb_id||'');
+            if(type==='tv')q+='&totalSeasons='+encodeURIComponent(String(mj.number_of_seasons||''));
+            q+='&enc=2&seed='+encodeURIComponent(sj.seed);
+            for(const path of ['/cdn/sources-with-title','/neon2/sources-with-title']){
+              const r=await fetch(BASE+path+'?'+q,{headers:H});
+              const t=await r.text();
+              console.log(type+' '+path+' status='+r.status+' len='+t.length+' head='+t.slice(0,80).replace(/\s+/g,' '));
+            }
+          }
+          (async()=>{
+            await one(238,'movie');
+            await one(1399,'tv',1,1);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

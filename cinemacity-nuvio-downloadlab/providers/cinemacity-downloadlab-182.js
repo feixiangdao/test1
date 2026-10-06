@@ -2849,14 +2849,29 @@ function ajaxCallShape(js, actionName) {
   };
 }
 
+// Upper bound on a recovered function body. parseFileSet measured 5000+ chars
+// (it hit the old 5000 cap mid-function), so give generous headroom; the
+// chunked logcat channel handles the size, and over-long output is truncated
+// with an explicit marker rather than silently.
+var SLICE_LIMIT = 20000;
+
 function functionSlice(js, fnName) {
   var text = clean(js);
   if (!fnName || fnName === "?") return "";
-  var re = new RegExp("function\\s+" + fnName.replace(/[$]/g,"\\$&") + "\\s*\\(([^)]*)\\)\\s*\\{","i");
+  // The parameter group must tolerate a destructured object param, e.g.
+  //   function renderItems({ quality, base, resolutions }) { ... }
+  // A naive `\(([^)]*)\)` stops at the first `)`-free run, but the inner `}`
+  // of the destructuring closes the brace loop at depth 0 — so the whole body
+  // is dropped and only the signature survives. Allow `{...}` inside the parens.
+  var re = new RegExp(
+    "function\\s+" + fnName.replace(/[$]/g,"\\$&") +
+    "\\s*\\(([^)]*(?:\\{[^}]*\\}[^)]*)*)\\)\\s*\\{", "i");
   var m = re.exec(text);
   if (!m) return "";
   var start = m.index;
-  var brace = text.indexOf("{", m.index);
+  // Search for the opening brace from the END of the matched signature, not
+  // from m.index — otherwise a `{` inside the parameter list is picked up.
+  var brace = text.indexOf("{", m.index + m[0].length - 1);
   if (brace < 0) return "";
   var depth = 0, quote = "", esc = false;
   for (var i=brace;i<text.length;i++) {
@@ -2867,14 +2882,19 @@ function functionSlice(js, fnName) {
       if (ch === quote) quote="";
       continue;
     }
-    if (ch === "'" || ch === '"') { quote=ch; continue; }
+    // Backticks matter: template literals can contain braces (${...}) that
+    // would otherwise unbalance the depth counter.
+    if (ch === "'" || ch === '"' || ch === "`") { quote=ch; continue; }
     if (ch === "{") depth++;
     else if (ch === "}") {
       depth--;
       if (depth === 0) return text.slice(start,i+1);
     }
   }
-  return text.slice(start, Math.min(text.length,start+5000));
+  // Safety net: never return silently-truncated source. Cut at a comma/semicolon
+  // boundary and flag it so the dump/summary shows the body was clipped.
+  var cut = text.slice(start, Math.min(text.length, start + SLICE_LIMIT));
+  return cut.replace(/[^,;)\]}]\s*$/, "") + " /*__SLICE_TRUNCATED__*/";
 }
 
 function callSites(js, fnName) {
@@ -3430,7 +3450,7 @@ function officialDownloadDiagnostic(item, detailHtml, newsId) {
     // Version marker so the running build is identifiable even when the
     // orchestration dump yields nothing.
     var head = diagnosticRow(
-      "DUI8BUILD=9.0.0 " +
+      "DUI8BUILD=10.0.0 " +
       "H1080=" + String(mp.has1080) +
       " BODIES=" + String(bodies.length) +
       " ORCH=" + orch +
@@ -3637,7 +3657,7 @@ function dhStreamsForMeta(meta) {
 function getStreams(tmdbId, mediaType, season, episode) {
   // adb logcat handshake: if this line shows up in `adb logcat | grep CCDUMP`,
   // the logcat exfil channel works and the full source dump is reachable.
-  console.log("CCDUMP|__HANDSHAKE__|GETSTREAMS|1|1|BUILD=9.0.0 tmdb=" +
+  console.log("CCDUMP|__HANDSHAKE__|GETSTREAMS|1|1|BUILD=10.0.0 tmdb=" +
     String(tmdbId) + " type=" + String(mediaType));
 
   if (!tmdbId || mediaType !== "movie") {

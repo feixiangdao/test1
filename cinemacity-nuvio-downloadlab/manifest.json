@@ -1,17 +1,17 @@
 {
   "name": "CinemaCity Download Lab",
-  "version": "2.0.0",
-  "description": "CinemaCity Download Lab 2.0.0. Fixes a bug that corrupted recovered function bodies (the naive // comment stripper ate real code after every https:// scheme), adds renderItems/buildName to the dump targets, and reports brace-balance per recovered body so a bad slice is visible instead of silent. Scraper id and manifest path stay stable so Nuvio keeps your saved Session Cookie.",
+  "version": "2.1.0",
+  "description": "CinemaCity Download Lab 2.1.0. Fixes functionSlice, which dropped the entire body of any function taking a destructured object parameter (renderItems, buildName) because the inner brace of the parameter list closed the brace-depth loop at zero. Also raises the body cap from 5000 to 20000 chars so parseFileSet is no longer clipped, and marks truncated bodies explicitly instead of silently. Scraper id and manifest path stay stable so Nuvio keeps your saved Session Cookie.",
   "scrapers": [
     {
       "id": "cinemacity-downloadlab-170",
-      "name": "CinemaCity Download Lab v2.0.0",
-      "description": "DUI8BUILD=9.0.0. Dumps full download orchestration function bodies to logcat (grep CCDUMP) and as chunked DUI8B rows, with per-body brace-balance verification.",
-      "version": "2.0.0",
+      "name": "CinemaCity Download Lab v2.1.0",
+      "description": "DUI8BUILD=10.0.0. Dumps full download orchestration function bodies to logcat (grep CCDUMP) and as chunked DUI8B rows, with per-body brace-balance verification.",
+      "version": "2.1.0",
       "supportedTypes": [
         "movie"
       ],
-      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/244caddf25dedd1cf6647461431ba9ad476ed2ae/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab-182.js",
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/PLACEHOLDER/cinemacity-nuvio-downloadlab/providers/cinemacity-downloadlab-182.js",
       "enabled": true,
       "formats": [
         "m3u8",

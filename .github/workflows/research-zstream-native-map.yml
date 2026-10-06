@@ -1,0 +1,26 @@
+name: Research ZStream native map
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-native-map.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Dump native resolver string neighborhoods
+        run: |
+          set -e
+          curl -L --fail --retry 2             -o /tmp/ZStreamNativeSources             'https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources'
+          strings -a -n 2 /tmp/ZStreamNativeSources > /tmp/s.txt
+          nl -ba /tmp/s.txt > /tmp/n.txt
+          echo '=== RANGE 7280-7445 ==='
+          sed -n '7280,7445p' /tmp/n.txt
+          echo '=== ASpera/Aurora/Artemis contexts ==='
+          for k in 'Aspera' 'Aurora' 'Artemis' 'A_APISRC' 'fontaine.lol' 'sources-with-title' 'api/b/movie' 'api/b/tv'; do
+            echo "--- $k ---"
+            grep -in -C 20 "$k" /tmp/s.txt || true
+          done

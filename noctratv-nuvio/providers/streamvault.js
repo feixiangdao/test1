@@ -270,7 +270,17 @@ function resolveOne(src,tmdbId,mediaType,season,episode,sess){
     body:JSON.stringify(payload)
   }),16000,src.label+" resolve").then(function(r){
     return r.json().catch(function(){return{};}).then(function(j){
-      if(!r.ok||j.success===false||!j.result)throw new Error(j.error||("HTTP "+r.status));
+      if(!r.ok||j.success===false||!j.result){
+        console.log("[Noctra/StreamVault] "+src.label+
+          " resolve status="+r.status+
+          " keys="+Object.keys(j||{}).join(",")+
+          " code="+clean(j&&j.code)+
+          " dependency="+clean(j&&j.dependency)+
+          " provider="+clean(j&&j.provider)+
+          " service="+clean(j&&j.service)+
+          " error="+clean(j&&j.error));
+        throw new Error(j.error||j.message||("HTTP "+r.status));
+      }
       var x=j.result||{};
       var u=clean(x.url||x.playlist||x.file);
       if(!u)throw new Error("no media");

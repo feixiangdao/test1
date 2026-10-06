@@ -1,11 +1,29 @@
 var BASES=["https://nontongo.win","https://www.nontongo.win"];
-var UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36";
+var UA="Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/137 Mobile Safari/537.36";
 function clean(v){return v==null?"":String(v).trim();}
-function qnum(q){var m=String(q||"").match(/(\d{3,4})/);return m?parseInt(m[1],10):0;}
-function headers(base){return{"User-Agent":UA,"Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8","Accept-Language":"en-US,en;q=0.9","Referer":base+"/"};}
-function extractArray(html){var m=String(html||"").match(/(?:const\s+sources\s*=|sources\s*:)\s*(\[[^\]]+\])/i);if(!m)return[];try{return JSON.parse(m[1]);}catch(e){return[];}}
-function pageUrl(base,id,type,season,episode){return type==="tv"?base+"/stream/tv_upcloud/view1.php?id="+encodeURIComponent(id)+"&s="+encodeURIComponent(season||1)+"&e="+encodeURIComponent(episode||1):base+"/stream/movie_upcloud/view1.php?id="+encodeURIComponent(id)+"&type=movie";}
-function oneBase(base,id,type,season,episode){var p=pageUrl(base,id,type,season,episode);return fetch(p,{headers:headers(base)}).then(function(r){if(!r.ok)throw new Error("page "+r.status);return r.text();}).then(function(html){return extractArray(html).map(function(s){var u=clean(s&&(s.file||s.src||s.url));if(!/^https?:\/\//i.test(u))return null;var q=clean(s.label||s.quality||"Auto");var name="OnlyFlix · Server 2 · NontonGo · "+q;return{name:name,title:name,url:u,quality:q,type:/\.m3u8(?:[?#]|$)/i.test(u)?"hls":"file",provider:"onlyflix-nontongo",headers:{"User-Agent":UA,"Referer":base+"/","Origin":base},subtitles:[]};}).filter(Boolean);});}
-function tryBase(i,id,type,season,episode){if(i>=BASES.length)return Promise.resolve([]);return oneBase(BASES[i],id,type,season,episode).then(function(x){return x.length?x:tryBase(i+1,id,type,season,episode);}).catch(function(){return tryBase(i+1,id,type,season,episode);});}
-function getStreams(tmdbId,mediaType,season,episode){if(!tmdbId||(mediaType!=="movie"&&mediaType!=="tv"))return Promise.resolve([]);if(mediaType==="tv"&&(!season||!episode))return Promise.resolve([]);return tryBase(0,tmdbId,mediaType,season,episode).then(function(rows){var out=[],seen={};(rows||[]).forEach(function(x){if(x.url&&!seen[x.url]){seen[x.url]=1;out.push(x);}});out.sort(function(a,b){return qnum(b.quality)-qnum(a.quality);});console.log("[OnlyFlix/NontonGo] "+mediaType+" "+tmdbId+" streams="+out.length);return out;}).catch(function(e){console.error("[OnlyFlix/NontonGo] "+(e&&e.message?e.message:e));return[];});}
+function timeout(ms){return new Promise(function(resolve){setTimeout(function(){resolve({__timeout:true});},ms);});}
+function timedFetch(url,opt,ms){return Promise.race([fetch(url,opt),timeout(ms||6500)]).then(function(r){if(r&&r.__timeout)throw new Error("timeout");return r;});}
+function rows(html,base){
+ var m=String(html||"").match(/(?:const\s+sources\s*=|sources\s*:)\s*(\[[^\]]+\])/i); if(!m)return[];
+ var a=[]; try{a=JSON.parse(m[1]);}catch(e){return[];}
+ return a.map(function(s){var u=clean(s&&(s.file||s.src||s.url)); if(!/^https?:\/\//i.test(u))return null;
+   var q=clean(s.label||s.quality||"Auto"),name="OnlyFlix · Server 2 · NontonGo · "+q;
+   return{name:name,title:name,url:u,quality:q,provider:"onlyflix-nontongo",headers:{"User-Agent":UA,"Referer":base+"/"},subtitles:[]};
+ }).filter(Boolean);
+}
+function page(base,id,type,s,e){return type==="tv"?base+"/stream/tv_upcloud/view1.php?id="+encodeURIComponent(id)+"&s="+encodeURIComponent(s||1)+"&e="+encodeURIComponent(e||1):base+"/stream/movie_upcloud/view1.php?id="+encodeURIComponent(id)+"&type=movie";}
+function tryBase(i,id,type,s,e){
+ if(i>=BASES.length)return Promise.resolve([]);
+ var b=BASES[i];
+ return timedFetch(page(b,id,type,s,e),{headers:{"User-Agent":UA,"Referer":b+"/","Accept":"text/html,*/*"}},6500)
+  .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.text();})
+  .then(function(t){var x=rows(t,b);return x.length?x:tryBase(i+1,id,type,s,e);})
+  .catch(function(){return tryBase(i+1,id,type,s,e);});
+}
+function getStreams(tmdbId,mediaType,season,episode){
+ if(!tmdbId)return Promise.resolve([]); if(mediaType==="tv"&&(!season||!episode))return Promise.resolve([]);
+ return Promise.race([tryBase(0,tmdbId,mediaType,season,episode),timeout(14000)]).then(function(x){
+   if(x&&x.__timeout)return[]; console.log("[OnlyFlix/NontonGo] streams="+(x||[]).length); return x||[];
+ }).catch(function(){return[];});
+}
 module.exports={getStreams:getStreams};

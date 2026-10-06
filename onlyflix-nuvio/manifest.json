@@ -1,13 +1,13 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.2.2",
-  "description": "Independent OnlyFlix provider for Nuvio. Server 1 and Server 3 use the current direct VAPlayer backend; Server 2 keeps the NontonGo direct extractor with bounded timeout because the current upstream is intermittently Cloudflare-blocked.",
+  "version": "0.3.0",
+  "description": "Independent OnlyFlix provider for Nuvio. Server 1 and Server 3 use a dedicated resolver to avoid mobile-network/API reachability failures. Server 2 NontonGo is temporarily disabled because its current upstream returns Cloudflare 403/502.",
   "scrapers": [
     {
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · Server 1 · VidAPI",
-      "description": "Current direct VAPlayer backend used by the OnlyFlix/VidAPI family; returns HLS immediately without browser/embed preflight.",
-      "version": "0.2.2",
+      "description": "VidAPI path through the dedicated OnlyFlix resolver; returns direct HLS.",
+      "version": "0.3.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -26,15 +26,15 @@
     {
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · Server 2 · NontonGo",
-      "description": "Direct NontonGo sources-array resolver with bounded timeout; current upstream may return Cloudflare 403/502.",
-      "version": "0.2.2",
+      "description": "Temporarily disabled: current NontonGo upstream returns Cloudflare 403/502 during live probes.",
+      "version": "0.3.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
       "filename": "providers/onlyflix-nontongo.js",
-      "enabled": true,
+      "enabled": false,
       "formats": [
         "m3u8",
         "mp4"
@@ -47,8 +47,8 @@
     {
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · Server 3 · VidFast",
-      "description": "Current VidFast path using the shared VAPlayer backend with source=vidfast; returns HLS immediately.",
-      "version": "0.2.2",
+      "description": "VidFast path through the dedicated OnlyFlix resolver with source=vidfast; returns direct HLS.",
+      "version": "0.3.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",

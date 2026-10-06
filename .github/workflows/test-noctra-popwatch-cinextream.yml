@@ -20,40 +20,34 @@ jobs:
         run: |
           node - <<'NODE'
           const fs=require('fs');
-          const base=fs.readFileSync('./providers/streamvault.js','utf8');
-          const sources=[
-            ['site-popwatch-cinextream-hable','Hable'],
-            ['site-popwatch-cinextream-nest','Nest'],
-            ['site-popwatch-cinextream-orion','Orion'],
-            ['site-popwatch-cinextream-light','Light'],
-            ['site-popwatch-cinextream-space','Space'],
-            ['site-popwatch-cinextream-luna','Luna'],
-            ['site-popwatch-cinextream-kuro','Kuro']
-          ];
-          async function runOne(id,label){
-            let s=base.replace(/var SOURCES=\[[\s\S]*?\];/,
-              'var SOURCES=[{id:'+JSON.stringify(id)+',label:'+JSON.stringify(label)+',movie:true,tv:true}];');
-            s=s.replace(/NoctraTV · StreamVault · /g,'NoctraTV · PopWatch · CineXtream · ');
-            s=s.replace(/noctra-streamvault/g,'noctra-popwatch-cinextream');
-            s=s.replace(/\[Noctra\/StreamVault\]/g,'[Noctra/PopWatch/CineXtream]');
-            const path='/tmp/cx-'+label+'.cjs';
-            fs.writeFileSync(path,s);
-            delete require.cache[require.resolve(path)];
-            const p=require(path);
+          let s=fs.readFileSync('./providers/streamvault.js','utf8');
+          s=s.replace(/var SOURCES=\[[\s\S]*?\];/,
+          `var SOURCES=[
+            {id:"site-popwatch-cinextream-hable",label:"Hable",movie:true,tv:false},
+            {id:"site-popwatch-cinextream-nest",label:"Nest",movie:true,tv:true},
+            {id:"site-popwatch-cinextream-orion",label:"Orion",movie:true,tv:true},
+            {id:"site-popwatch-cinextream-light",label:"Light",movie:true,tv:true},
+            {id:"site-popwatch-cinextream-space",label:"Space",movie:true,tv:true},
+            {id:"site-popwatch-cinextream-luna",label:"Luna",movie:true,tv:true},
+            {id:"site-popwatch-cinextream-kuro",label:"Kuro",movie:true,tv:false}
+          ];`);
+          s=s.replace(/NoctraTV · StreamVault · /g,'NoctraTV · PopWatch · CineXtream · ');
+          s=s.replace(/noctra-streamvault/g,'noctra-popwatch-cinextream');
+          s=s.replace(/\[Noctra\/StreamVault\]/g,'[Noctra/PopWatch/CineXtream]');
+          fs.writeFileSync('/tmp/cinextream.cjs',s);
+          const p=require('/tmp/cinextream.cjs');
+          async function run(label,args){
             const rows=await Promise.race([
-              Promise.resolve(p.getStreams(550,'movie')),
-              new Promise(r=>setTimeout(()=>r([]),22000))
-            ]).catch(e=>{console.log('ERR '+label+' '+e.message);return[]});
-            console.log(label+' movie: streams='+(rows||[]).length);
-            for(const x of (rows||[]).slice(0,5)){
+              Promise.resolve(p.getStreams(...args)),
+              new Promise(r=>setTimeout(()=>r([]),60000))
+            ]).catch(e=>{console.log('ERR '+e.message);return[]});
+            console.log(label+': streams='+(rows||[]).length);
+            for(const x of (rows||[]).slice(0,10)){
               let host='',pathname='';try{const u=new URL(x.url);host=u.hostname;pathname=u.pathname}catch{}
               console.log('  '+x.name+' q='+x.quality+' type='+(x.type||'')+' host='+host+' path='+pathname);
             }
-            return (rows||[]).length;
           }
           (async()=>{
-            let total=0;
-            for(const [id,label] of sources) total+=await runOne(id,label);
-            console.log('TOTAL_VALIDATED='+total);
+            await run('CineXtream movie',[550,'movie']);
           })().catch(e=>{console.error(e);process.exitCode=1});
           NODE

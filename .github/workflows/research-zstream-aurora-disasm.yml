@@ -21,4 +21,13 @@ jobs:
           strings -a -t x /tmp/ZStreamNativeSources | egrep -C 35 'AuroraNative|aurora\.fontaine\.lol|traffic\?ui=|shelf|slot|variant|tmdbId|title|year|token' || true
           echo '=== disassembly ==='
           otool -tvV /tmp/ZStreamNativeSources > /tmp/dis.txt
-          grep -n -A360 -B40 'zs_auroraResolve' /tmp/dis.txt | head -440 || true
+          python3 - <<'PY'
+from pathlib import Path
+s=Path('/tmp/dis.txt').read_text(errors='ignore').splitlines()
+start=next((i for i,x in enumerate(s) if x.startswith('0000000000021628')),None)
+end=next((i for i,x in enumerate(s) if start is not None and i>start and x.startswith('0000000000027938')),None)
+print('AURORA_BODY_LINES',start,end)
+if start is not None:
+    for line in s[start:min(end or len(s),start+1800)]:
+        print(line)
+PY

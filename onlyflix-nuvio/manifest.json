@@ -1,13 +1,13 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.9.4",
-  "description": "OnlyFlix local build. NontonGo 0.9.4 races the current Videasy official local protocol (including on-device decryption) against VidNest, with a 7-second local timeout and no self-hosted cloud resolver.",
+  "version": "0.9.5",
+  "description": "OnlyFlix local build. NontonGo 0.9.5 removes the invalid TMDB_API_KEY global dependency in Nuvio QuickJS and uses the current public Videasy client metadata path before local source decryption.",
   "scrapers": [
     {
       "id": "onlyflix-cdnm",
       "name": "OnlyFlix · CDNM",
       "description": "Pure local CDNM with device-side TMDB→IMDb lookup, PlayerJS #2 decoding and explicit 1080p/720p/480p/360p/240p variants when available.",
-      "version": "0.9.4",
+      "version": "0.9.5",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -27,7 +27,7 @@
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
       "description": "Pure local VidAPI/VAPlayer. Master HLS playlists are expanded into explicit resolution streams with actual pixel dimensions.",
-      "version": "0.9.4",
+      "version": "0.9.5",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -46,14 +46,14 @@
     {
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · NontonGo",
-      "description": "Pure-local NontonGo race: current Videasy official seed/encrypted-source protocol is decrypted on device, in parallel with VidNest. First successful route returns immediately.",
-      "version": "0.9.4",
+      "description": "Pure-local NontonGo race. Videasy official protocol now resolves metadata without relying on a missing Nuvio global, then decrypts sources on-device in parallel with VidNest.",
+      "version": "0.9.5",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-nontongo-race094.js",
+      "filename": "providers/onlyflix-nontongo-race095.js",
       "enabled": true,
       "formats": [
         "m3u8",
@@ -68,7 +68,7 @@
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
       "description": "Pure local VidFast using the direct VA upstream source=vidfast path. Master HLS playlists are expanded into explicit resolution streams. No helper resolver.",
-      "version": "0.9.4",
+      "version": "0.9.5",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",

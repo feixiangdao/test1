@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.40.0",
+  "version": "4.41.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1287,6 +1287,28 @@
       "formats": [
         "m3u8",
         "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-zstream-native-aspera",
+      "name": "NoctraTV · ZStream Native · Aspera",
+      "description": "Research-only reconstruction of ZStreamNativeSources Aspera. Uses enc-dec VidLink TMDB encryption plus vidlink.pro /api/b movie/TV endpoints and returns verified direct media. Kept disabled until NoctraTV Apollo/Vienna/Chase alias mapping is proven.",
+      "version": "0.1.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/zstream-native-aspera.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
       ],
       "contentLanguage": [
         "multi"

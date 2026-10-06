@@ -1,0 +1,31 @@
+name: Research ZStream Aurora Swift ABI
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-aurora-swift-abi.yml'
+
+jobs:
+  probe:
+    runs-on: macos-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect Swift ABI metadata
+        run: |
+          set -e
+          BASE='https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/Modules/ZStreamNativeSources.swiftmodule'
+          curl -L --fail --retry 2 -o /tmp/abi.json "$BASE/arm64-apple-ios.abi.json"
+          echo '=== ABI hits ==='
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('/tmp/abi.json').read_text(errors='ignore')
+          for term in ['NativeSources','Aurora','Fontaine','shelf','slot','token','preferredVariantId','availableSources','SourceInfo']:
+              print('\n###',term)
+              p=0
+              for _ in range(12):
+                  i=s.find(term,p)
+                  if i<0: break
+                  print(s[max(0,i-900):i+2600])
+                  p=i+len(term)
+          PY

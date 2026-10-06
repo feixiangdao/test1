@@ -10,15 +10,20 @@ function getStreams(tmdbId,mediaType,season,episode){
   return fetch(u,{headers:{"Accept":"application/json","User-Agent":UA}})
     .then(function(r){if(!r.ok)throw new Error("resolver HTTP "+r.status);return r.json();})
     .then(function(j){
-      var urls=j&&Array.isArray(j.streams)?j.streams:[];
+      var rows=j&&Array.isArray(j.streams)?j.streams:[];
       var subs=j&&Array.isArray(j.subtitles)?j.subtitles.filter(function(s){return s&&s.url;}).slice(0,8).map(function(s){
-        return{url:s.url,language:clean(s.lang||s.code)||"en",name:clean(s.lang||s.code)||"Subtitle"};
+        return{url:s.url,language:clean(s.lang||s.code||s.language)||"en",name:clean(s.label||s.lang||s.code||s.name)||"Subtitle"};
       }):[];
       var out=[],seen={};
-      urls.forEach(function(x,i){
-        var url=clean(x);if(!/^https?:\/\//i.test(url)||seen[url])return;seen[url]=1;
-        var name="OnlyFlix · Server 3 · VidFast · HLS "+(i+1);
-        out.push({name:name,title:name,url:url,quality:"Auto",type:"hls",provider:"onlyflix-vidfast",headers:{"User-Agent":UA},subtitles:subs});
+      rows.forEach(function(x,i){
+        var obj=x&&typeof x==="object"?x:null;
+        var url=clean(obj?obj.url:x);
+        if(!/^https?:\/\//i.test(url)||seen[url])return;
+        seen[url]=1;
+        var q=clean(obj&&(obj.quality||obj.label))||"Auto";
+        var suffix=clean(obj&&obj.name)||("HLS "+(i+1));
+        var name="OnlyFlix · VidFast · "+suffix;
+        out.push({name:name,title:name,url:url,quality:q,type:"hls",provider:"onlyflix-vidfast",headers:{"User-Agent":UA},subtitles:subs});
       });
       console.log("[onlyflix-vidfast] resolver streams="+out.length);
       return out;

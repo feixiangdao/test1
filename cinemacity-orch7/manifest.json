@@ -11,7 +11,7 @@
       "supportedTypes": [
         "movie"
       ],
-      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/PLACEHOLDER/cinemacity-orch7/providers/cinemacity-orch7.js",
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/ab42b8851926a846818abf74b862457f150bc0ac/cinemacity-orch7/providers/cinemacity-orch7.js",
       "enabled": true,
       "formats": [
         "m3u8",

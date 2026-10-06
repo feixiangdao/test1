@@ -23,7 +23,7 @@ function getStreams(tmdbId,mediaType,season,episode){
         var q=clean(obj&&(obj.quality||obj.label))||"Auto";
         var suffix=clean(obj&&obj.name)||("HLS "+(i+1));
         var name="OnlyFlix · NontonGo · "+suffix;
-        out.push({name:name,title:name,url:url,quality:q,type:"hls",provider:"onlyflix-nontongo",headers:{"User-Agent":UA},subtitles:subs});
+        out.push({name:name,title:name,url:url,quality:q,type:(clean(obj&&obj.type)||"hls"),provider:"onlyflix-nontongo",headers:{"User-Agent":UA},subtitles:subs});
       });
       console.log("[onlyflix-nontongo] resolver streams="+out.length);
       return out;

@@ -1,0 +1,61 @@
+name: Research Noctra provider gap
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-noctra-provider-gap.yml'
+
+jobs:
+  gap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare current Noctra source catalogue with local manifest
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const URL='https://noctratv.com/assets/pStreamBackend-BO-fiiV-.js';
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+          const norm=s=>String(s||'').toLowerCase()
+            .replace(/noctratv/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+          (async()=>{
+            const r=await fetch(URL,{headers:{'User-Agent':UA,'Accept':'application/javascript,*/*'}});
+            if(!r.ok)throw new Error('bundle HTTP '+r.status);
+            const s=await r.text();
+            const manifest=JSON.parse(fs.readFileSync('noctratv-nuvio/manifest.json','utf8'));
+            const local=manifest.scrapers.map(x=>({name:x.name,n:norm(x.name),enabled:x.enabled}));
+            const re=/\{id:"(site-[^"]+)",name:"([^"]+)"([\s\S]*?)\}(?=,\{id:|\])/g;
+            const rows=[];
+            let m;
+            while((m=re.exec(s))){
+              const tail=m[3];
+              const enabled=/enabled:!0/.test(tail);
+              const disabled=/enabled:!1/.test(tail);
+              const family=(tail.match(/family:"([^"]+)"/)||[])[1]||'';
+              const source=(tail.match(/source:"([^"]+)"/)||[])[1]||'';
+              const service=(tail.match(/service:"([^"]+)"/)||[])[1]||'';
+              const movie=/movie:!0/.test(tail);
+              const tv=/tv:!0/.test(tail);
+              const reason=(tail.match(/reason:"([^"]*)"/)||[])[1]||'';
+              if(!enabled||disabled)continue;
+              const nn=norm(m[2]);
+              const words=nn.split(' ').filter(x=>x.length>=3);
+              const score=x=>{
+                const lw=x.n.split(' ');
+                let hit=0;for(const w of words)if(lw.includes(w))hit++;
+                return hit;
+              };
+              const ranked=local.map(x=>({name:x.name,enabled:x.enabled,score:score(x)})).sort((a,b)=>b.score-a.score);
+              const best=ranked[0]||{score:0};
+              rows.push({id:m[1],name:m[2],family,source,service,movie,tv,reason,best});
+            }
+            console.log('MANIFEST '+manifest.version+' local='+local.length+' currentEnabled='+rows.length);
+            console.log('=== POSSIBLE GAPS (weak/no local label match) ===');
+            rows.filter(x=>x.best.score<Math.min(2,x.name.split(/\s+·\s+|\s+\/\s+/).length))
+              .forEach(x=>console.log(JSON.stringify(x)));
+            console.log('=== ALL CURRENT ENABLED NOCTRA SOURCES ===');
+            rows.forEach(x=>console.log(JSON.stringify(x)));
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

@@ -1,0 +1,22 @@
+name: Research ZStream Artemis final
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-artemis-final.yml'
+
+jobs:
+  probe:
+    runs-on: macos-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dump final Artemis blocks
+        run: |
+          set -e
+          curl -L --fail --retry 2             -o /tmp/ZStreamNativeSources             'https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources'
+          otool -tvV /tmp/ZStreamNativeSources > /tmp/dis.txt
+          echo '=== PREQUERY ==='
+          sed -n '28260,28435p' /tmp/dis.txt
+          echo '=== RESPONSE ==='
+          sed -n '28820,29180p' /tmp/dis.txt

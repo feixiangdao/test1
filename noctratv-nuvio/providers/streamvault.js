@@ -319,7 +319,36 @@ function getStreams(tmdbId,mediaType,season,episode){
   if(mediaType==="tv"&&(!season||!episode))return Promise.resolve([]);
   var list=SOURCES.filter(function(s){return mediaType==="tv"?s.tv:s.movie;});
   return getSession().then(function(sess){
-    return Promise.all(list.map(function(s){return resolveOne(s,tmdbId,mediaType,season,episode,sess);}));
+    // Silver is the currently verified movie backend. Try it first and stop on success.
+    if(mediaType==="movie"){
+      var silver=list.find(function(s){return s.label==="Silver";});
+      if(silver){
+        return resolveOne(silver,tmdbId,mediaType,season,episode,sess).then(function(x){
+          if(x)return[x];
+          var rest=list.filter(function(s){return s!==silver;});
+          var i=0;
+          function next(){
+            if(i>=rest.length)return Promise.resolve([]);
+            var src=rest[i++];
+            return resolveOne(src,tmdbId,mediaType,season,episode,sess).then(function(v){
+              return v?[v]:next();
+            });
+          }
+          return next();
+        });
+      }
+    }
+    // TV currently only has Zoisite coverage; resolve sequentially to avoid slot contention.
+    var out=[],i=0;
+    function next(){
+      if(i>=list.length)return Promise.resolve(out);
+      var src=list[i++];
+      return resolveOne(src,tmdbId,mediaType,season,episode,sess).then(function(v){
+        if(v)out.push(v);
+        return next();
+      });
+    }
+    return next();
   }).then(function(rows){
     var out=[],seen={};
     (rows||[]).forEach(function(x){

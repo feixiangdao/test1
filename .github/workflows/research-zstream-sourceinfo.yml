@@ -1,4 +1,4 @@
-name: Research ZStream SourceInfo strings
+name: Research ZStream SourceInfo
 
 on:
   workflow_dispatch:
@@ -7,33 +7,16 @@ on:
       - '.github/workflows/research-zstream-sourceinfo.yml'
 
 jobs:
-  inspect:
+  probe:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      - name: Extract SourceInfo metadata strings
+      - name: Dump exact SourceInfo/native string ranges
         run: |
+          set -e
           curl -L --fail --retry 2             -o /tmp/ZStreamNativeSources             'https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources'
-          strings -a -n 3 /tmp/ZStreamNativeSources > /tmp/s.txt
-          python - <<'PY'
-          from pathlib import Path
-          s=Path('/tmp/s.txt').read_text(errors='ignore').splitlines()
-          # Print tight windows around likely source ids/names and catalog metadata.
-          needles=[
-            'aphrodite','artemis','aspera','aurora','nesterov','stellar','tokyo',
-            'magnolia-astral','magnolia-neon',
-            'SourceInfo','availableSources','enabled','disabled','status',
-            'Bloom','Petal','Yoru','Noche','anineko','anipm'
-          ]
-          shown=set()
-          for nd in needles:
-              hits=[i for i,x in enumerate(s) if x.strip().lower()==nd.lower() or nd.lower() in x.lower()]
-              print('\n###',nd,'hits',len(hits))
-              for i in hits[:12]:
-                  key=(max(0,i-18),min(len(s),i+19))
-                  if key in shown: continue
-                  shown.add(key)
-                  print('---',i+1,'---')
-                  for j in range(*key):
-                      print(f'{j+1:7d} {s[j]}')
-          PY
+          strings -a -n 2 /tmp/ZStreamNativeSources | nl -ba > /tmp/n.txt
+          echo '=== SOURCEINFO 97980-98050 ==='
+          sed -n '97980,98050p' /tmp/n.txt
+          echo '=== NATIVE PROTOCOL 95380-95570 ==='
+          sed -n '95380,95570p' /tmp/n.txt

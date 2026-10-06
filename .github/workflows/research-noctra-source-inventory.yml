@@ -1,0 +1,59 @@
+name: Research NoctraTV source inventory
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-noctra-source-inventory.yml'
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Extract current source inventory
+        run: |
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+          const urls=[
+            'https://noctratv.com/assets/pStreamBackend-BO-fiiV-.js',
+            'https://noctratv.com/assets/index-B_JGO8C1.js'
+          ];
+          async function txt(u){
+            const r=await fetch(u,{headers:{'User-Agent':UA,'Accept':'application/javascript,*/*'}});
+            if(!r.ok)throw new Error(u+' HTTP '+r.status);
+            return r.text();
+          }
+          function parseObjects(s){
+            const out=[];
+            const re=/\{id:"([^"]+)",name:"([^"]+)"([^}]*)\}/g;
+            let m;
+            while((m=re.exec(s))){
+              const tail=m[3]||'';
+              const fam=(tail.match(/family:"([^"]+)"/)||[])[1]||'';
+              const src=(tail.match(/source:"([^"]+)"/)||[])[1]||'';
+              const service=(tail.match(/service:"([^"]+)"/)||[])[1]||'';
+              const enabled=!/enabled:!1/.test(tail);
+              const movie=!/movie:!1/.test(tail);
+              const tv=!/tv:!1/.test(tail);
+              out.push({id:m[1],name:m[2],family:fam,source:src,service,enabled,movie,tv});
+            }
+            return out;
+          }
+          (async()=>{
+            const map=new Map();
+            for(const u of urls){
+              let s;try{s=await txt(u)}catch(e){console.log('ERR '+u+' '+e.message);continue}
+              for(const x of parseObjects(s)){
+                if(!map.has(x.id))map.set(x.id,x);
+              }
+            }
+            const arr=[...map.values()].sort((a,b)=>a.id.localeCompare(b.id));
+            console.log('SOURCE_COUNT '+arr.length);
+            for(const x of arr)console.log(JSON.stringify(x));
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

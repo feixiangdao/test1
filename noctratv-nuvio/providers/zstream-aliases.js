@@ -269,6 +269,13 @@ function resolveOne(src,tmdbId,mediaType,season,episode,sess){
   }),16000,src.label+" resolve").then(function(r){
     return r.json().catch(function(){return{};}).then(function(j){
       if(!r.ok||j.success===false||!j.result){
+        var ps=j&&j.playbackSecurity&&typeof j.playbackSecurity==="object"?j.playbackSecurity:{};
+        console.log("[Noctra/ZStream/Aliases] "+src.label+
+          " playback dependency="+clean(ps.dependency)+
+          " provider="+clean(ps.provider)+
+          " service="+clean(ps.service)+
+          " mode="+clean(ps.mode)+
+          " reason="+clean(ps.reason));
         console.log("[Noctra/ZStream/Aliases] "+src.label+
           " resolve status="+r.status+
           " keys="+Object.keys(j||{}).join(",")+

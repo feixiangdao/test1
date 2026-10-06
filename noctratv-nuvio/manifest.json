@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.44.0",
+  "version": "4.45.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -883,15 +883,15 @@
     {
       "id": "noctra-bingr",
       "name": "NoctraTV · Bingr",
-      "description": "noctratv.com Bingr family. Directly resolves the current Bingr Aphelion (s40), Bastion (s62), Corvus (s61) and Edmunds (s3) JSON backends; final HLS/MP4 media is preflighted locally before return.",
-      "version": "1.1.0",
+      "description": "Legacy aggregated Bingr family provider. Disabled to avoid duplicate rows after splitting the repeatedly verified Aphelion and Bastion sources into independent providers.",
+      "version": "1.2.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
       "filename": "providers/bingr.js",
-      "enabled": true,
+      "enabled": false,
       "formats": [
         "m3u8",
         "mp4"
@@ -900,6 +900,48 @@
         "multi"
       ],
       "limited": true
+    },
+    {
+      "id": "noctra-bingr-aphelion",
+      "name": "NoctraTV · Bingr · Aphelion",
+      "description": "Current NoctraTV Bingr Aphelion source (server s40). Uses the direct Bingr JSON API and returns only media that passes local HLS/MP4 preflight. Enabled after repeated movie/TV verification, including 1080p samples.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/bingr-aphelion.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
+    },
+    {
+      "id": "noctra-bingr-bastion",
+      "name": "NoctraTV · Bingr · Bastion",
+      "description": "Current NoctraTV Bingr Bastion source (server s62). Uses the direct Bingr JSON API and returns only media that passes local HLS/MP4 preflight. Enabled after repeated movie/TV verification, commonly 720p on current samples.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/bingr-bastion.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
     },
     {
       "id": "noctra-nesterov",

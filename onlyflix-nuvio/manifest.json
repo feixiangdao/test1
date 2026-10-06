@@ -1,19 +1,19 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.6.1",
-  "description": "Independent OnlyFlix provider for Nuvio. CDNM now resolves on-device with OnlyFlix's default translation/server so IP-bound HLS signatures remain valid on playback.",
+  "version": "0.6.2",
+  "description": "Independent OnlyFlix provider for Nuvio. CDNM resolves on-device so its IP-bound HLS signature matches playback; cache-busted device scraper path.",
   "scrapers": [
     {
       "id": "onlyflix-cdnm",
       "name": "OnlyFlix · CDNM",
-      "description": "CDNM resolved directly on the Nuvio Android device so IP-bound HLS signatures match playback; uses OnlyFlix's default translation/server and returns the five direct quality variants.",
-      "version": "0.6.1",
+      "description": "CDNM is fetched and decoded directly on the Android device so the signed HLS is generated for the same public IP used by playback.",
+      "version": "0.6.2",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-cdnm.js",
+      "filename": "providers/onlyflix-cdnm-device.js",
       "enabled": true,
       "formats": [
         "m3u8"
@@ -27,7 +27,7 @@
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
       "description": "VidAPI source through the dedicated OnlyFlix resolver; returns direct HLS.",
-      "version": "0.6.1",
+      "version": "0.6.2",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -47,7 +47,7 @@
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · NontonGo",
       "description": "NontonGo/Soap2Day source using the current multisourcesoap endpoint; failed candidates are filtered and live HLS/MP4 streams are typed correctly.",
-      "version": "0.6.1",
+      "version": "0.6.2",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -68,7 +68,7 @@
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
       "description": "VidFast source through the dedicated OnlyFlix resolver; returns direct HLS.",
-      "version": "0.6.1",
+      "version": "0.6.2",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",

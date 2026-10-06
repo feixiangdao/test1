@@ -4,30 +4,49 @@ Independent Nuvio provider reconstructed from `https://onlyflix.to/`.
 
 ## Current site mapping
 
-Live inspection of the OnlyFlix movie player found three top-level choices:
+OnlyFlix server numbers are dynamic. The reliable identifier is the upstream source name.
 
-- **Server 1** → `vidapi.xyz`
-- **Server 2** → `sv2.nontongo.stream` / NontonGo
-- **Server 3** → `vidfast.vc`
+For titles where CDNM is available, the current page order is typically:
 
-OnlyFlix itself is primarily a catalog/player shell; playback is delegated to those downstream services.
+1. **CDNM** → `share.cdnm.ink`
+2. **VidAPI** → `vidapi.xyz`
+3. **NontonGo** → `sv2.nontongo.stream` / `sv2.nontongo.day`
+4. **VidFast** → `vidfast.vc`
 
-## v0.1.0
+For titles without CDNM, the remaining sources shift forward, so this plugin displays source names rather than hard-coded Server numbers.
 
-Enabled:
+## v0.4.x
 
-- **OnlyFlix · Server 3 · VidFast**
+Enabled sources:
+
+- **OnlyFlix · CDNM**
+  - IMDb-backed CDNM / PlayerJS route
+  - TMDB → IMDb mapping handled by the resolver
   - movie + TV
-  - TMDB ID based
-  - direct HLS/MP4 resolution
-  - subtitles when returned by VidFast
-  - tries `vidfast.vc`, then recent mirrors
-  - does not return iframe/player pages
+  - direct HLS qualities when available, including 240p / 360p / 480p / 720p / 1080p
+  - video bytes are not proxied through Vercel; the resolver only discovers the final HLS URLs
 
-Research status:
+- **OnlyFlix · VidAPI**
+  - movie + TV
+  - direct HLS via the current VAPlayer backend
 
-- **Server 1 / VidAPI**: the embed endpoint accepts TMDB or IMDb IDs. Its A/X/N/V/Y/P/B/S/F/M buttons are internal VidAPI server selections and the final media URL is not exposed directly in the static DOM. Not enabled until direct media extraction is reproduced.
-- **Server 2 / NontonGo**: upstream identified, but direct-stream protocol is not yet reproduced. Not enabled yet.
+- **OnlyFlix · NontonGo**
+  - current `/01russia/multisourcesoap.php` path
+  - movie + TV
+  - probes Soap2 candidates and removes failed upstreams
+  - returns live HLS and MP4 candidates with the correct stream type
+
+- **OnlyFlix · VidFast**
+  - movie + TV
+  - direct HLS via the current VAPlayer/VidFast backend
+
+## Resolver
+
+The local scrapers use:
+
+`https://onlyflix-resolver-feixiangdao.vercel.app/api/resolve`
+
+The resolver performs upstream discovery only. Returned HLS/MP4 URLs are played directly by Nuvio.
 
 ## Install
 

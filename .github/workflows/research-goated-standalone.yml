@@ -1,0 +1,58 @@
+name: Research Goated Standalone
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-goated-standalone.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe Goated direct API
+        run: |
+          node - <<'NODE'
+          const API='https://api.reallyfast.xyz';
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+          const H={'User-Agent':UA,'Referer':'https://goated.cx/','Origin':'https://goated.cx','Accept':'application/json,*/*'};
+          const crypto=require('node:crypto');
+
+          async function pow(){
+            const r=await fetch(API+'/api/challenge',{headers:H});
+            console.log('challenge status='+r.status+' ct='+(r.headers.get('content-type')||''));
+            const t=await r.text();
+            if(!r.ok){console.log('challenge body='+t.slice(0,300));return null}
+            let j;try{j=JSON.parse(t)}catch{console.log('challenge non-json '+t.slice(0,300));return null}
+            const target='0'.repeat(Number(j.difficulty||0));
+            for(let n=0;n<5_000_000;n++){
+              const h=crypto.createHash('sha256').update(String(j.challenge)+n).digest('hex');
+              if(h.startsWith(target))return {challenge:String(j.challenge),nonce:String(n)};
+            }
+            return null;
+          }
+          async function probe(kind,id,s,e){
+            const p=await pow(); if(!p)return;
+            const body={mediaType:kind,id:String(id),challenge:p.challenge,nonce:p.nonce};
+            if(kind==='tv'){body.season=s;body.episode=e}
+            const r=await fetch(API+'/api/resolve',{method:'POST',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify(body)});
+            const t=await r.text();
+            console.log(kind+' resolve status='+r.status+' body='+t.slice(0,700));
+            if(!r.ok)return;
+            let j;try{j=JSON.parse(t)}catch{return}
+            if(!j.url)return;
+            let host='';try{host=new URL(j.url).hostname}catch{}
+            const mr=await fetch(j.url,{headers:H});
+            const mb=await mr.text();
+            console.log(kind+' media host='+host+' status='+mr.status+' hls='+mb.startsWith('#EXTM3U')+' bytes='+mb.length);
+          }
+          (async()=>{
+            await probe('movie',238);
+            await probe('tv',1399,1,1);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

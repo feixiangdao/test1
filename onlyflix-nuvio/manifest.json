@@ -1,13 +1,13 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.10.5",
-  "description": "OnlyFlix local build. NontonGo 0.10.5 keeps one provider, processes Soap2Cloud qualities sequentially, and compresses repaired HLS playlists with EXT-X-DEFINE to reduce QuickJS result size.",
+  "version": "0.10.6",
+  "description": "OnlyFlix local build. NontonGo 0.10.6 restores the Base64 data-HLS format proven playable on-device, while keeping EXT-X-DEFINE compression and all repaired Soap2Cloud qualities.",
   "scrapers": [
     {
       "id": "onlyflix-cdnm",
       "name": "OnlyFlix · CDNM",
       "description": "Pure local CDNM with device-side TMDB→IMDb lookup, PlayerJS #2 decoding and explicit 1080p/720p/480p/360p/240p variants when available.",
-      "version": "0.10.5",
+      "version": "0.10.6",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -27,7 +27,7 @@
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
       "description": "Pure local VidAPI/VAPlayer. Master HLS playlists are expanded into explicit resolution streams with actual pixel dimensions.",
-      "version": "0.10.5",
+      "version": "0.10.6",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -46,14 +46,14 @@
     {
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · NontonGo",
-      "description": "Single-provider local NontonGo. 1080p/720p/360p Soap2Cloud playlists are repaired sequentially and compacted with HLS variables before returning to Nuvio.",
-      "version": "0.10.5",
+      "description": "Single-provider local NontonGo. Uses Base64 in-memory HLS (known playable on Nuvio), EXT-X-DEFINE compression, TS-fix, and sequential 1080p/720p/360p processing.",
+      "version": "0.10.6",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-nontongo-compact0105.js",
+      "filename": "providers/onlyflix-nontongo-base64define0106.js",
       "enabled": true,
       "formats": [
         "m3u8"
@@ -67,7 +67,7 @@
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
       "description": "Pure local VidFast using the direct VA upstream source=vidfast path. Master HLS playlists are expanded into explicit resolution streams. No helper resolver.",
-      "version": "0.10.5",
+      "version": "0.10.6",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",

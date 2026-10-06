@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.39.0",
+  "version": "4.40.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1237,14 +1237,14 @@
     {
       "id": "noctra-oneshows-ethan",
       "name": "NoctraTV · 1Shows · Ethan",
-      "description": "Current noctratv.com 1Shows Ethan movie source. A prior resolver probe returned a 720p MZone stream, but isolated re-test now returns 424 standalone dependency failed; kept disabled until upstream recovers.",
-      "version": "1.0.0",
+      "description": "noctratv.com 1Shows · Ethan movie source. Uses the current signed MZone playback session and mz_lease media proxy, returning validated direct HLS. Focused CI verified 720p on multiple movies; MZone free sessions currently allow up to two titles at once.",
+      "version": "1.1.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie"
       ],
       "filename": "providers/oneshows-ethan.js",
-      "enabled": false,
+      "enabled": true,
       "formats": [
         "m3u8"
       ],

@@ -1,0 +1,50 @@
+name: Research Noctra ZStream alias contexts
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-noctra-zstream-alias-contexts.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Fetch current Noctra bundles and extract ZStream alias contexts
+        run: |
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+          async function txt(url){
+            const r=await fetch(url,{headers:{'User-Agent':UA,'Accept':'text/html,*/*'}});
+            if(!r.ok)throw new Error(url+' HTTP '+r.status);
+            return r.text();
+          }
+          function abs(x,b){try{return new URL(x,b).href}catch{return''}}
+          (async()=>{
+            const page='https://noctratv.com/watch/movie/238';
+            const html=await txt(page);
+            const scripts=[...html.matchAll(/<script[^>]+src=["']([^"']+\.js[^"']*)["']/ig)]
+              .map(m=>abs(m[1],page)).filter(Boolean);
+            const extras=[
+              'https://noctratv.com/assets/pStreamBackend-BO-fiiV-.js',
+              'https://noctratv.com/assets/index-B_JGO8C1.js',
+              'https://noctratv.com/assets/vortexApiSource-B-QupYve.js'
+            ];
+            const all=[...new Set([...scripts,...extras])];
+            for(const u of all){
+              let s;try{s=await txt(u)}catch(e){continue}
+              let hit=false;
+              for(const key of ['zstream-apollo','zstream-vienna','zstream-chase']){
+                let from=0,n=0;
+                while((from=s.indexOf(key,from))>=0&&n<4){
+                  n++;hit=true;
+                  console.log('\n=== '+key+' asset='+u+' #'+n+' ===');
+                  console.log(s.slice(Math.max(0,from-9000),Math.min(s.length,from+15000)));
+                  from+=key.length;
+                }
+              }
+              if(hit)console.log('\n=== END ASSET '+u+' ===');
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

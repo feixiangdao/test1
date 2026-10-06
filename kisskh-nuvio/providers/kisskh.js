@@ -4,16 +4,18 @@
 // No iframe/web-player fallback.
 
 var BASES=[
-  "https://kisskh.co",
-  "https://kisskh.do",
+  "https://kisskh.nl",
   "https://kisskh.is",
-  "https://kisskh.nl"
+  "https://kisskh.co",
+  "https://kisskh.do"
 ];
 
 var TOKEN_API="https://enc-dec.app/api";
 var DEFAULT_TMDB_API_KEY="1865f43a0549ca50d341dd9ab8b29f49";
 var VIDEO_GUID="62f176f3bb1b5b8e70e39932ad34a0c7";
 var SUB_GUID="VgV52sWhwvBSf8BsM3BRY9weWiiCbtGp";
+var KKEY_AES_KEY_HEX="4F6BDAA39E2F8CB07F5E722D9EDEF314";
+var KKEY_AES_IV_HEX="01504AF356E619CF2E42BBA68C3F70F9";
 var UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36";
 
 var lookupCache={};
@@ -126,6 +128,66 @@ function mediaKind(url){
   return"";
 }
 function directMedia(url){return !!mediaKind(url);}
+
+function hexBytes(s){
+  s=clean(s).replace(/\s+/g,"");
+  if(!s||s.length%2)return new Uint8Array(0);
+  var out=new Uint8Array(s.length/2);
+  for(var i=0;i<out.length;i++)out[i]=parseInt(s.slice(i*2,i*2+2),16);
+  return out;
+}
+function asciiBytes(s){
+  s=String(s||"");
+  var out=new Uint8Array(s.length);
+  for(var i=0;i<s.length;i++)out[i]=s.charCodeAt(i)&255;
+  return out;
+}
+function bytesHex(buf){
+  var a=buf instanceof Uint8Array?buf:new Uint8Array(buf||0),s="";
+  for(var i=0;i<a.length;i++){
+    var h=a[i].toString(16).toUpperCase();
+    if(h.length<2)h="0"+h;
+    s+=h;
+  }
+  return s;
+}
+function kissHash(s){
+  var h=0;
+  s=String(s||"");
+  for(var i=0;i<s.length;i++)h=(h<<5)-h+s.charCodeAt(i);
+  return h;
+}
+function tokenPlain(episodeId,type){
+  var guid=type==="sub"?SUB_GUID:VIDEO_GUID;
+  var parts=[
+    "",String(episodeId),"","mg3c3b04ba","2.8.10",guid,"4830201",
+    "kisskh","kisskh","kisskh","kisskh","kisskh","kisskh","00",""
+  ];
+  var raw=parts.join("|");
+  parts.splice(1,0,String(kissHash(raw)));
+  return parts.join("|");
+}
+function staticToken(episodeId,type){
+  try{
+    if(typeof globalThis==="undefined"||!globalThis.crypto||!globalThis.crypto.subtle){
+      return Promise.reject(new Error("WebCrypto unavailable"));
+    }
+    var keyRaw=hexBytes(KKEY_AES_KEY_HEX);
+    var iv=hexBytes(KKEY_AES_IV_HEX);
+    var plain=asciiBytes(tokenPlain(episodeId,type));
+    return globalThis.crypto.subtle.importKey(
+      "raw",keyRaw,{name:"AES-CBC"},false,["encrypt"]
+    ).then(function(key){
+      return globalThis.crypto.subtle.encrypt({name:"AES-CBC",iv:iv},key,plain);
+    }).then(function(cipher){
+      var out=bytesHex(new Uint8Array(cipher));
+      if(!out)throw new Error("local static token empty");
+      return out;
+    });
+  }catch(e){
+    return Promise.reject(e);
+  }
+}
 
 function getTmdbInfo(tmdbId,mediaType){
   var type=mediaType==="tv"?"tv":"movie";
@@ -312,7 +374,10 @@ function localToken(base,episodeId,type){
   });
 }
 function getToken(base,episodeId,type){
-  return remoteToken(episodeId,type).catch(function(e){
+  return staticToken(episodeId,type).catch(function(e){
+    console.log("[KissKH] static token fallback: "+(e&&e.message?e.message:e));
+    return remoteToken(episodeId,type);
+  }).catch(function(e){
     console.log("[KissKH] remote token fallback: "+(e&&e.message?e.message:e));
     return localToken(base,episodeId,type);
   });

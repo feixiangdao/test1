@@ -1,19 +1,19 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.7.0",
-  "description": "OnlyFlix Local local-first build: CDNM, VidAPI, NontonGo and VidFast resolve on the Nuvio device first, with cloud fallback only when the local upstream path fails.",
+  "version": "0.8.0",
+  "description": "Pure-local OnlyFlix build for Nuvio. All four sources resolve on the Android device. No Vercel resolver or self-hosted cloud fallback is used.",
   "scrapers": [
     {
       "id": "onlyflix-cdnm",
       "name": "OnlyFlix · CDNM",
-      "description": "Fully local-first CDNM: device-local TMDB→IMDb lookup, PlayerJS decoding and IP-bound HLS generation; Vercel only falls back for IMDb mapping if local lookup fails.",
-      "version": "0.7.0",
+      "description": "Pure local: device-side TMDB→IMDb lookup, PlayerJS #2 decoding and IP-bound HLS generation.",
+      "version": "0.8.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-cdnm-local.js",
+      "filename": "providers/onlyflix-cdnm-purelocal.js",
       "enabled": true,
       "formats": [
         "m3u8"
@@ -26,14 +26,14 @@
     {
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
-      "description": "Local-first VidAPI/VAPlayer API on the device; cloud resolver only if both local referer paths fail.",
-      "version": "0.7.0",
+      "description": "Pure local: device directly calls the current VAPlayer/VidAPI upstream and returns direct HLS.",
+      "version": "0.8.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-vidapi-local.js",
+      "filename": "providers/onlyflix-vidapi-purelocal.js",
       "enabled": true,
       "formats": [
         "m3u8"
@@ -46,14 +46,14 @@
     {
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · NontonGo",
-      "description": "Local-first NontonGo multisourcesoap parsing plus device-side HEAD filtering of dead Soap2 nodes; cloud resolver only if local discovery yields no live candidates.",
-      "version": "0.7.0",
+      "description": "Pure local: device parses multisourcesoap and probes candidate Soap2 nodes directly, with no cloud fallback.",
+      "version": "0.8.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-nontongo-local.js",
+      "filename": "providers/onlyflix-nontongo-purelocal.js",
       "enabled": true,
       "formats": [
         "m3u8",
@@ -67,17 +67,18 @@
     {
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
-      "description": "Local-first VidFast native token + enc/dec protocol on the device; cloud resolver only if all VidFast domains fail.",
-      "version": "0.7.0",
+      "description": "Pure local: device tries the native VidFast token+enc/dec protocol, then the local VAPlayer source=vidfast path. No cloud fallback.",
+      "version": "0.8.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-vidfast-local.js",
+      "filename": "providers/onlyflix-vidfast-purelocal.js",
       "enabled": true,
       "formats": [
-        "m3u8"
+        "m3u8",
+        "mp4"
       ],
       "contentLanguage": [
         "multi"

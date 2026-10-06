@@ -1,13 +1,13 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.4.1",
-  "description": "Independent OnlyFlix provider for Nuvio with four current upstream sources: CDNM, VidAPI, NontonGo and VidFast. NontonGo candidates are live-probed and source names are used because webpage server numbers shift by title.",
+  "version": "0.5.1",
+  "description": "Independent OnlyFlix provider for Nuvio with CDNM, VidAPI, NontonGo and VidFast. CDNM now uses direct HTTP + PlayerJS #2 decoding instead of Chromium, avoiding parser timeouts.",
   "scrapers": [
     {
       "id": "onlyflix-cdnm",
       "name": "OnlyFlix · CDNM",
-      "description": "CDNM source with automatic TMDB→IMDb mapping; returns direct PlayerJS HLS qualities up to 1080p when available.",
-      "version": "0.4.1",
+      "description": "CDNM source with automatic TMDB→IMDb mapping and direct PlayerJS #2 decoding; returns 240p/360p/480p/720p/1080p HLS without browser startup.",
+      "version": "0.5.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -27,7 +27,7 @@
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
       "description": "VidAPI source through the dedicated OnlyFlix resolver; returns direct HLS.",
-      "version": "0.4.1",
+      "version": "0.5.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -47,7 +47,7 @@
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · NontonGo",
       "description": "NontonGo/Soap2Day source using the current multisourcesoap endpoint; failed candidates are filtered and live HLS/MP4 streams are typed correctly.",
-      "version": "0.4.1",
+      "version": "0.5.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -68,7 +68,7 @@
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
       "description": "VidFast source through the dedicated OnlyFlix resolver; returns direct HLS.",
-      "version": "0.4.1",
+      "version": "0.5.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",

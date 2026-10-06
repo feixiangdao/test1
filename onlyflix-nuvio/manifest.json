@@ -1,13 +1,13 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.9.2",
-  "description": "Pure-local OnlyFlix build. NontonGo no longer uses sv2.nontongo.day; it resolves through current NontonGo main-domain/VidNest backends locally on the device.",
+  "version": "0.9.3",
+  "description": "OnlyFlix local build. NontonGo 0.9.3 bypasses the NontonGo main-domain preflight and returns direct VidNest media URLs immediately, avoiding Android QuickJS timeouts before fallback.",
   "scrapers": [
     {
       "id": "onlyflix-cdnm",
       "name": "OnlyFlix · CDNM",
       "description": "Pure local CDNM with device-side TMDB→IMDb lookup, PlayerJS #2 decoding and explicit 1080p/720p/480p/360p/240p variants when available.",
-      "version": "0.9.2",
+      "version": "0.9.3",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -27,7 +27,7 @@
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
       "description": "Pure local VidAPI/VAPlayer. Master HLS playlists are expanded into explicit resolution streams with actual pixel dimensions.",
-      "version": "0.9.2",
+      "version": "0.9.3",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -46,14 +46,14 @@
     {
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · NontonGo",
-      "description": "Pure local NontonGo using current main-domain/VidNest backends. Avoids the sv2 subdomain that can disappear on Android local networking, and expands real HLS qualities.",
-      "version": "0.9.2",
+      "description": "Direct VidNest local resolver. No nontongo.win preflight and no HLS preflight; returns direct media candidates immediately to Nuvio.",
+      "version": "0.9.3",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-nontongo-mainlocal.js",
+      "filename": "providers/onlyflix-nontongo-direct093.js",
       "enabled": true,
       "formats": [
         "m3u8",
@@ -68,7 +68,7 @@
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
       "description": "Pure local VidFast using the direct VA upstream source=vidfast path. Master HLS playlists are expanded into explicit resolution streams. No helper resolver.",
-      "version": "0.9.2",
+      "version": "0.9.3",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",

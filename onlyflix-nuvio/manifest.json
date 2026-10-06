@@ -1,13 +1,13 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.3.0",
-  "description": "Independent OnlyFlix provider for Nuvio. Server 1 and Server 3 use a dedicated resolver to avoid mobile-network/API reachability failures. Server 2 NontonGo is temporarily disabled because its current upstream returns Cloudflare 403/502.",
+  "version": "0.3.1",
+  "description": "Independent OnlyFlix provider for Nuvio. Provider labels now use upstream source names because OnlyFlix server numbers shift when CDNM is available.",
   "scrapers": [
     {
       "id": "onlyflix-vidapi",
-      "name": "OnlyFlix · Server 1 · VidAPI",
-      "description": "VidAPI path through the dedicated OnlyFlix resolver; returns direct HLS.",
-      "version": "0.3.0",
+      "name": "OnlyFlix · VidAPI",
+      "description": "VidAPI source. On titles with CDNM this appears as webpage Server 2; without CDNM it appears as Server 1.",
+      "version": "0.3.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -25,9 +25,9 @@
     },
     {
       "id": "onlyflix-nontongo",
-      "name": "OnlyFlix · Server 2 · NontonGo",
-      "description": "Temporarily disabled: current NontonGo upstream returns Cloudflare 403/502 during live probes.",
-      "version": "0.3.0",
+      "name": "OnlyFlix · NontonGo",
+      "description": "NontonGo source. Temporarily disabled while direct extraction is being rebuilt.",
+      "version": "0.3.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -46,9 +46,9 @@
     },
     {
       "id": "onlyflix-vidfast",
-      "name": "OnlyFlix · Server 3 · VidFast",
-      "description": "VidFast path through the dedicated OnlyFlix resolver with source=vidfast; returns direct HLS.",
-      "version": "0.3.0",
+      "name": "OnlyFlix · VidFast",
+      "description": "VidFast source. On titles with CDNM this appears as webpage Server 4; without CDNM it appears as Server 3.",
+      "version": "0.3.1",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",

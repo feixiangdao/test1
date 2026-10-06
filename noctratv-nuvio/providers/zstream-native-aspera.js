@@ -67,19 +67,49 @@ function proxyFileUrl(url){
   return FILE_PROXY+"?url="+encodeURIComponent(String(url))+
     "&headers="+encodeURIComponent(JSON.stringify(ph));
 }
+function verifyDirectFile(x){
+  var h={
+    "User-Agent":UA,
+    "Referer":"https://vidlink.pro/",
+    "Origin":"https://vidlink.pro",
+    "Range":"bytes=0-4095"
+  };
+  return timeout(fetch(x.url,{headers:h}),10000,"direct file").then(function(r){
+    if(!(r.ok||r.status===206))throw new Error("direct file HTTP "+r.status);
+    var ct=clean(r.headers&&r.headers.get?r.headers.get("content-type"):"").toLowerCase();
+    if(/text\/html|application\/json/.test(ct))throw new Error("not media");
+    return r.arrayBuffer().then(function(b){
+      if(!b||!b.byteLength)throw new Error("empty media");
+      x.type="file";
+      x.headers={
+        "User-Agent":UA,
+        "Referer":"https://vidlink.pro/",
+        "Origin":"https://vidlink.pro"
+      };
+      return x;
+    });
+  });
+}
+function verifyProxyFile(x){
+  var pu=proxyFileUrl(x.url);
+  return timeout(fetch(pu,{headers:{"User-Agent":UA,"Range":"bytes=0-4095"}}),12000,"file proxy").then(function(r){
+    if(!(r.ok||r.status===206))throw new Error("file proxy HTTP "+r.status);
+    var ct=clean(r.headers&&r.headers.get?r.headers.get("content-type"):"").toLowerCase();
+    if(/text\/html|application\/json/.test(ct))throw new Error("not media");
+    return r.arrayBuffer().then(function(b){
+      if(!b||!b.byteLength)throw new Error("empty media");
+      x.url=pu;
+      x.type="file";
+      x.headers={"User-Agent":UA};
+      return x;
+    });
+  });
+}
 function verify(x){
   if(x.type==="file"||/\.mp4(?:[?#]|$)/i.test(x.url)){
-    var pu=proxyFileUrl(x.url);
-    return timeout(fetch(pu,{headers:{"User-Agent":UA,"Range":"bytes=0-4095"}}),12000,"file proxy").then(function(r){
-      if(!(r.ok||r.status===206))throw new Error("file proxy HTTP "+r.status);
-      var ct=clean(r.headers&&r.headers.get?r.headers.get("content-type"):"").toLowerCase();
-      if(/text\/html|application\/json/.test(ct))throw new Error("not media");
-      return r.arrayBuffer().then(function(b){
-        if(!b||!b.byteLength)throw new Error("empty media");
-        x.url=pu;
-        x.type="file";
-        return x;
-      });
+    return verifyDirectFile(x).catch(function(e){
+      console.log("[Noctra/ZStream/Aspera] direct file "+(e&&e.message?e.message:e));
+      return verifyProxyFile(x);
     });
   }
   if(x.type==="dash"||/\.mpd(?:[?#]|$)/i.test(x.url)){
@@ -120,7 +150,7 @@ function getStreams(tmdbId,mediaType,season,episode){
         var x=rows[i++];
         return verify(x).then(function(v){
           var name="NoctraTV · ZStream Native · Aspera · "+v.quality;
-          out.push({name:name,title:name,url:v.url,quality:v.quality,type:v.type,provider:"noctra-zstream-native-aspera",headers:hdr(),subtitles:[]});
+          out.push({name:name,title:name,url:v.url,quality:v.quality,type:v.type,provider:"noctra-zstream-native-aspera",headers:v.headers||hdr(),subtitles:[]});
           return next();
         }).catch(function(e){console.log("[Noctra/ZStream/Aspera] verify "+(e&&e.message?e.message:e));return next();});
       }

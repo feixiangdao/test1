@@ -1,13 +1,13 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.10.2",
-  "description": "OnlyFlix local build. NontonGo 0.10.2 exposes every verified Soap2Cloud quality after applying the TS playlist fix independently to each variant.",
+  "version": "0.10.3",
+  "description": "OnlyFlix local build. NontonGo is split into independent 1080p/720p/360p TS-fix scrapers so each result stays small enough for Nuvio QuickJS while preserving all available qualities.",
   "scrapers": [
     {
       "id": "onlyflix-cdnm",
       "name": "OnlyFlix · CDNM",
       "description": "Pure local CDNM with device-side TMDB→IMDb lookup, PlayerJS #2 decoding and explicit 1080p/720p/480p/360p/240p variants when available.",
-      "version": "0.10.2",
+      "version": "0.10.3",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -27,7 +27,7 @@
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
       "description": "Pure local VidAPI/VAPlayer. Master HLS playlists are expanded into explicit resolution streams with actual pixel dimensions.",
-      "version": "0.10.2",
+      "version": "0.10.3",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -44,20 +44,59 @@
       "limited": false
     },
     {
-      "id": "onlyflix-nontongo",
-      "name": "OnlyFlix · NontonGo",
-      "description": "NontonGo multi-resolution local resolver. Each Soap2Cloud HLS variant is verified and repaired independently; all surviving qualities are returned.",
-      "version": "0.10.2",
+      "id": "onlyflix-nontongo-1080",
+      "name": "OnlyFlix · NontonGo 1080p",
+      "description": "Pure-local Soap2Cloud 1080p TS-fix. Repairs malformed EXT-X-MAP on-device and returns one compact verified stream result.",
+      "version": "0.10.3",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-nontongo-multires0102.js",
+      "filename": "providers/onlyflix-nontongo-1080-0103.js",
       "enabled": true,
       "formats": [
-        "m3u8",
-        "mp4"
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "onlyflix-nontongo-720",
+      "name": "OnlyFlix · NontonGo 720p",
+      "description": "Pure-local Soap2Cloud 720p TS-fix. Repairs malformed EXT-X-MAP on-device and returns one compact verified stream result.",
+      "version": "0.10.3",
+      "author": "OnlyFlix Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/onlyflix-nontongo-720-0103.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "onlyflix-nontongo-360",
+      "name": "OnlyFlix · NontonGo 360p",
+      "description": "Pure-local Soap2Cloud 360p TS-fix. Repairs malformed EXT-X-MAP on-device and returns one compact verified stream result.",
+      "version": "0.10.3",
+      "author": "OnlyFlix Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/onlyflix-nontongo-360-0103.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
       ],
       "contentLanguage": [
         "multi"
@@ -68,7 +107,7 @@
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
       "description": "Pure local VidFast using the direct VA upstream source=vidfast path. Master HLS playlists are expanded into explicit resolution streams. No helper resolver.",
-      "version": "0.10.2",
+      "version": "0.10.3",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",

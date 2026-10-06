@@ -16,7 +16,8 @@ Nuvio TMDB ID → TMDB 标题/年份 → KissKH Search → Drama Detail → Epis
 - 只返回经过媒体预检的直链；
 - 电影与电视剧都支持；
 - TV 会按 season/episode 做标题与 Episode 匹配；
-- kkey 优先走当前 enc-kisskh token 端点，失败时尝试读取 KissKH 当前 common JS 在本地生成；
+- kkey 主路径使用 Nuvio WebCrypto 在本地按现行 AES-128-CBC 算法生成；
+- 若设备 WebCrypto 不支持 AES-CBC，则回退到当前 enc-kisskh 端点；再失败才尝试读取 KissKH common JS 动态生成；
 - 字幕支持 KissKH 直接字幕；加密 .txt 字幕使用当前 dec-kisskh 解密端点。
 
 ## 设置

@@ -5,6 +5,7 @@
 
 var ENC="https://enc-dec.app/api/enc-vidlink?text=";
 var BASE="https://vidlink.pro";
+var FILE_PROXY="https://tokyo.fontaine.lol/mp4-proxy.mp4";
 var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36";
 
 function clean(v){return v==null?"":String(v).trim();}
@@ -57,13 +58,28 @@ function mediaRows(j){
   src.forEach(function(x){if(x)add(x.url||x.file,x.quality||x.label,x.type);});
   var seen={};return rows.filter(function(x){if(seen[x.url])return false;seen[x.url]=1;return true;});
 }
+function proxyFileUrl(url){
+  var ph={
+    "User-Agent":UA,
+    "Referer":"https://vidlink.pro/",
+    "Origin":"https://vidlink.pro"
+  };
+  return FILE_PROXY+"?url="+encodeURIComponent(String(url))+
+    "&headers="+encodeURIComponent(JSON.stringify(ph));
+}
 function verify(x){
   if(x.type==="file"||/\.mp4(?:[?#]|$)/i.test(x.url)){
-    return timeout(fetch(x.url,{headers:hdr({"Range":"bytes=0-4095"})}),10000,"file").then(function(r){
-      if(!(r.ok||r.status===206))throw new Error("file HTTP "+r.status);
+    var pu=proxyFileUrl(x.url);
+    return timeout(fetch(pu,{headers:{"User-Agent":UA,"Range":"bytes=0-4095"}}),12000,"file proxy").then(function(r){
+      if(!(r.ok||r.status===206))throw new Error("file proxy HTTP "+r.status);
       var ct=clean(r.headers&&r.headers.get?r.headers.get("content-type"):"").toLowerCase();
       if(/text\/html|application\/json/.test(ct))throw new Error("not media");
-      return x;
+      return r.arrayBuffer().then(function(b){
+        if(!b||!b.byteLength)throw new Error("empty media");
+        x.url=pu;
+        x.type="file";
+        return x;
+      });
     });
   }
   if(x.type==="dash"||/\.mpd(?:[?#]|$)/i.test(x.url)){

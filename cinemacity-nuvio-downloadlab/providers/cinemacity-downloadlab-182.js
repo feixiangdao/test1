@@ -3199,13 +3199,17 @@ var ORCH_TARGETS = [
   "currentFileSet",
   "makeDownloadHref",
   "loadSizeMap",
-  "getTotalSize"
+  "getTotalSize",
+  "renderItems",
+  "buildName"
 ];
 
 function tidyBody(src) {
+  // NOTE: do NOT try to strip `//` comments here. The naive pattern
+  // / \/\/[^"']{0,200}/ also eats real code after a URL scheme ("https://"),
+  // silently corrupting recovered function bodies. Collapsing whitespace is
+  // enough; comments are harmless in a dump.
   return clean(src)
-    .replace(/\s+/g, " ")
-    .replace(/ \/\/[^"']{0,200}/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -3259,6 +3263,20 @@ function dumpKeywordLines(js, tag) {
   var blob = picked.join("\n");
   var n = dumpToLogcat(tag, "__KEYWORD_LINES__", blob);
   return { lines: picked.length, chunks: n, chars: blob.length };
+}
+
+// Verify that a recovered body is brace-balanced. functionSlice stops at the
+// first line matching `^}` at column 0 — on a minified/one-line file that can
+// truncate early (or over-capture). Reporting the imbalance makes a bad slice
+// visible in the dump instead of looking like a genuine short function.
+function braceBalance(s) {
+  var opens = 0, closes = 0;
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charAt(i);
+    if (c === "{") opens++;
+    else if (c === "}") closes++;
+  }
+  return opens - closes;
 }
 
 // Dump a full function body as numbered chunk rows.
@@ -3329,8 +3347,11 @@ function orchestrationBodies(html, pageUrl) {
       }
 
       // Compact index row first: which targets exist and how big each body is.
+      // `bal` is the brace balance — a value other than 0 means functionSlice
+      // mis-sliced the body, so the dump for that function cannot be trusted.
       var sizes = hit.map(function(n) {
-        return n + "=" + String(tidyBody(functionSlice(js, n)).length);
+        var b = functionSlice(js, n);
+        return n + "=" + String(tidyBody(b).length) + "/bal" + String(braceBalance(b));
       });
       rows.push("DUI8 " + f.name + " SIZES " + sizes.join(" "));
 
@@ -3339,11 +3360,15 @@ function orchestrationBodies(html, pageUrl) {
       // remain as a screenshot fallback.
       var order = ["getProtectedDownloadTarget", "parseFileSet", "currentFileSet",
         "startDownload", "getSelectedQualityIndex", "makeDownloadHref",
-        "loadSizeMap", "getTotalSize"];
+        "loadSizeMap", "getTotalSize", "renderItems", "buildName"];
       var dumped = 0;
       order.forEach(function(n) {
         var body = functionSlice(js, n);
         if (!body) return;
+        var bal = braceBalance(body);
+        console.log("CCDUMP|" + f.name + "|__META_" + n + "__|1|1|len=" +
+          String(body.length) + " bal=" + String(bal) +
+          (bal === 0 ? "" : " WARN_UNBALANCED"));
         dumped += dumpToLogcat(f.name, n, tidyBody(body));
       });
       console.log("CCDUMP|" + f.name + "|__TOTAL__|1|1|chunks=" + String(dumped) +
@@ -3405,7 +3430,7 @@ function officialDownloadDiagnostic(item, detailHtml, newsId) {
     // Version marker so the running build is identifiable even when the
     // orchestration dump yields nothing.
     var head = diagnosticRow(
-      "DUI8BUILD=8.0.0 " +
+      "DUI8BUILD=9.0.0 " +
       "H1080=" + String(mp.has1080) +
       " BODIES=" + String(bodies.length) +
       " ORCH=" + orch +
@@ -3612,7 +3637,7 @@ function dhStreamsForMeta(meta) {
 function getStreams(tmdbId, mediaType, season, episode) {
   // adb logcat handshake: if this line shows up in `adb logcat | grep CCDUMP`,
   // the logcat exfil channel works and the full source dump is reachable.
-  console.log("CCDUMP|__HANDSHAKE__|GETSTREAMS|1|1|BUILD=8.0.0 tmdb=" +
+  console.log("CCDUMP|__HANDSHAKE__|GETSTREAMS|1|1|BUILD=9.0.0 tmdb=" +
     String(tmdbId) + " type=" + String(mediaType));
 
   if (!tmdbId || mediaType !== "movie") {

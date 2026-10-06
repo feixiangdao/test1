@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.50.0",
+  "version": "4.51.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1451,6 +1451,27 @@
         "movie"
       ],
       "filename": "providers/1shows-jill.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-bingr-corvus",
+      "name": "NoctraTV · Bingr · Corvus",
+      "description": "Current NoctraTV Bingr Corvus source (server s61). Uses the direct Bingr JSON API and returns only HLS/MP4 media that passes local preflight. Enabled after aggregate live verification produced a 1080p Corvus movie stream; TV may legitimately return zero on uncovered titles.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/bingr-corvus.js",
       "enabled": true,
       "formats": [
         "m3u8",

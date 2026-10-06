@@ -7,10 +7,10 @@
 // local MagnoliaCipher decrypt -> direct HLS/DASH.
 // No iframe, no dec-videasy dependency.
 
-var BASE="https://api.wingsdatabase.com";
+var BASE="https://api.speedracelight.com";
 var DB="https://db.wingsdatabase.com";
-var REFERER="https://player.videasy.to/";
-var ORIGIN="https://www.videasy.to";
+var REFERER="https://www.vidking.net/";
+var ORIGIN="https://www.vidking.net";
 var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36";
 var PROVIDERS=[
   {id:"astral",label:"Astral",path:"/cdn/sources-with-title",isYoru:true},
@@ -98,7 +98,14 @@ function decodeBody(text,seed,mediaId){
   try{return JSON.parse(new TextDecoder("utf-8").decode(dec));}catch(_){return null;}
 }
 function headers(){
-  return{"User-Agent":UA,"Referer":REFERER,"Accept":"application/json"};
+  return{
+    "User-Agent":UA,
+    "Origin":ORIGIN,
+    "Referer":REFERER,
+    "Accept":"application/json",
+    "Cache-Control":"no-cache, no-store, must-revalidate",
+    "Pragma":"no-cache"
+  };
 }
 function mediaHeaders(){
   return{"User-Agent":UA,"Referer":REFERER,"Origin":ORIGIN};

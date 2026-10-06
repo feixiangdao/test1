@@ -1,0 +1,50 @@
+name: Diagnose Wings database
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/diagnose-wings.yml'
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: DNS and HTTP diagnostics
+        run: |
+          set +e
+          echo '=== DNS ==='
+          getent ahosts db.wingsdatabase.com
+          getent ahosts api.wingsdatabase.com
+          echo '=== curl db default ==='
+          curl -sv --connect-timeout 8 --max-time 15             -H 'Referer: https://player.videasy.to/'             'https://db.wingsdatabase.com/3/movie/238?append_to_response=external_ids&language=en'             -o /tmp/db.out 2>&1 | tail -n 80
+          echo "db bytes=$(wc -c </tmp/db.out 2>/dev/null || echo 0)"
+          head -c 300 /tmp/db.out 2>/dev/null; echo
+          echo '=== curl db IPv4 ==='
+          curl -4 -sv --connect-timeout 8 --max-time 15             -H 'Referer: https://player.videasy.to/'             'https://db.wingsdatabase.com/3/movie/238?append_to_response=external_ids&language=en'             -o /tmp/db4.out 2>&1 | tail -n 80
+          echo "db4 bytes=$(wc -c </tmp/db4.out 2>/dev/null || echo 0)"
+          head -c 300 /tmp/db4.out 2>/dev/null; echo
+          echo '=== curl api seed IPv4 ==='
+          curl -4 -sv --connect-timeout 8 --max-time 15             -H 'Referer: https://player.videasy.to/'             'https://api.wingsdatabase.com/seed?mediaId=238'             -o /tmp/seed.out 2>&1 | tail -n 80
+          echo "seed bytes=$(wc -c </tmp/seed.out 2>/dev/null || echo 0)"
+          cat /tmp/seed.out 2>/dev/null | head -c 500; echo
+          echo '=== node fetch ==='
+          node - <<'NODE'
+          const dns=require('dns');
+          for(const h of ['db.wingsdatabase.com','api.wingsdatabase.com']){
+            dns.lookup(h,{all:true},(e,a)=>console.log('lookup',h,e&&e.message,a));
+          }
+          Promise.allSettled([
+            fetch('https://db.wingsdatabase.com/3/movie/238?append_to_response=external_ids&language=en',{headers:{Referer:'https://player.videasy.to/'}}),
+            fetch('https://api.wingsdatabase.com/seed?mediaId=238',{headers:{Referer:'https://player.videasy.to/'}})
+          ]).then(async rs=>{
+            for(const r of rs){
+              if(r.status==='rejected')console.log('FETCH ERR',r.reason,r.reason&&r.reason.cause);
+              else console.log('FETCH',r.value.status,(await r.value.text()).slice(0,300));
+            }
+          });
+          NODE

@@ -1,20 +1,10 @@
 {
-  "name": "OnlyFlix Local",
-  "version": "0.1.0",
-  "description": "Independent OnlyFlix provider for Nuvio. Current verified path implements OnlyFlix Server 3 (VidFast) as direct media; Server 1 (VidAPI) and Server 2 (NontonGo) are still under direct-stream research and are not exposed as fake iframe streams.",
-  "scrapers": [
-    {
-      "id": "onlyflix-vidfast",
-      "name": "OnlyFlix · Server 3 · VidFast",
-      "description": "Reproduces OnlyFlix Server 3 through VidFast's current player API and returns direct HLS/MP4 media with subtitles when available.",
-      "version": "0.1.0",
-      "author": "OnlyFlix Local",
-      "supportedTypes": ["movie", "tv"],
-      "filename": "providers/onlyflix-vidfast.js",
-      "enabled": true,
-      "formats": ["m3u8", "mp4"],
-      "contentLanguage": ["multi"],
-      "limited": true
-    }
+  "name":"OnlyFlix Local",
+  "version":"0.2.0",
+  "description":"Independent OnlyFlix provider for Nuvio. Implements the three current OnlyFlix top-level servers as separate scrapers.",
+  "scrapers":[
+    {"id":"onlyflix-vidapi","name":"OnlyFlix · Server 1 · VidAPI","description":"Direct VidAPI/StreamIMDb family resolver.","version":"0.2.0","author":"OnlyFlix Local","supportedTypes":["movie","tv"],"filename":"providers/onlyflix-vidapi.js","enabled":true,"formats":["m3u8"],"contentLanguage":["multi"],"limited":true},
+    {"id":"onlyflix-nontongo","name":"OnlyFlix · Server 2 · NontonGo","description":"Direct NontonGo sources-array resolver.","version":"0.2.0","author":"OnlyFlix Local","supportedTypes":["movie","tv"],"filename":"providers/onlyflix-nontongo.js","enabled":true,"formats":["m3u8","mp4"],"contentLanguage":["multi"],"limited":true},
+    {"id":"onlyflix-vidfast","name":"OnlyFlix · Server 3 · VidFast","description":"Direct VidFast resolver.","version":"0.2.0","author":"OnlyFlix Local","supportedTypes":["movie","tv"],"filename":"providers/onlyflix-vidfast.js","enabled":true,"formats":["m3u8","mp4"],"contentLanguage":["multi"],"limited":true}
   ]
 }

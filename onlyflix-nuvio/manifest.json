@@ -1,19 +1,19 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.6.2",
-  "description": "Independent OnlyFlix provider for Nuvio. CDNM resolves on-device so its IP-bound HLS signature matches playback; cache-busted device scraper path.",
+  "version": "0.7.0",
+  "description": "OnlyFlix Local local-first build: CDNM, VidAPI, NontonGo and VidFast resolve on the Nuvio device first, with cloud fallback only when the local upstream path fails.",
   "scrapers": [
     {
       "id": "onlyflix-cdnm",
       "name": "OnlyFlix · CDNM",
-      "description": "CDNM is fetched and decoded directly on the Android device so the signed HLS is generated for the same public IP used by playback.",
-      "version": "0.6.2",
+      "description": "Fully local-first CDNM: device-local TMDB→IMDb lookup, PlayerJS decoding and IP-bound HLS generation; Vercel only falls back for IMDb mapping if local lookup fails.",
+      "version": "0.7.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-cdnm-device.js",
+      "filename": "providers/onlyflix-cdnm-local.js",
       "enabled": true,
       "formats": [
         "m3u8"
@@ -26,14 +26,14 @@
     {
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
-      "description": "VidAPI source through the dedicated OnlyFlix resolver; returns direct HLS.",
-      "version": "0.6.2",
+      "description": "Local-first VidAPI/VAPlayer API on the device; cloud resolver only if both local referer paths fail.",
+      "version": "0.7.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-vidapi.js",
+      "filename": "providers/onlyflix-vidapi-local.js",
       "enabled": true,
       "formats": [
         "m3u8"
@@ -46,14 +46,14 @@
     {
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · NontonGo",
-      "description": "NontonGo/Soap2Day source using the current multisourcesoap endpoint; failed candidates are filtered and live HLS/MP4 streams are typed correctly.",
-      "version": "0.6.2",
+      "description": "Local-first NontonGo multisourcesoap parsing plus device-side HEAD filtering of dead Soap2 nodes; cloud resolver only if local discovery yields no live candidates.",
+      "version": "0.7.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-nontongo.js",
+      "filename": "providers/onlyflix-nontongo-local.js",
       "enabled": true,
       "formats": [
         "m3u8",
@@ -67,14 +67,14 @@
     {
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
-      "description": "VidFast source through the dedicated OnlyFlix resolver; returns direct HLS.",
-      "version": "0.6.2",
+      "description": "Local-first VidFast native token + enc/dec protocol on the device; cloud resolver only if all VidFast domains fail.",
+      "version": "0.7.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-vidfast.js",
+      "filename": "providers/onlyflix-vidfast-local.js",
       "enabled": true,
       "formats": [
         "m3u8"

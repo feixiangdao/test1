@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.46.0",
+  "version": "4.47.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -528,8 +528,8 @@
     {
       "id": "noctra-novera-videasy-yoru",
       "name": "NoctraTV · Novera · Videasy Yoru",
-      "description": "noctratv.com Source: Novera · Videasy yoru. Resolves only the Videasy Yoru / cdn backend. Current upstream is movie-only.",
-      "version": "1.0.0",
+      "description": "noctratv.com Novera · Videasy Yoru. Migrated to the current seed + enc=2 + local mvm1 protocol on api.speedracelight.com (/cdn/sources-with-title) with separate Cineby API and VidKing media request headers. Kept disabled because the shared speedracelight seed backend currently returns HTTP 502 across fresh external probes.",
+      "version": "2.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie"
@@ -548,8 +548,8 @@
     {
       "id": "noctra-novera-videasy-vyse",
       "name": "NoctraTV · Novera · Videasy Vyse",
-      "description": "noctratv.com Source: Novera · Videasy vyse. Resolves only the current Videasy hdmovie/Vyse backend.",
-      "version": "1.0.0",
+      "description": "noctratv.com Novera · Videasy Vyse. Migrated to the current seed + enc=2 + local mvm1 protocol on api.speedracelight.com (/hdmovie/sources-with-title) with separate Cineby API and VidKing media request headers. Kept disabled because the shared speedracelight seed backend currently returns HTTP 502 across fresh external probes.",
+      "version": "2.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",

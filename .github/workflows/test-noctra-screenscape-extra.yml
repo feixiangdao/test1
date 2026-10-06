@@ -1,0 +1,60 @@
+name: Test NoctraTV Screenscape Extras
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'noctratv-nuvio/providers/screenscape-hindibox.js'
+      - 'noctratv-nuvio/providers/screenscape-showbox.js'
+      - 'noctratv-nuvio/providers/screenscape-goated.js'
+      - 'noctratv-nuvio/manifest.json'
+      - '.github/workflows/test-noctra-screenscape-extra.yml'
+
+jobs:
+  screenscape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save crypto-js
+      - name: Focused live probe
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          async function fetchTimeout(url,opts,ms){
+            const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);
+            try{return await fetch(url,{...(opts||{}),signal:c.signal})}finally{clearTimeout(t)}
+          }
+          async function validate(x){
+            try{
+              const r=await fetchTimeout(x.url,{headers:x.headers||{}},10000);
+              const ct=(r.headers.get('content-type')||'').toLowerCase();
+              if(!r.ok)return {ok:false,reason:'HTTP '+r.status,ct};
+              if(x.type==='hls'||/\.m3u8(?:[?#]|$)/i.test(x.url)||ct.includes('mpegurl')){
+                const body=await r.text();
+                return {ok:body.startsWith('#EXTM3U'),reason:body.startsWith('#EXTM3U')?'HLS':'not-HLS',ct};
+              }
+              if(ct.includes('text/html')||ct.includes('application/json'))return {ok:false,reason:'not-media',ct};
+              return {ok:true,reason:x.type||'media',ct};
+            }catch(e){return {ok:false,reason:e&&e.message?e.message:String(e)}}
+          }
+          async function run(file,label){
+            const p=require('./providers/'+file);
+            for(const [kind,args] of [['movie',[238,'movie']],['tv',[1399,'tv',1,1]]]){
+              const rows=await Promise.race([Promise.resolve(p.getStreams(...args)),new Promise(r=>setTimeout(()=>r([]),30000))]);
+              console.log(label+' '+kind+': streams='+(rows||[]).length);
+              for(const [i,x] of (rows||[]).slice(0,6).entries()){
+                let host='';try{host=new URL(x.url).hostname}catch{}
+                console.log('  '+(i+1)+'. host='+host+' '+JSON.stringify(await validate(x)));
+              }
+            }
+          }
+          (async()=>{
+            await run('screenscape-hindibox.js','hindibox');
+            await run('screenscape-showbox.js','showbox');
+            await run('screenscape-goated.js','goated');
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

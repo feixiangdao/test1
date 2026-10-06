@@ -1,0 +1,42 @@
+name: Test public 1Shows provider
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/test-public-1shows.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run public Nuvio 1Shows provider
+        run: |
+          set -e
+          curl -L --fail --retry 2             -o /tmp/1shows.cjs             'https://raw.githubusercontent.com/NuvioPlugin/All-in-One-Nuvio/main/providers/1shows.js'
+          node - <<'NODE'
+          const p=require('/tmp/1shows.cjs');
+          async function timeout(pr,ms){
+            return Promise.race([Promise.resolve(pr),new Promise(r=>setTimeout(()=>r([]),ms))])
+              .catch(e=>{console.log('ERR '+(e&&e.message?e.message:e));return[]});
+          }
+          async function run(label,args){
+            const rows=await timeout(p.getStreams(...args),50000);
+            console.log(label+' streams='+(rows||[]).length);
+            for(const x of (rows||[]).slice(0,20)){
+              let host='',path='';try{const u=new URL(x.url);host=u.hostname;path=u.pathname}catch{}
+              console.log(JSON.stringify({
+                name:x.name,title:x.title,quality:x.quality||'',host,path,
+                headers:Object.keys((x.behaviorHints&&x.behaviorHints.proxyHeaders&&x.behaviorHints.proxyHeaders.request)||x.headers||{})
+              }));
+            }
+          }
+          (async()=>{
+            await run('movie',[238,'movie']);
+            await run('tv',[1399,'tv',1,1]);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

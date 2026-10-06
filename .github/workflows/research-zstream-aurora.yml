@@ -1,0 +1,29 @@
+name: Research ZStream Aurora binary
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-zstream-aurora.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Inspect Aurora strings
+        run: |
+          curl -L --fail --retry 2             -o /tmp/ZStreamNativeSources             'https://raw.githubusercontent.com/aaslam12/ZStream-iOS-Mirror-Dev/development/ZStreamNativeSources.xcframework/ios-arm64/ZStreamNativeSources.framework/ZStreamNativeSources'
+          strings -a -n 3 /tmp/ZStreamNativeSources > /tmp/s.txt
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('/tmp/s.txt').read_text(errors='ignore').splitlines()
+          needles=['aurora.fontaine.lol','AuroraNative','auroraResolve','aurora','traffic?ui=']
+          for nd in needles:
+              hits=[i for i,x in enumerate(s) if nd.lower() in x.lower()]
+              print('\n###',nd,'hits',len(hits))
+              for i in hits[:20]:
+                  print('--- line',i+1,'---')
+                  for j in range(max(0,i-90),min(len(s),i+91)):
+                      print(f'{j+1:7d} {s[j]}')
+          PY

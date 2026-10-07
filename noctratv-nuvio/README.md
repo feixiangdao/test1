@@ -128,3 +128,46 @@ NoctraTV 当前 MPlayer 会把真实 Provider 名显示为匿名别名。不要�
 因此播放器中出现 “Lumen Verified” 实际表示当前 vidapi 路径已通过验证，而不是新出现了一个名为 Lumen 的后端。
 
 当前优先补齐的顶层 pStream 缺口：vidup、peachify、videasy_cdn、anipm，以及尚未独立落地的 vidfast/vidcore 顶层路径。
+
+
+## v4.59.0 — 当前 NoctraTV 顶层 pStream 补齐（2026-10-07）
+
+基于当前 NoctraTV 前端 bundle（`pStreamBackend-BO-fiiV-.js`、`vortexApiSource-B-QupYve.js`、`mplayerProviderPathHealth-9o08cPRb.js`）重新核对后，播放器显示的 Lumen / Orion / Lyra / Phoenix / Vega / Nova / Atlas / Hoshi 等是匿名显示名，不是新的站点名称。
+
+本轮新增的独立顶层 Provider：
+
+- `noctra-vidup` — VidUp / Orion — `providers/vidup.js`
+- `noctra-vidfast` — VidFast / Lyra — `providers/vidfast.js`
+- `noctra-peachify` — Peachify / Phoenix — `providers/peachify.js`
+- `noctra-vidcore` — VidCore / Vega — `providers/vidcore.js`
+- `noctra-videasy-cdn` — Videasy CDN / Nova（preferredProvider=neon2）— `providers/videasy-cdn.js`
+- `noctra-onetouchtv` — OneTouchTV / Atlas — `providers/onetouchtv.js`
+- `noctra-anipm` — AniPM / Hoshi — `providers/anipm.js`
+
+其中 VidFast、VidCore、Atlas、Nova 使用 NoctraTV / MZone 自己的 `/tmdb/...` 元数据代理，不需要在新文件中嵌入 TMDB API Key。
+
+当前活跃顶层源覆盖情况：
+
+- Lumen = vidapi — 已有
+- Sol = cinejoy — 已有
+- Orion = vidup — 本轮新增
+- Lyra = vidfast — 本轮新增
+- Phoenix = peachify — 本轮新增
+- Vega = vidcore — 本轮新增
+- Nova = videasy_cdn — 本轮新增
+- Atlas = onetouchtv — 本轮新增
+- Titan = vidrock — 已有
+- Sirius = vidlink — 已有
+- Halo = hexa — 已有
+- Draco = vidrift — 已有
+- Comet = vixsrc — 已有
+- Polaris = fsonline — 已有
+- Hoshi = anipm — 本轮新增
+- Astra = purstream — 已有
+- Mira = kisskh — 已有
+- Zenith = lmscript — 已有
+- Aurora = cinesrc — 已有
+
+新加的 7 个 Provider 当前均保持 `enabled: false`，原因不是已知不可用，而是尚未经过 Android/Nuvio 实机播放确认。确认返回正确影片、音视频正常、无明显启动延迟后再逐个转为默认启用。
+
+Manifest：v4.59.0，共 81 个 Provider 条目。

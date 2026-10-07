@@ -1,0 +1,56 @@
+name: YFlix Research
+on:
+  push:
+    paths:
+      - '.github/workflows/yflix-research.yml'
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Inspect YFlix and PlayAPI bundles
+        shell: bash
+        run: |
+          python - <<'PY'
+          import re, urllib.request, urllib.parse
+
+          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/153 Safari/537.36'
+          pages=[
+            ('YFLIX','https://www.yflix.in/movies/watch/interstellar-157336'),
+            ('PLAYAPI','https://player.playapi.eu.cc/movie/157336'),
+          ]
+          def get(url):
+              req=urllib.request.Request(url,headers={'User-Agent':UA,'Accept':'text/html,*/*'})
+              with urllib.request.urlopen(req,timeout=20) as r:
+                  return r.read().decode('utf-8','replace')
+          def compact(s): return re.sub(r'\\s+',' ',s)
+
+          for label,page in pages:
+              print('\\n===== PAGE',label,page,'=====')
+              html=get(page)
+              print('html bytes',len(html))
+              srcs=re.findall(r'<script[^>]+src=["\\\']([^"\\\']+)',html,re.I)
+              print('scripts',srcs)
+              for src in srcs:
+                  u=urllib.parse.urljoin(page,src)
+                  try: js=get(u)
+                  except Exception as e:
+                      print('SCRIPT_FAIL',u,repr(e)); continue
+                  print('\\n--- SCRIPT',u,'bytes',len(js),'---')
+                  needles=['Multi Source','Multi Dubbed','Multi Audio','BackUp','playapi.eu.cc','fetch(','/api/','m3u8','vidsrc','vidlink','vidfast','vidzee','moviebox','server','stream','source']
+                  seen=set()
+                  for needle in needles:
+                      low=js.lower(); nl=needle.lower(); start=0; count=0
+                      while count<12:
+                          i=low.find(nl,start)
+                          if i<0: break
+                          frag=compact(js[max(0,i-260):min(len(js),i+520)])
+                          key=frag[:350]
+                          if key not in seen:
+                              seen.add(key); print('HIT',needle,frag[:900])
+                          count+=1; start=i+len(nl)
+                  urls=sorted(set(re.findall(r'https?://[^"\\\'\x60\\\\\\s<>]+',js)))
+                  print('URLS',urls[:150])
+          PY

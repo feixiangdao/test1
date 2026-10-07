@@ -1,9 +1,11 @@
 // YFlix Local for Nuvio
-// v0.1.0
+// v0.1.1
 // Current YFlix.in Server 1 (Multi Source):
 // TMDB -> player.playapi.eu.cc -> tmdb-embed-api.stayawayx.workers.dev
 //
 // React Native / Hermes friendly: Promise chains, no async/await.
+// v0.1.1: hide DahmerMovies rows after device testing showed that this
+// upstream consistently fails in Nuvio while the other S1 providers play.
 
 var API_BASE = "https://tmdb-embed-api.stayawayx.workers.dev";
 var UA = "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36";
@@ -34,8 +36,6 @@ function streamType(url){
   var u = clean(url).toLowerCase().split("?")[0];
   if(u.indexOf(".m3u8") >= 0) return "hls";
   if(u.indexOf(".mpd") >= 0) return "dash";
-  // Nuvio uses mp4 as the generic direct-file type. This also keeps MKV
-  // links usable by compatible/external players.
   return "mp4";
 }
 
@@ -77,19 +77,29 @@ function rank(row){
   var transport = url.indexOf(".m3u8") >= 0 ? 30000 :
                   url.indexOf(".mp4") >= 0 ? 20000 :
                   url.indexOf(".mkv") >= 0 ? 10000 : 0;
-  // Prefer normal streaming transports before very large direct MKV/remux files.
   return transport + res;
 }
 
 function normalize(rows){
-  var out = [], seen = {};
+  var out = [], seen = {}, skippedDahmer = 0;
   (rows || []).forEach(function(row, i){
     if(!row || typeof row !== "object") return;
+
+    var provider = clean(row.provider || row.name) || "Server";
+
+    // The current DahmerMovies rows are p.111477.xyz/bulk direct-file
+    // endpoints. They are returned by PlayAPI but repeatedly fail on the
+    // tested Nuvio/Android playback path, while the other S1 providers work.
+    // Keep this filter provider-specific: other MKV sources are not removed.
+    if(provider.toLowerCase() === "dahmermovies"){
+      skippedDahmer++;
+      return;
+    }
+
     var url = clean(row.url);
     if(!/^https?:\/\//i.test(url) || seen[url]) return;
     seen[url] = 1;
 
-    var provider = clean(row.provider || row.name) || "Server";
     var q = qualityOf(row);
     var lang = languageHint(row);
     var container = containerLabel(url);
@@ -111,6 +121,7 @@ function normalize(rows){
 
   out.sort(function(a,b){ return b._rank - a._rank; });
   out.forEach(function(x){ try { delete x._rank; } catch(_) {} });
+  if(skippedDahmer) console.log("[YFlix S1] skipped DahmerMovies=" + skippedDahmer);
   return out;
 }
 
@@ -161,7 +172,7 @@ function onSettings(){
     { type:"header", label:"YFlix Local · Server 1" },
     {
       type:"info",
-      label:"直接调用当前 YFlix Server 1 使用的 PlayAPI 后台，按 TMDB ID 获取真实 HLS/MP4/MKV 流，并保留每条线路要求的 Referer/User-Agent 等请求头。"
+      label:"直接调用当前 YFlix Server 1 使用的 PlayAPI 后台，按 TMDB ID 获取真实播放流并保留各线路请求头。已暂时隐藏实机测试持续失败的 DahmerMovies 线路。"
     }
   ];
 }

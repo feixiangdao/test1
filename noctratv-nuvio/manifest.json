@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.57.0",
+  "version": "4.58.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1603,6 +1603,50 @@
       "formats": [
         "m3u8",
         "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-vidfast",
+      "name": "NoctraTV · VidFast / Lyra",
+      "description": "Current NoctraTV top-level Lyra source (real provider: vidfast). Uses NoctraTV's keyless /tmdb proxy plus the current generic /mplayer/vidfast/resolve contract and an ephemeral MZone v2 playback session. Returns only validated HLS/DASH/MP4.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidfast.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-vidcore",
+      "name": "NoctraTV · VidCore / Vega",
+      "description": "Current NoctraTV top-level Vega source (real provider: vidcore). Uses NoctraTV's keyless /tmdb proxy plus the current generic /mplayer/vidcore/resolve contract and an ephemeral MZone v2 playback session. Returns only validated HLS/DASH/MP4.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidcore.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
       ],
       "contentLanguage": [
         "multi"

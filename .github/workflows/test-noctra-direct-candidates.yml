@@ -1,0 +1,83 @@
+name: Test NoctraTV Direct Candidates
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'noctratv-nuvio/providers/cinevaro-vidnest.js'
+      - 'noctratv-nuvio/providers/cinevaro-videasy.js'
+      - 'noctratv-nuvio/providers/framex-vidcore.js'
+      - 'noctratv-nuvio/providers/cinemaos-vidfast.js'
+      - 'noctratv-nuvio/providers/cinesrc.js'
+      - 'noctratv-nuvio/providers/1embed.js'
+      - 'noctratv-nuvio/providers/nextbox-moviesapi.js'
+      - '.github/workflows/test-noctra-direct-candidates.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: |
+          for f in             cinevaro-vidnest.js             cinevaro-videasy.js             framex-vidcore.js             cinemaos-vidfast.js             cinesrc.js             1embed.js             nextbox-moviesapi.js; do
+            node --check "noctratv-nuvio/providers/$f"
+          done
+      - name: Focused live probe
+        working-directory: noctratv-nuvio
+        run: |
+          node - <<'NODE'
+          async function timeout(p,ms,label){
+            return new Promise(resolve=>{
+              let done=false;
+              const timer=setTimeout(()=>{
+                if(done)return;
+                done=true;
+                console.log(label+' timeout');
+                resolve([]);
+              },ms);
+              Promise.resolve(p).then(v=>{
+                if(done)return;
+                done=true;
+                clearTimeout(timer);
+                resolve(v);
+              }).catch(e=>{
+                if(done)return;
+                done=true;
+                clearTimeout(timer);
+                console.log(label+' error '+(e&&e.message?e.message:e));
+                resolve([]);
+              });
+            });
+          }
+          const rows=[
+            ['cinevaro-vidnest.js','Cinevaro/VidNest'],
+            ['cinevaro-videasy.js','Cinevaro/Videasy'],
+            ['framex-vidcore.js','FrameX/VidCore'],
+            ['cinemaos-vidfast.js','CinemaOS/VidFast'],
+            ['cinesrc.js','CineSrc'],
+            ['1embed.js','1Embed'],
+            ['nextbox-moviesapi.js','Nextbox/MoviesAPI']
+          ];
+          async function run(){
+            for(const [file,label] of rows){
+              const p=require('./providers/'+file);
+              for(const [kind,args] of [
+                ['movie',[238,'movie']],
+                ['tv',[1399,'tv',1,1]]
+              ]){
+                const streams=await timeout(p.getStreams(...args),45000,label+' '+kind);
+                console.log(label+' '+kind+': streams='+(streams||[]).length);
+                for(const x of (streams||[]).slice(0,5)){
+                  let host='';try{host=new URL(x.url).hostname}catch{}
+                  console.log('  '+x.name+' q='+(x.quality||'')+' host='+host);
+                }
+              }
+            }
+          }
+          run().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

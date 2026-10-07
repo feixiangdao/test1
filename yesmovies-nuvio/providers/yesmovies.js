@@ -1,5 +1,5 @@
 // YesMovies Local for Nuvio
-// v0.1.6
+// v0.2.0
 // Flow:
 // TMDB metadata -> YesMovies search -> movie/season page -> /ajax/v4_movie_episodes/{id}
 // -> movie_embed and/or movie_sources (+ token when required) -> direct HLS/MP4/DASH.
@@ -12,6 +12,7 @@ var DEFAULT_BASES=[
 ];
 var DEFAULT_TMDB_API_KEY="1865f43a0549ca50d341dd9ab8b29f49";
 var UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36";
+var PLOYAN="https://ployan.me";
 
 var pageCache={};
 var lookupCache={};
@@ -344,37 +345,118 @@ function queriesFor(info,type,season){
   if(info.originalTitle&&lower(info.originalTitle)!==lower(info.title))q.push(info.originalTitle);
   return uniq(q);
 }
-function findPage(info,type,season){
-  var bases=currentBases(),queries=queriesFor(info,type,season),jobs=[];
-  return Promise.all(bases.map(function(b){return directSlugProbe(b,info,type,season);}))
-  .then(function(ds){
-    var direct=[];
-    ds.forEach(function(g){(g||[]).forEach(function(c){direct.push(c);});});
-    if(direct.length)return direct;
-    bases.forEach(function(b){queries.forEach(function(q){jobs.push(searchOne(b,q));});});
-    return Promise.all(jobs);
-  }).then(function(groups){
-    var all=[],seen={};
-    groups.forEach(function(g){(g||[]).forEach(function(c){if(!seen[c.url]){seen[c.url]=1;all.push(c);}});});
-    all.sort(function(a,b){return scoreCandidate(b,info,type,season)-scoreCandidate(a,info,type,season);});
-    if(all.length&&scoreCandidate(all[0],info,type,season)>=35)return all;
-    diag("SEARCH · blocked/empty; switching to filter index");
-    return Promise.all(bases.map(function(b){return scanFilter(b,info,type,season);}))
-      .then(function(gs){
-        var x=[],ss={};
-        gs.forEach(function(g){(g||[]).forEach(function(c){if(!ss[c.url]){ss[c.url]=1;x.push(c);}});});
-        x.sort(function(a,b){return scoreCandidate(b,info,type,season)-scoreCandidate(a,info,type,season);});
-        return x;
+function apiFindPage(info,type,season){
+  var bases=currentBases(),idx=0;
+  function normalizeTitle(v){
+    return simple(v).replace(/\s+season\s+\d+$/i,"").trim();
+  }
+  function nextBase(){
+    if(idx>=bases.length)return Promise.reject(new Error("YesMovies search API unavailable"));
+    var base=bases[idx++],q=info.title||info.originalTitle;
+    var u=base+"/searching?q="+encodeURIComponent(q)+"&limit=40&offset=0";
+    return fetchText(u,{headers:baseHeaders(base,base+"/yes.html","application/json, text/plain, */*")},9000,"searching")
+      .then(function(t){
+        var j=jsonMaybe(t),arr=j&&Array.isArray(j.data)?j.data:[];
+        if(!arr.length){diag("SEARCHING · "+base+" · 0 results");return nextBase();}
+        var wantType=type==="tv"?"s":"m";
+        var target=normalizeTitle(info.title||info.originalTitle);
+        var ranked=arr.map(function(x){
+          var title=decodeHtml(x&&x.t),baseTitle=normalizeTitle(title),sc=0;
+          if(clean(x&&x.d)===wantType)sc+=45; else sc-=80;
+          if(baseTitle===target)sc+=120;
+          else sc+=titleScore(baseTitle,target);
+          if(type==="tv"){
+            if(Number(x&&x.n)===Number(season))sc+=70; else sc-=50;
+          }else if(info.year&&Number(x&&x.y)===Number(info.year))sc+=30;
+          return{x:x,score:sc,title:title};
+        }).sort(function(a,b){return b.score-a.score;});
+        var best=ranked[0];
+        if(!best||best.score<100){diag("SEARCHING · best score "+(best?best.score:0)+" too weak");return nextBase();}
+        var slug=clean(best.x.s),idm=slug.match(/-(\d+)$/);
+        if(!slug||!idm){diag("SEARCHING · result missing internal id");return nextBase();}
+        var match={
+          url:base+"/movie/"+slug+".html",
+          id:idm[1],
+          slug:slug,
+          title:best.title,
+          year:Number(best.x.y)||0,
+          base:base
+        };
+        diag("MATCH · "+match.title+" · id "+match.id+" · API");
+        return match;
+      }).catch(function(e){
+        diag("SEARCHING · "+base+" · "+(e&&e.message?e.message:e));
+        return nextBase();
       });
-  }).then(function(all){
-    if(!all.length){diag("LOOKUP · no YesMovies result");throw new Error("no YesMovies result");}
-    var best=all[0],sc=scoreCandidate(best,info,type,season);
-    if(sc<35){diag("MATCH · title score "+sc+" too weak");throw new Error("title match too weak");}
-    best.base=originOf(best.url)||bases[0];
-    diag("MATCH · "+(best.title||best.slug||best.id)+" · score "+sc+" · id "+best.id);
-    log("matched "+best.title+" id="+best.id+" score="+sc+" "+best.url);
-    return best;
-  });
+  }
+  return nextBase();
+}
+function findPage(info,type,season){
+  return apiFindPage(info,type,season);
+}
+
+function bytesToHex(a){
+  var out="",i;
+  for(i=0;i<a.length;i++)out+=(a[i]<16?"0":"")+a[i].toString(16);
+  return out;
+}
+function hexToBytes(h){
+  h=clean(h);var a=new Uint8Array(Math.floor(h.length/2)),i;
+  for(i=0;i<a.length;i++)a[i]=parseInt(h.substr(i*2,2),16)||0;
+  return a;
+}
+function utf8Bytes(v){
+  var s=unescape(encodeURIComponent(String(v))),a=new Uint8Array(s.length),i;
+  for(i=0;i<s.length;i++)a[i]=s.charCodeAt(i)&255;
+  return a;
+}
+function utf8Hex(v){return bytesToHex(utf8Bytes(v));}
+function randomHex(n){
+  try{
+    if(typeof __crypto_get_random_values_hex==="function"){
+      var x=clean(__crypto_get_random_values_hex(n));
+      if(x.length===n*2)return x;
+    }
+  }catch(_){}
+  try{
+    var a=new Uint8Array(n);
+    if(typeof crypto!=="undefined"&&crypto.getRandomValues){crypto.getRandomValues(a);return bytesToHex(a);}
+  }catch(_){}
+  var out="",i;
+  for(i=0;i<n;i++){var b=Math.floor(Math.random()*256);out+=(b<16?"0":"")+b.toString(16);}
+  return out;
+}
+function ployanToken(plaintext){
+  var saltHex=randomHex(8),ivHex=randomHex(12),passHex=utf8Hex("player"),dataHex=utf8Hex(plaintext);
+  try{
+    if(typeof __crypto_pbkdf2_hex==="function"&&typeof __crypto_aes_encrypt_hex==="function"){
+      var keyHex=__crypto_pbkdf2_hex(passHex,saltHex,1000,256,"SHA256");
+      var cipherHex=__crypto_aes_encrypt_hex("AES-GCM",keyHex,ivHex,dataHex);
+      if(keyHex&&cipherHex)return Promise.resolve(saltHex+"-"+ivHex+"-"+cipherHex);
+    }
+  }catch(e){log("native crypto "+(e&&e.message?e.message:e));}
+  try{
+    var subtle=(typeof crypto!=="undefined"&&crypto.subtle)?crypto.subtle:null;
+    if(!subtle)throw new Error("crypto unavailable");
+    return subtle.importKey("raw",utf8Bytes("player"),"PBKDF2",false,["deriveKey"])
+      .then(function(material){
+        return subtle.deriveKey(
+          {name:"PBKDF2",salt:hexToBytes(saltHex),iterations:1000,hash:"SHA-256"},
+          material,{name:"AES-GCM",length:256},false,["encrypt"]
+        );
+      }).then(function(key){
+        return subtle.encrypt({name:"AES-GCM",iv:hexToBytes(ivHex)},key,utf8Bytes(plaintext));
+      }).then(function(buf){
+        return saltHex+"-"+ivHex+"-"+bytesToHex(new Uint8Array(buf));
+      });
+  }catch(e){
+    return Promise.reject(e);
+  }
+}
+function subtitleId(mid,eid){
+  var s=String(mid)+"-"+String(eid),out="",i,b;
+  for(i=0;i<s.length;i++){b=s.charCodeAt(i)^0x13;out+=(b<16?"0":"")+b.toString(16);}
+  return out;
 }
 
 function attr(tag,name){
@@ -411,14 +493,32 @@ function wantEpisode(row,type,episode){
   return !!(m&&Number(m[1])===n);
 }
 function loadEpisodeItems(match,type,episode){
-  var u=match.base+"/ajax/v4_movie_episodes/"+encodeURIComponent(match.id);
-  return fetchText(u,{headers:xhrHeaders(match.base,match.url)},9000,"episodes").then(function(t){
-    var all=parseEpisodeItems(t),rows=all.filter(function(x){return wantEpisode(x,type,episode);});
-    log("episodes total="+all.length+" selected="+rows.length);
-    if(!all.length)diag("EPISODES · response parsed 0 server rows");
-    if(!rows.length&&type==="movie")rows=all;
-    if(!rows.length){diag("EPISODES · target episode/server not found");throw new Error("episode/server list empty");}
-    return rows;
+  if(type==="movie"){
+    diag("EPISODES · movie episode id 1");
+    return Promise.resolve([{id:"1",server:"1",label:"Movie"}]);
+  }
+  return fetchText(match.url,{headers:baseHeaders(match.base,match.base+"/yes.html")},9000,"episode page").then(function(html){
+    var block="";
+    var bm=html.match(/<ul\b[^>]*id=["']episodes-sv-1["'][^>]*>([\s\S]*?)<\/ul>/i);
+    if(bm)block=bm[1];
+    if(!block)block=html;
+    var rows=[],re=/<li\b([^>]*\bep-item\b[^>]*)>([\s\S]*?)<\/li>/ig,m;
+    while((m=re.exec(block))!==null){
+      var tag=m[1],body=m[2],id=attr(tag,"data-id"),label="";
+      var lm=body.match(/\btitle=["']([^"']+)["']/i);
+      if(lm)label=decodeHtml(lm[1]);
+      if(!label)label=decodeHtml(body.replace(/<[^>]+>/g," "));
+      if(id)rows.push({id:id,server:"1",label:label});
+    }
+    var want=Number(episode)||1,selected=rows.filter(function(r){
+      var m=lower(r.label).match(/episode\s*0*(\d+)/i);
+      if(m)return Number(m[1])===want;
+      return Number(r.id)===want;
+    });
+    if(!selected.length&&rows[want-1])selected=[rows[want-1]];
+    diag("EPISODES · inline "+rows.length+" rows · selected "+selected.length);
+    if(!selected.length)throw new Error("episode not found in inline page");
+    return selected;
   });
 }
 
@@ -521,28 +621,26 @@ function getSourcePayloads(match,row){
   });
 }
 function resolveRow(match,row){
-  return getSourcePayloads(match,row).then(function(payloads){
-    var found=[],nested=[];
-    payloads.forEach(function(p){
-      urlsFromSourcePayload(p.text).forEach(function(u){found.push({url:u,referer:match.url});});
-      if(p.kind==="embed"){
-        embedUrlFromPayload(p.text,match.base).forEach(function(u){
-          if(mediaKind(u))found.push({url:u,referer:match.url});
-          else nested.push(nestedMedia(u,match.url,0));
-        });
-      }
-    });
-    if(!nested.length)return found;
-    return Promise.all(nested).then(function(gs){
-      gs.forEach(function(g){found=found.concat(g||[]);});
-      return found;
-    });
-  }).then(function(rows){
-    var seen={},out=[];
-    rows.forEach(function(r){var u=clean(r.url);if(u&&!seen[u]){seen[u]=1;out.push({url:u,referer:r.referer||match.url,server:row.server});}});
-    log("server "+row.server+" media candidates="+out.length);
-    if(!out.length)diag("MEDIA · server "+row.server+" returned no direct m3u8/mp4/mpd");
-    return out;
+  var sv="1",eid=clean(row.id)||"1";
+  var stamp=Math.floor(now()/1000);
+  var plain=String(match.id)+"+"+eid+"+"+sv+"+"+stamp;
+  return ployanToken(plain).then(function(token){
+    var watch=PLOYAN+"/watch/?v"+sv+eid;
+    var h={"User-Agent":UA,"Accept":"application/json, text/plain, */*","Referer":watch,"Origin":PLOYAN};
+    return fetchText(PLOYAN+"/get/"+token,{headers:h},9000,"ployan get");
+  }).then(function(t){
+    var j=jsonMaybe(t);
+    if(!j||Number(j.code)!==200||!j.info){
+      diag("PLOYAN · invalid response for episode "+eid);
+      throw new Error("ployan refused token");
+    }
+    if(clean(j.mode)!=="direct"){
+      diag("PLOYAN · server 1 mode "+clean(j.mode));
+      throw new Error("ployan mode is not direct");
+    }
+    var hls=PLOYAN+"/hls/"+clean(j.info)+"/master.m3u8";
+    diag("PLOYAN · direct HLS resolved · episode "+eid);
+    return[{url:hls,referer:PLOYAN+"/",server:"1"}];
   });
 }
 
@@ -583,7 +681,7 @@ function verifyAndExpand(row){
     return fetchText(row.url,{headers:h},8000,"HLS").then(function(t){
       if(t.indexOf("#EXTM3U")<0)throw new Error("not HLS");
       var vars=parseMaster(t,row.url);
-      if(!vars.length)return[{url:row.url,quality:"Auto",type:"hls",headers:h,server:row.server}];
+      if(!vars.length){var qm=t.match(/\/(2160|1440|1080|720|480|360)\//);return[{url:row.url,quality:qm?(qm[1]+"p"):"Auto",type:"hls",headers:h,server:row.server}];}
       return vars.map(function(v){return{url:v.url,quality:v.quality,type:"hls",headers:h,server:row.server};});
     });
   }
@@ -661,7 +759,7 @@ function getStreams(tmdbId,mediaType,season,episode){
 function onSettings(){
   return[
     {type:"header",label:"YesMovies Local"},
-    {type:"info",label:"独立解析 YesMovies。只向 Nuvio 返回验证过的 HLS / MP4 / DASH，不返回 iframe 或网页播放器。"},
+    {type:"info",label:"使用 YesMovies 当前 /searching 目录与 Ployan direct API，直接返回验证过的 HLS。"},
     {
       type:"text",
       key:"baseUrl",

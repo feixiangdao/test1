@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.59.2",
+  "version": "4.59.3",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1620,7 +1620,7 @@
         "tv"
       ],
       "filename": "providers/vidfast.js",
-      "enabled": true,
+      "enabled": false,
       "formats": [
         "m3u8",
         "mp4",

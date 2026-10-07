@@ -1,13 +1,13 @@
 {
   "name": "YesMovies Local",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Independent YesMovies provider for Nuvio using the current YesMovies JSON catalog and Ployan direct HLS flow, with visible in-app diagnostics.",
   "scrapers": [
     {
       "id": "yesmovies-direct",
       "name": "YesMovies · Direct",
       "description": "TMDB → /searching JSON catalog → direct movie/TV episode mapping → Ployan token → direct HLS + subtitles.",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "author": "YesMovies Local",
       "supportedTypes": ["movie", "tv"],
       "filename": "providers/yesmovies.js",

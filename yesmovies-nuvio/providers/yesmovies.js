@@ -1,5 +1,5 @@
 // YesMovies Local for Nuvio
-// v0.1.0
+// v0.1.2
 // Flow:
 // TMDB metadata -> YesMovies search -> movie/season page -> /ajax/v4_movie_episodes/{id}
 // -> movie_embed and/or movie_sources (+ token when required) -> direct HLS/MP4/DASH.
@@ -27,8 +27,9 @@ function statusRows(){
   return a.map(function(msg,i){
     var name="YesMovies · DIAG "+(i+1)+" · "+msg;
     return {
-      name:name,title:name,url:"about:error",
-      quality:"Status",type:"diagnostic",
+      name:name,title:name,
+      url:"data:application/vnd.apple.mpegurl;base64,I0VYVE0zVQojRVhULVgtVkVSU0lPTjozCiNFWFQtWC1FTkRMSVNUCg==",
+      quality:"Status",type:"hls",
       provider:"yesmovies-direct",headers:{},subtitles:[]
     };
   });

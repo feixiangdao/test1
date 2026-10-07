@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.53.0",
+  "version": "4.54.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1506,15 +1506,15 @@
     {
       "id": "noctra-popwatch-cinextream-direct",
       "name": "NoctraTV · PopWatch · CineXtream",
-      "description": "Direct CineXtream resolver bypassing the broken Noctra/MZone standalone dependency. Calls cinextream.cc/api/proxy, decrypts enc payloads locally with the current SHA-256/XOR protocol, and returns validated direct media only.",
-      "version": "0.1.0",
+      "description": "Direct CineXtream resolver bypassing the broken Noctra/MZone standalone dependency. Uses cinextream.cc/api/proxy and local SHA-256/XOR decryption. Only the Nest backend is enabled because it passed master, variant, and real media-segment verification for both movie and TV; failing backends are excluded.",
+      "version": "1.0.0",
       "author": "NoctraTV Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
       "filename": "providers/popwatch-cinextream-direct.js",
-      "enabled": false,
+      "enabled": true,
       "formats": [
         "m3u8",
         "mp4"

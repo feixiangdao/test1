@@ -1,5 +1,5 @@
 // YesMovies Local for Nuvio
-// v0.2.1
+// v0.2.2
 // Flow:
 // TMDB metadata -> YesMovies /searching JSON -> movie/season page
 // -> Nuvio episode number -> Ployan token -> /get -> direct HLS + Ployan subtitles.
@@ -346,51 +346,99 @@ function queriesFor(info,type,season){
   return uniq(q);
 }
 function apiFindPage(info,type,season){
-  var bases=currentBases(),idx=0;
+  var bases=currentBases(),bi=0;
   function normalizeTitle(v){
     return simple(v).replace(/\s+season\s+\d+$/i,"").trim();
   }
+  var queries=[];
+  function addQuery(v){
+    v=clean(v);if(!v)return;
+    if(queries.indexOf(v)<0)queries.push(v);
+  }
+  addQuery(info.title);
+  addQuery(info.originalTitle);
+
+  function queryUrls(base,q){
+    var enc=encodeURIComponent(q),plus=enc.replace(/%20/g,"+");
+    var a=[base+"/searching?q="+plus+"&limit=40&offset=0"];
+    if(enc!==plus)a.push(base+"/searching?q="+enc+"&limit=40&offset=0");
+    return a;
+  }
+
+  function scoreRows(arr,q){
+    var wantType=type==="tv"?"s":"m";
+    var target=normalizeTitle(info.title||info.originalTitle||q);
+    var ranked=arr.map(function(x){
+      var title=decodeHtml(x&&x.t),baseTitle=normalizeTitle(title),sc=0;
+      if(clean(x&&x.d)===wantType)sc+=45; else sc-=80;
+      if(baseTitle===target)sc+=120;
+      else sc+=Math.max(titleScore(baseTitle,target),titleScore(baseTitle,normalizeTitle(q)));
+      if(type==="tv"){
+        if(Number(x&&x.n)===Number(season))sc+=70; else sc-=50;
+      }else if(info.year&&Number(x&&x.y)===Number(info.year))sc+=30;
+      return{x:x,score:sc,title:title};
+    }).sort(function(a,b){return b.score-a.score;});
+    return ranked;
+  }
+
+  function tryBase(base){
+    var qi=0;
+    function nextQuery(){
+      if(qi>=queries.length)return Promise.resolve(null);
+      var q=queries[qi++],urls=queryUrls(base,q),ui=0;
+      function nextUrl(){
+        if(ui>=urls.length)return nextQuery();
+        var u=urls[ui++];
+        var mode=u.indexOf("+")>=0?"plus":"pct";
+        return fetchText(u,{headers:baseHeaders(base,base+"/search.html","application/json, text/plain, */*")},9000,"searching")
+          .then(function(t){
+            var j=jsonMaybe(t),arr=j&&Array.isArray(j.data)?j.data:[];
+            diag("SEARCHING · "+mode+" · "+q+" · "+arr.length);
+            if(!arr.length)return nextUrl();
+            var ranked=scoreRows(arr,q),best=ranked[0];
+            if(!best||best.score<100){
+              diag("SEARCHING · best "+(best?best.score:0)+" too weak");
+              return nextUrl();
+            }
+            var slug=clean(best.x.s),idm=slug.match(/-(\d+)$/);
+            if(!slug||!idm){
+              diag("SEARCHING · result missing internal id");
+              return nextUrl();
+            }
+            return{
+              url:base+"/movie/"+slug+".html",
+              id:idm[1],
+              slug:slug,
+              title:best.title,
+              year:Number(best.x.y)||0,
+              base:base
+            };
+          }).catch(function(e){
+            diag("SEARCHING · "+mode+" · "+(e&&e.message?e.message:e));
+            return nextUrl();
+          });
+      }
+      return nextUrl();
+    }
+    return nextQuery();
+  }
+
   function nextBase(){
-    if(idx>=bases.length)return Promise.reject(new Error("YesMovies search API unavailable"));
-    var base=bases[idx++],q=info.title||info.originalTitle;
-    var u=base+"/searching?q="+encodeURIComponent(q)+"&limit=40&offset=0";
-    return fetchText(u,{headers:baseHeaders(base,base+"/yes.html","application/json, text/plain, */*")},9000,"searching")
-      .then(function(t){
-        var j=jsonMaybe(t),arr=j&&Array.isArray(j.data)?j.data:[];
-        if(!arr.length){diag("SEARCHING · "+base+" · 0 results");return nextBase();}
-        var wantType=type==="tv"?"s":"m";
-        var target=normalizeTitle(info.title||info.originalTitle);
-        var ranked=arr.map(function(x){
-          var title=decodeHtml(x&&x.t),baseTitle=normalizeTitle(title),sc=0;
-          if(clean(x&&x.d)===wantType)sc+=45; else sc-=80;
-          if(baseTitle===target)sc+=120;
-          else sc+=titleScore(baseTitle,target);
-          if(type==="tv"){
-            if(Number(x&&x.n)===Number(season))sc+=70; else sc-=50;
-          }else if(info.year&&Number(x&&x.y)===Number(info.year))sc+=30;
-          return{x:x,score:sc,title:title};
-        }).sort(function(a,b){return b.score-a.score;});
-        var best=ranked[0];
-        if(!best||best.score<100){diag("SEARCHING · best score "+(best?best.score:0)+" too weak");return nextBase();}
-        var slug=clean(best.x.s),idm=slug.match(/-(\d+)$/);
-        if(!slug||!idm){diag("SEARCHING · result missing internal id");return nextBase();}
-        var match={
-          url:base+"/movie/"+slug+".html",
-          id:idm[1],
-          slug:slug,
-          title:best.title,
-          year:Number(best.x.y)||0,
-          base:base
-        };
+    if(bi>=bases.length)return Promise.reject(new Error("YesMovies search API unavailable"));
+    var base=bases[bi++];
+    return tryBase(base).then(function(match){
+      if(match){
         diag("MATCH · "+match.title+" · id "+match.id+" · API");
         return match;
-      }).catch(function(e){
-        diag("SEARCHING · "+base+" · "+(e&&e.message?e.message:e));
-        return nextBase();
-      });
+      }
+      return nextBase();
+    });
   }
+
+  diag("TMDB · "+(info.title||"?")+(type==="tv"?(" · S"+season):""));
   return nextBase();
 }
+
 function findPage(info,type,season){
   return apiFindPage(info,type,season);
 }

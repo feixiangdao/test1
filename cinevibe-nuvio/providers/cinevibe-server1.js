@@ -1,5 +1,5 @@
 // CineVibe Local for Nuvio
-// v0.2.0
+// v0.2.1
 //
 // Proven current chain (2026-10-07):
 // cinevibe.cc Server 1 -> vidsrc.wtf API 1 -> Viduki V1.
@@ -24,6 +24,22 @@ function mediaType(url,fallback){
   if(/\.mpd$/.test(p))return"dash";
   if(/\.mp4$/.test(p))return"mp4";
   return fallback==="dash"?"dash":fallback==="mp4"?"mp4":"hls";
+}
+function transferable(url){
+  url=clean(url);
+  // Leon currently returns a signed jerso URL containing the resolver egress IP.
+  // That token is not portable to the phone running Nuvio, so drop it.
+  if(/jerso441ceg\.com/i.test(url))return false;
+  if(/:[0-9]{9,12}:(?:\d{1,3}\.){3}\d{1,3}:/i.test(url))return false;
+  return true;
+}
+function routeRank(x){
+  var u=clean(x&&x.url).toLowerCase(),s=clean(x&&x.server).toLowerCase();
+  if(/reamefly\.cyou/.test(u)||s==="rebecca")return 1;
+  if(/boomchick\.org/.test(u)&&s==="jill")return 2;
+  if(/boomchick\.org/.test(u)&&s==="claire")return 3;
+  if(/boomchick\.org/.test(u)&&s==="ada")return 4;
+  return 20;
 }
 function requestUrl(id,type,season,episode){
   var u=resolverUrl()+"?type="+(type==="tv"?"tv":"movie")+"&id="+encodeURIComponent(String(id))+"&maxServers=8";
@@ -56,12 +72,13 @@ function getStreams(tmdbId,mediaTypeArg,season,episode){
   try{console.log("[CineVibe] "+type+" "+tmdbId+(type==="tv"?" S"+season+"E"+episode:"")+" via resolver");}catch(_){}
 
   return fetchJson(u).then(function(j){
-    var rows=Array.isArray(j&&j.streams)?j.streams:[];
+    var rows=Array.isArray(j&&j.streams)?j.streams.slice():[];
+    rows.sort(function(a,b){return routeRank(a)-routeRank(b);});
     var seen={},out=[];
     rows.forEach(function(x){
       x=x||{};
       var url=clean(x.url);
-      if(!/^https?:\/\//i.test(url)||seen[url])return;
+      if(!/^https?:\/\//i.test(url)||!transferable(url)||seen[url])return;
       seen[url]=1;
       var server=clean(x.server)||"Server 1";
       var lang=clean(x.language);
@@ -83,7 +100,7 @@ function getStreams(tmdbId,mediaTypeArg,season,episode){
         subtitles:[]
       });
     });
-    try{console.log("[CineVibe] resolver streams="+out.length+" wasm="+clean(j&&j.wasmHash));}catch(_){}
+    try{console.log("[CineVibe] portable streams="+out.length+" / raw="+rows.length+" wasm="+clean(j&&j.wasmHash));}catch(_){}
     return out;
   }).catch(function(e){
     try{console.log("[CineVibe] resolver FAIL · "+(e&&e.message?e.message:e));}catch(_){}
@@ -93,7 +110,7 @@ function getStreams(tmdbId,mediaTypeArg,season,episode){
 function onSettings(){
   return[
     {type:"header",label:"CineVibe Local · Server 1"},
-    {type:"info",label:"当前真实链路：CineVibe → vidsrc.wtf API 1 → Viduki V1。解析器只解出媒体 URL，视频流量不经过解析服务器。"},
+    {type:"info",label:"当前真实链路：CineVibe → vidsrc.wtf API 1 → Viduki V1。自动过滤与解析服务器 IP 绑定的临时线路；视频流量仍由 Nuvio 直连 CDN。"},
     {
       type:"text",
       key:"resolverUrl",

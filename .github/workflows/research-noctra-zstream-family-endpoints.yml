@@ -1,4 +1,5 @@
 name: Research Noctra ZStream family endpoints
+# probe-revision: 2026-10-07
 
 on:
   workflow_dispatch:

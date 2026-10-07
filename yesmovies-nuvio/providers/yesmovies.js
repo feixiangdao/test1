@@ -1,8 +1,8 @@
 // YesMovies Local for Nuvio
-// v0.2.4
+// v0.2.5
 // Flow:
 // TMDB metadata -> YesMovies /searching JSON -> movie/season page
-// -> Nuvio episode number -> Ployan S1 direct HLS + S3 Vidara HLS (real variants only).
+// -> Nuvio episode number -> Ployan token -> /get -> direct HLS + Ployan subtitles.
 // No iframe/web-player result is returned to Nuvio.
 
 var DEFAULT_BASES=[
@@ -455,16 +455,6 @@ function utf8Bytes(v){
   return a;
 }
 function utf8Hex(v){return bytesToHex(utf8Bytes(v));}
-function bytesToUtf8(a){
-  try{
-    var bin="",i;
-    for(i=0;i<a.length;i++)bin+=String.fromCharCode(a[i]);
-    return decodeURIComponent(escape(bin));
-  }catch(_){
-    var out="",j;for(j=0;j<a.length;j++)out+=String.fromCharCode(a[j]);return out;
-  }
-}
-
 function randomHex(n){
   try{
     if(typeof __crypto_get_random_values_hex==="function"){
@@ -507,70 +497,6 @@ function ployanToken(plaintext){
     return Promise.reject(e);
   }
 }
-function decryptPloyanInfo(blob){
-  var p=clean(blob).split("-");
-  if(p.length!==3)return Promise.reject(new Error("bad ployan info blob"));
-  var saltHex=p[0],ivHex=p[1],cipherHex=p[2],passHex=utf8Hex("player");
-  try{
-    if(typeof __crypto_pbkdf2_hex==="function"&&typeof __crypto_aes_decrypt_hex==="function"){
-      var keyHex=__crypto_pbkdf2_hex(passHex,saltHex,1000,256,"SHA256");
-      var plainHex=__crypto_aes_decrypt_hex("AES-GCM",keyHex,ivHex,cipherHex);
-      if(plainHex)return Promise.resolve(bytesToUtf8(hexToBytes(plainHex)));
-    }
-  }catch(e){log("native decrypt "+(e&&e.message?e.message:e));}
-  try{
-    var subtle=(typeof crypto!=="undefined"&&crypto.subtle)?crypto.subtle:null;
-    if(!subtle)throw new Error("crypto unavailable");
-    return subtle.importKey("raw",utf8Bytes("player"),"PBKDF2",false,["deriveKey"])
-      .then(function(material){
-        return subtle.deriveKey(
-          {name:"PBKDF2",salt:hexToBytes(saltHex),iterations:1000,hash:"SHA-256"},
-          material,{name:"AES-GCM",length:256},false,["decrypt"]
-        );
-      }).then(function(key){
-        return subtle.decrypt({name:"AES-GCM",iv:hexToBytes(ivHex)},key,hexToBytes(cipherHex));
-      }).then(function(buf){return bytesToUtf8(new Uint8Array(buf));});
-  }catch(e){
-    return Promise.reject(e);
-  }
-}
-
-function ployanGet(mid,eid,sv){
-  var stamp=Math.floor(now()/1000),plain=String(mid)+"+"+String(eid)+"+"+String(sv)+"+"+stamp;
-  return ployanToken(plain).then(function(token){
-    var watch=PLOYAN+"/watch/?v"+sv+eid;
-    var h={"User-Agent":UA,"Accept":"application/json, text/plain, */*","Referer":watch,"Origin":PLOYAN};
-    return fetchText(PLOYAN+"/get/"+token,{headers:h},9000,"ployan get").then(function(t){
-      var j=jsonMaybe(t);
-      if(!j||Number(j.code)!==200||!j.info)throw new Error("ployan refused token");
-      return j;
-    });
-  });
-}
-
-function resolveVidaraEmbed(info){
-  return decryptPloyanInfo(info).then(function(embedUrl){
-    if(!/^https?:\/\/[^/]*vidara\./i.test(embedUrl))throw new Error("embed is not Vidara");
-    var m=embedUrl.match(/\/e\/([^/?#]+)/i);
-    if(!m)throw new Error("Vidara filecode missing");
-    var filecode=m[1],om=embedUrl.match(/^(https?:\/\/[^/]+)/i),origin=om?om[1]:"https://vidara.to";
-    var api=origin+"/api/stream";
-    var h={
-      "User-Agent":UA,
-      "Accept":"application/json, text/plain, */*",
-      "Content-Type":"application/json",
-      "Origin":origin,
-      "Referer":embedUrl
-    };
-    return fetchText(api,{method:"POST",headers:h,body:JSON.stringify({filecode:filecode,device:"web"})},9000,"Vidara API")
-      .then(function(t){
-        var j=jsonMaybe(t),u=clean(j&&j.streaming_url);
-        if(!u)throw new Error("Vidara stream unavailable");
-        return{url:u,referer:embedUrl,server:"3",subtitles:[]};
-      });
-  });
-}
-
 function subtitleId(mid,eid){
   var s=String(mid)+"-"+String(eid),out="",i,b;
   for(i=0;i<s.length;i++){b=s.charCodeAt(i)^0x13;out+=(b<16?"0":"")+b.toString(16);}
@@ -741,35 +667,29 @@ function fetchPloyanSubtitles(mid,eid){
 }
 
 function resolveRow(match,row){
-  var eid=clean(row.id)||"1";
+  var sv="1",eid=clean(row.id)||"1";
+  var stamp=Math.floor(now()/1000);
+  var plain=String(match.id)+"+"+eid+"+"+sv+"+"+stamp;
   return Promise.all([
-    Promise.all([
-      ployanGet(match.id,eid,"1"),
-      fetchPloyanSubtitles(match.id,eid)
-    ]).then(function(parts){
-      var j=parts[0],subs=parts[1]||[];
-      if(clean(j.mode)!=="direct")throw new Error("server 1 mode "+clean(j.mode));
-      var hls=PLOYAN+"/hls/"+clean(j.info)+"/master.m3u8";
-      diag("PLOYAN · S1 direct HLS · episode "+eid);
-      return[{url:hls,referer:PLOYAN+"/",server:"1",subtitles:subs}];
-    }).catch(function(e){
-      log("S1 "+(e&&e.message?e.message:e));
-      return[];
+    ployanToken(plain).then(function(token){
+      var watch=PLOYAN+"/watch/?v"+sv+eid;
+      var h={"User-Agent":UA,"Accept":"application/json, text/plain, */*","Referer":watch,"Origin":PLOYAN};
+      return fetchText(PLOYAN+"/get/"+token,{headers:h},9000,"ployan get");
     }),
-    ployanGet(match.id,eid,"5").then(function(j){
-      if(clean(j.mode)!=="embed")throw new Error("server 3 mode "+clean(j.mode));
-      return resolveVidaraEmbed(j.info).then(function(row){
-        diag("PLOYAN · S3 Vidara HLS · episode "+eid);
-        return[row];
-      });
-    }).catch(function(e){
-      log("S3 "+(e&&e.message?e.message:e));
-      return[];
-    })
-  ]).then(function(groups){
-    var out=[];groups.forEach(function(g){out=out.concat(g||[]);});
-    if(!out.length)throw new Error("no ployan candidates");
-    return out;
+    fetchPloyanSubtitles(match.id,eid)
+  ]).then(function(parts){
+    var t=parts[0],subs=parts[1]||[],j=jsonMaybe(t);
+    if(!j||Number(j.code)!==200||!j.info){
+      diag("PLOYAN · invalid response for episode "+eid);
+      throw new Error("ployan refused token");
+    }
+    if(clean(j.mode)!=="direct"){
+      diag("PLOYAN · server 1 mode "+clean(j.mode));
+      throw new Error("ployan mode is not direct");
+    }
+    var hls=PLOYAN+"/hls/"+clean(j.info)+"/master.m3u8";
+    diag("PLOYAN · direct HLS resolved · episode "+eid);
+    return[{url:hls,referer:PLOYAN+"/",server:"1",subtitles:subs}];
   });
 }
 
@@ -888,7 +808,7 @@ function getStreams(tmdbId,mediaType,season,episode){
 function onSettings(){
   return[
     {type:"header",label:"YesMovies Local"},
-    {type:"info",label:"使用 YesMovies 当前 /searching + Ployan；S1 直连，S3 解析 Vidara，并按真实 HLS master 展开分辨率。"},
+    {type:"info",label:"使用 YesMovies 当前 /searching 目录与 Ployan direct API，直接返回验证过的 HLS。"},
     {
       type:"text",
       key:"baseUrl",

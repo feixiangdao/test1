@@ -9,38 +9,50 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      - name: Extract FilmU server configuration
+      - name: Extract targeted FilmU provider definitions
         shell: bash
         run: |
           python - <<'PY'
           import re, urllib.request
-          BASE='https://embed.filmu.in/assets/'
-          files=['servers-B7U1aDDl.js','EmbedPage-DKo4EtSL.js']
-          UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'
-          for fn in files:
-              req=urllib.request.Request(BASE+fn,headers={'User-Agent':UA,'Referer':'https://embed.filmu.in/movie/157336'})
-              txt=urllib.request.urlopen(req,timeout=25).read().decode('utf-8','replace')
-              print('===== FILE',fn,'LEN',len(txt),'=====')
-              urls=sorted(set(re.findall(r'https?://[^"\\\'\x60\\s<>]+',txt)))
-              print('URLS')
-              for u in urls:
-                  if not any(x in u for x in ['reactjs','mozilla','w3.org','github.com','fonts.','flagcdn','image.tmdb']):
-                      print(u[:700])
-              print('STRINGS')
-              vals=set()
-              for m in re.finditer(r'["\\\']([^"\\\']{2,400})["\\\']',txt):
-                  s=m.group(1)
-                  if any(k in s.lower() for k in ['server','api/','stream','source','m3u8','mp4','filmu.in','prime','box.','vidsrc','vidlink','smashy','tmdb','proxy','resolve','provider']):
-                      vals.add(s)
-              for s in sorted(vals):
-                  print(s[:700])
-              for needle in ['/api/','fetch(','server2.filmu.in','prime.filmu.in','box.filmu.in','m3u8','sources','servers','streamUrl','stream_url','url:']:
-                  print('---',needle,'---')
-                  low=txt.lower(); nd=needle.lower(); start=0; count=0
-                  while count<20:
-                      i=low.find(nd,start)
-                      if i<0: break
-                      frag=re.sub(r'\\s+',' ',txt[max(0,i-450):min(len(txt),i+1100)])
-                      print(frag[:1550])
-                      start=i+len(nd); count+=1
+          U='https://embed.filmu.in/assets/servers-B7U1aDDl.js'
+          req=urllib.request.Request(U,headers={
+            'User-Agent':'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36',
+            'Referer':'https://embed.filmu.in/movie/157336'
+          })
+          txt=urllib.request.urlopen(req,timeout=25).read().decode('utf-8','replace')
+          print('LEN',len(txt))
+          needles=[
+            'Multi-language HD stream',
+            'Premium HD streams',
+            'PrimeVids',
+            'StreamVault',
+            'High quality Hindi stream',
+            'High quality English stream',
+            'Direct-play Hindi stream',
+            'Top multi-server streaming',
+            'Fast direct-play stream',
+            'Reliable multi-title HD source',
+            'https://api.filmu.in',
+            'https://movieapi4.filmu.in',
+            'https://ott.filmu.in',
+            'https://box.filmu.in',
+            'https://prime.filmu.in',
+            'https://server2.filmu.in',
+            'https://rive.filmu.in',
+            'https://wormhole.filmu.in'
+          ]
+          for needle in needles:
+              print('\n===== '+needle+' =====')
+              low=txt.lower(); nd=needle.lower(); start=0; count=0
+              while count<8:
+                  i=low.find(nd,start)
+                  if i<0: break
+                  frag=re.sub(r'\s+',' ',txt[max(0,i-1400):min(len(txt),i+2500)])
+                  print(frag[:3900])
+                  start=i+len(nd); count+=1
+
+          print('\n===== LIKELY PROVIDER OBJECTS =====')
+          for m in re.finditer(r'(?:name|scraperName|label|description):["\'][^"\']*(?:PrimeVids|StreamVault|Multi-language|Hindi|English|multi-server)[^"\']*["\']',txt,re.I):
+              i=m.start()
+              print(re.sub(r'\s+',' ',txt[max(0,i-1800):min(len(txt),i+3500)])[:5300])
           PY

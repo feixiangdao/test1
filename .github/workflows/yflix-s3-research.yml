@@ -1,0 +1,41 @@
+name: YFlix S3 Research
+on:
+  push:
+    paths:
+      - '.github/workflows/yflix-s3-research.yml'
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe VidGod Sigma terminal streams
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36';
+          async function api(url){
+            const r=await fetch(url,{headers:{Accept:'application/json',Origin:'https://vidgod.space',Referer:'https://vidgod.space/','User-Agent':UA}});
+            console.log('API',url,r.status,r.headers.get('content-type'));
+            const j=await r.json();
+            console.log('COUNT',j.streams?.length||0);
+            return j.streams||[];
+          }
+          async function probe(row){
+            const h=Object.assign({'User-Agent':UA},row.headers||{});
+            const r=await fetch(row.url,{headers:h,signal:AbortSignal.timeout(12000)});
+            const ct=r.headers.get('content-type')||'';
+            const tx=await r.text();
+            console.log('PROBE',row.quality,r.status,ct,tx.slice(0,120).replace(/\n/g,'\\n'));
+          }
+          async function run(){
+            for(const u of [
+              'https://404-vidnest.lofiserver.workers.dev/api/movie/157336?server=sigma',
+              'https://404-vidnest.lofiserver.workers.dev/api/tv/108978/1/1?server=sigma'
+            ]){
+              const rows=await api(u);
+              for(const x of rows) await probe(x);
+            }
+          }
+          run().catch(e=>{console.error(e);process.exit(1)});
+          NODE

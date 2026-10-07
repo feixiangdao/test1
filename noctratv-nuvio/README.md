@@ -100,3 +100,31 @@ Vidy、CineJoy、Orion、Lyra、Phoenix、KissKH、LMScript、Atlas、Vega、Hex
 其中 Dulo 与 1Shows 已有独立 Provider，GapProbe 主要用于继续验证 Cineflix 与 CinemaOS 三个未独立落地的 Source family。只有最终媒体通过 HLS/MP4 校验才会返回，HTML/iframe 不返回。
 
 当前 manifest 版本：**4.55.0**，共 **74 个 Provider**（包含研究 Provider）。
+
+## NoctraTV 当前匿名 Source 名映射（2026-10-07）
+
+NoctraTV 当前 MPlayer 会把真实 Provider 名显示为匿名别名。不要把这些别名当成新的独立后端。
+
+- Lumen = vidapi
+- Aurora = cinesrc
+- Sol = cinejoy
+- Titan = vidrock
+- Sirius = vidlink
+- Halo = hexa
+- Draco = vidrift
+- Comet = vixsrc
+- Polaris = fsonline
+- Hoshi = anipm
+- Astra = purstream
+- Mira = kisskh
+- Zenith = lmscript
+- Lyra = vidfast
+- Phoenix = peachify
+- Vega = vidcore
+- Orion = vidup
+- Nova = videasy_cdn
+- Atlas = onetouchtv
+
+因此播放器中出现 “Lumen Verified” 实际表示当前 vidapi 路径已通过验证，而不是新出现了一个名为 Lumen 的后端。
+
+当前优先补齐的顶层 pStream 缺口：vidup、peachify、videasy_cdn、anipm，以及尚未独立落地的 vidfast/vidcore 顶层路径。

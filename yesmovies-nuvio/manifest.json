@@ -1,7 +1,7 @@
 {
   "name": "YesMovies Local",
   "version": "0.1.0",
-  "description": "Independent YesMovies provider for Nuvio. Resolves TMDB metadata to YesMovies movie/season pages, follows the YesMovies server/AJAX chain, and returns direct HLS/MP4/DASH streams only.",
+  "description": "Independent YesMovies provider for Nuvio with visible in-app diagnostics. Resolves TMDB metadata to YesMovies movie/season pages, follows the YesMovies server/AJAX chain, and returns direct HLS/MP4/DASH streams only.",
   "scrapers": [
     {
       "id": "yesmovies-direct",

@@ -1,5 +1,5 @@
 // YFlix Local for Nuvio
-// v0.1.1
+// v0.3.1
 // Current YFlix.in Server 1 (Multi Source):
 // TMDB -> player.playapi.eu.cc -> tmdb-embed-api.stayawayx.workers.dev
 //
@@ -9,6 +9,9 @@
 
 var API_BASE = "https://tmdb-embed-api.stayawayx.workers.dev";
 var UA = "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36";
+var DIAG=[];
+function diag(msg){msg=clean(msg).replace(/\s+/g," ").slice(0,160);if(msg&&DIAG.indexOf(msg)<0)DIAG.push(msg);}
+function statusRows(){var a=DIAG.slice(-3);if(!a.length)a=["No stream returned"];return a.map(function(msg,i){var n="YFlix · S1 · DIAG "+(i+1)+" · "+msg;return{name:n,title:n,url:"about:error",quality:"Status",type:"diagnostic",provider:"yflix-server1",headers:{},subtitles:[]};});}
 
 function clean(v){ return v == null ? "" : String(v).trim(); }
 
@@ -126,7 +129,8 @@ function normalize(rows){
 }
 
 function getStreams(tmdbId, mediaType, season, episode){
-  if(!tmdbId) return Promise.resolve([]);
+  DIAG=[];
+  if(!tmdbId){diag("missing TMDB id");return Promise.resolve(statusRows());}
 
   var type = mediaType === "tv" ? "tv" : "movie";
   var s = parseInt(season,10) || 0;
@@ -134,7 +138,8 @@ function getStreams(tmdbId, mediaType, season, episode){
 
   if(type === "tv" && (!s || !e)){
     console.log("[YFlix S1] TV missing season/episode");
-    return Promise.resolve([]);
+    diag("TV missing season/episode");
+    return Promise.resolve(statusRows());
   }
 
   var url = API_BASE + "/api/streams/" + type + "/" + encodeURIComponent(String(tmdbId));
@@ -159,11 +164,14 @@ function getStreams(tmdbId, mediaType, season, episode){
     var rows = Array.isArray(j.streams) ? j.streams : [];
     var out = normalize(rows);
     console.log("[YFlix S1] tmdb=" + tmdbId + " raw=" + rows.length + " playable=" + out.length);
+    if(!out.length){diag("PlayAPI returned 0 playable streams");return statusRows();}
     return out;
   })
   .catch(function(err){
-    console.error("[YFlix S1] " + (err && err.message ? err.message : err));
-    return [];
+    var m=(err && err.message ? err.message : err);
+    console.error("[YFlix S1] " + m);
+    diag("PlayAPI · "+m);
+    return statusRows();
   });
 }
 

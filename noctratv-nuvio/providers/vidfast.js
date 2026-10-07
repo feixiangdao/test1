@@ -24,6 +24,15 @@ function rawSig(a){
   var out=new Uint8Array(64);out.set(r,32-r.length);out.set(s,32+32-s.length);return out;
 }
 function hdr(x){var h={"User-Agent":UA,Origin:ORIGIN,Referer:ORIGIN+"/",Accept:"application/json,text/plain,*/*"};Object.keys(x||{}).forEach(function(k){h[k]=String(x[k]);});return h;}
+function responseCookie(r){
+  try{
+    var raw=c(r&&r.headers&&r.headers.get?r.headers.get("set-cookie"):"");
+    if(!raw)return"";
+    return raw.split(/,(?=\s*[^;,\s]+=)/).map(function(v){
+      return c(v).split(";")[0];
+    }).filter(Boolean).join("; ");
+  }catch(_){return"";}
+}
 function fp(){var n=typeof navigator!=="undefined"?navigator:{},s=typeof screen!=="undefined"?screen:{},tz="Asia/Shanghai";try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||tz;}catch(_){}
  return{webdriver:false,languages:Array.isArray(n.languages)?n.languages.slice(0,8):["en-US","en"],plugins:Math.min(100,n.plugins&&n.plugins.length?n.plugins.length:5),hardwareConcurrency:Number(n.hardwareConcurrency||8),deviceMemory:Number(n.deviceMemory||8),maxTouchPoints:Number(n.maxTouchPoints||5),platform:c(n.userAgentData&&n.userAgentData.platform)||c(n.platform)||"Android",brands:n.userAgentData&&Array.isArray(n.userAgentData.brands)?n.userAgentData.brands.slice(0,8):[{brand:"Chromium",version:"143"}],mobile:n.userAgentData?!!n.userAgentData.mobile:true,timezone:tz,screen:{width:Number(s.width||1080),height:Number(s.height||2400),colorDepth:Number(s.colorDepth||24),pixelRatio:Number(typeof devicePixelRatio!=="undefined"?devicePixelRatio:2.75)},visibilityState:typeof document!=="undefined"?c(document.visibilityState)||"visible":"visible"};}
 function caps(){return{version:1,video:{avc:true,hevc:false,vp9:true,av1:false},audio:{aac:true,heaac:true,opus:true,ac3:false,eac3:false,mp3:true}};}
@@ -32,11 +41,29 @@ function newSession(){
  if(!globalThis.crypto||!globalThis.crypto.subtle)return Promise.reject(new Error("WebCrypto unavailable"));
  var ch,kp;
  return wait(fetch(BASE+"/api/player/v2/challenge",{cache:"no-store",credentials:"include",headers:hdr()}),8000,"challenge")
- .then(function(r){if(!r.ok)throw new Error("challenge HTTP "+r.status);return r.json();})
- .then(function(j){if(!j||!j.challengeId||!j.nonce||!j.issuedAt)throw new Error("bad challenge");ch=j;return crypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);})
+ .then(function(r){
+   if(!r.ok)throw new Error("challenge HTTP "+r.status);
+   var cookie=responseCookie(r);
+   return r.json().then(function(j){
+     if(!j||!j.challengeId||!j.nonce||!j.issuedAt)throw new Error("bad challenge");
+     j.__cookie=cookie;
+     return j;
+   });
+ })
+ .then(function(j){ch=j;return crypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);})
  .then(function(k){kp=k;return Promise.all([crypto.subtle.exportKey("jwk",k.publicKey),crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},k.privateKey,new TextEncoder().encode(ch.challengeId+"."+ch.nonce+"."+ch.issuedAt))]);})
- .then(function(v){return wait(fetch(BASE+"/api/player/v2/session",{method:"POST",cache:"no-store",credentials:"include",headers:hdr({"Content-Type":"application/json"}),body:JSON.stringify({challengeId:ch.challengeId,nonce:ch.nonce,publicKey:v[0],signature:b64(rawSig(new Uint8Array(v[1]))),fingerprint:fp(),embedded:false,embedOrigin:"",sandboxed:false,turnstileToken:"",supportsEncryptedTransport:false,supportsEncryptedCapabilities:false,transportPublicKey:null,playerVersion:"mplayer-web-v2",playbackSessionVersion:2,capabilities:["hls","dash","codec-avc"]})}),10000,"session");})
- .then(function(r){return r.json().catch(function(){return{};}).then(function(j){if(r.status===428&&j.challengeRequired)throw new Error("Turnstile required");if(!r.ok||!j.token||!j.sessionId||!j.expiresAt)throw new Error(c(j.error)||("session HTTP "+r.status));return{token:String(j.token),sessionId:String(j.sessionId),expiresAt:Number(j.expiresAt)};});});
+ .then(function(v){
+   var sh=hdr({"Content-Type":"application/json"});
+   if(ch.__cookie)sh.Cookie=ch.__cookie;
+   return wait(fetch(BASE+"/api/player/v2/session",{method:"POST",cache:"no-store",credentials:"include",headers:sh,body:JSON.stringify({challengeId:ch.challengeId,nonce:ch.nonce,publicKey:v[0],signature:b64(rawSig(new Uint8Array(v[1]))),fingerprint:fp(),embedded:false,embedOrigin:"",sandboxed:false,turnstileToken:"",supportsEncryptedTransport:false,supportsEncryptedCapabilities:false,transportPublicKey:null,playerVersion:"mplayer-web-v2",playbackSessionVersion:2,capabilities:["hls","dash","codec-avc"]})}),10000,"session");
+ })
+ .then(function(r){return r.json().catch(function(){return{};}).then(function(j){
+   if(r.status===428&&j.challengeRequired)throw new Error("Turnstile required");
+   if(!r.ok||!j.token||!j.sessionId||!j.expiresAt)throw new Error(c(j.error)||("session HTTP "+r.status));
+   var c2=responseCookie(r),cookie=ch.__cookie||"";
+   if(c2)cookie=cookie?cookie+"; "+c2:c2;
+   return{token:String(j.token),sessionId:String(j.sessionId),expiresAt:Number(j.expiresAt),cookie:cookie};
+ });});
 }
 function session(){if(goodSession(SESSION))return Promise.resolve(SESSION);if(SESSION_PROMISE)return SESSION_PROMISE;SESSION_PROMISE=newSession().then(function(s){SESSION=s;return s;}).finally(function(){SESSION_PROMISE=null;});return SESSION_PROMISE;}
 function meta(id,type){
@@ -65,7 +92,9 @@ function verifyMp4(u,h){return wait(fetch(u,{cache:"no-store",headers:Object.ass
 function resolve(m,id,type,season,episode,s){
  var b={codecCapabilities:caps(),type:type==="tv"?"tv":"movie",tmdbId:String(id),imdbId:m.imdbId||"",title:m.title||"",releaseYear:m.releaseYear||0};
  if(type==="tv"){b.season=String(Number(season||1));b.episode=String(Number(episode||1));}
- return wait(fetch(BASE+"/mplayer/"+PROVIDER+"/resolve",{method:"POST",cache:"no-store",credentials:"include",headers:hdr({"Content-Type":"application/json","X-MZone-Playback-Lease":s.token,"X-MZone-Relay-Affinity":"https://relay-a.m-zone.org"}),body:JSON.stringify(b)}),20000,LABEL+" resolver").then(function(r){return r.json().catch(function(){return{};}).then(function(j){if(!r.ok||!j||j.success===false||!j.result)throw new Error(c(j&&j.error)||("resolver HTTP "+r.status));return j;});});
+ var rh=hdr({"Content-Type":"application/json","X-MZone-Playback-Lease":s.token,"X-MZone-Relay-Affinity":"https://relay-a.m-zone.org"});
+ if(s.cookie)rh.Cookie=s.cookie;
+ return wait(fetch(BASE+"/mplayer/"+PROVIDER+"/resolve",{method:"POST",cache:"no-store",credentials:"include",headers:rh,body:JSON.stringify(b)}),20000,LABEL+" resolver").then(function(r){return r.json().catch(function(){return{};}).then(function(j){if(!r.ok||!j||j.success===false||!j.result)throw new Error(c(j&&j.error)||("resolver HTTP "+r.status));return j;});});
 }
 function makeRow(u,quality,type,server,h,sb){var n="NoctraTV · "+LABEL+" · "+server+" · "+quality;return{name:n,title:n,url:u,quality:quality,type:type,provider:PLUGIN_ID,headers:h||{},subtitles:sb||[]};}
 function convert(j,s){

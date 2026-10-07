@@ -1,5 +1,5 @@
 // YFlix Local for Nuvio
-// v0.2.0 - YFlix Server 2 / VidBolt
+// v0.3.1 - YFlix Server 2 / VidBolt
 //
 // Current YFlix S2 iframe:
 //   https://vidbolt.xyz/movie/{tmdb}
@@ -18,6 +18,9 @@ var DEFAULT_TMDB_API_KEY = "1865f43a0549ca50d341dd9ab8b29f49";
 var ORION_API = "https://api.movy.lol";
 var ORION_KEY = "0f461eaa465bb2a7acd037425217f2f209ef540a3171e1ac";
 var UA = "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36";
+var DIAG=[];
+function diag(msg){msg=clean(msg).replace(/\s+/g," ").slice(0,160);if(msg&&DIAG.indexOf(msg)<0)DIAG.push(msg);}
+function statusRows(){var a=DIAG.slice(-4);if(!a.length)a=["No stream returned"];return a.map(function(msg,i){var n="YFlix · S2 · DIAG "+(i+1)+" · "+msg;return{name:n,title:n,url:"about:error",quality:"Status",type:"diagnostic",provider:"yflix-server2",headers:{},subtitles:[]};});}
 
 function clean(v){ return v == null ? "" : String(v).trim(); }
 
@@ -195,7 +198,7 @@ function callCallisto(info, mediaType, season, episode){
       "Referer":"https://vidbolt.xyz/"
     }
   }).then(normalizeCallisto).catch(function(e){
-    console.warn("[YFlix S2] Callisto " + (e && e.message ? e.message : e));
+    var m=(e && e.message ? e.message : e);console.warn("[YFlix S2] Callisto " + m);diag("Callisto · "+m);
     return [];
   });
 }
@@ -240,7 +243,7 @@ function callOrionMovie(tmdbId){
     });
     return out;
   }).catch(function(e){
-    console.warn("[YFlix S2] Orion " + (e && e.message ? e.message : e));
+    var m=(e && e.message ? e.message : e);console.warn("[YFlix S2] Orion " + m);diag("Orion · "+m);
     return [];
   });
 }
@@ -260,15 +263,16 @@ function dedupeSort(rows){
 }
 
 function getStreams(tmdbId, mediaType, season, episode){
-  if(!tmdbId) return Promise.resolve([]);
+  DIAG=[];
+  if(!tmdbId){diag("missing TMDB id");return Promise.resolve(statusRows());}
   mediaType=mediaType==="tv" ? "tv" : "movie";
   season=parseInt(season,10)||0;
   episode=parseInt(episode,10)||0;
 
-  if(mediaType==="tv" && (!season || !episode)) return Promise.resolve([]);
+  if(mediaType==="tv" && (!season || !episode)){diag("TV missing season/episode");return Promise.resolve(statusRows());}
 
   var metaPromise=getTmdbInfo(String(tmdbId),mediaType).catch(function(e){
-    console.warn("[YFlix S2] TMDB " + (e && e.message ? e.message : e));
+    var m=(e && e.message ? e.message : e);console.warn("[YFlix S2] TMDB " + m);diag("TMDB · "+m);
     return null;
   });
 
@@ -279,10 +283,11 @@ function getStreams(tmdbId, mediaType, season, episode){
     ]).then(function(all){
       var out=dedupeSort((all[0]||[]).concat(all[1]||[]));
       console.log("[YFlix S2] movie tmdb="+tmdbId+" streams="+out.length);
+      if(!out.length){diag("movie · 0 playable streams");return statusRows();}
       return out;
     }).catch(function(e){
-      console.error("[YFlix S2] " + (e && e.message ? e.message : e));
-      return [];
+      var m=(e && e.message ? e.message : e);console.error("[YFlix S2] " + m);diag("runtime · "+m);
+      return statusRows();
     });
   }
 
@@ -291,10 +296,11 @@ function getStreams(tmdbId, mediaType, season, episode){
   }).then(function(rows){
     var out=dedupeSort(rows||[]);
     console.log("[YFlix S2] tv tmdb="+tmdbId+" S"+season+"E"+episode+" streams="+out.length);
+    if(!out.length){diag("TV · 0 playable streams");return statusRows();}
     return out;
   }).catch(function(e){
-    console.error("[YFlix S2] " + (e && e.message ? e.message : e));
-    return [];
+    var m=(e && e.message ? e.message : e);console.error("[YFlix S2] " + m);diag("runtime · "+m);
+    return statusRows();
   });
 }
 

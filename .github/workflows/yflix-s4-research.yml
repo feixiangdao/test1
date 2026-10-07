@@ -1,0 +1,45 @@
+name: YFlix S4 Research
+on:
+  push:
+    paths:
+      - '.github/workflows/yflix-s4-research.yml'
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Inspect FilmU embed app
+        shell: bash
+        run: |
+          python - <<'PY'
+          import re, urllib.request, urllib.parse
+          PAGE='https://embed.filmu.in/movie/157336'
+          UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'
+          def get(u, ref='https://www.yflix.in/'):
+              req=urllib.request.Request(u,headers={'User-Agent':UA,'Accept':'text/html,*/*','Referer':ref})
+              with urllib.request.urlopen(req,timeout=25) as r:
+                  return r.geturl(),r.status,r.read().decode('utf-8','replace')
+          final,status,html=get(PAGE)
+          print('PAGE',final,status,'LEN',len(html))
+          print('HTML',html[:30000])
+          srcs=re.findall(r'<script[^>]+src=["\\\']([^"\\\']+)',html,re.I)
+          print('SCRIPTS',srcs)
+          for src in srcs:
+              u=urllib.parse.urljoin(final,src)
+              try: fu,st,js=get(u,final)
+              except Exception as e:
+                  print('FAIL',u,repr(e));continue
+              print('SCRIPT',fu,st,'LEN',len(js))
+              for needle in ['fetch(','/api/','m3u8','mp4','source','stream','server','tmdb','provider','vidsrc','vidlink','smashy','worker','supabase']:
+                  low=js.lower(); nd=needle.lower(); start=0; count=0
+                  while count<15:
+                      i=low.find(nd,start)
+                      if i<0:break
+                      frag=re.sub(r'\\s+',' ',js[max(0,i-300):min(len(js),i+800)])
+                      print('HIT['+needle+']',frag[:1100])
+                      start=i+len(nd);count+=1
+              urls=sorted(set(re.findall(r'https?://[^"\\\'\x60\\s<>]+',js)))
+              print('URLS')
+              for x in urls[:150]: print(x[:600])
+          PY

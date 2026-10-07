@@ -1,5 +1,5 @@
 // YesMovies Local for Nuvio
-// v0.1.4
+// v0.1.5
 // Flow:
 // TMDB metadata -> YesMovies search -> movie/season page -> /ajax/v4_movie_episodes/{id}
 // -> movie_embed and/or movie_sources (+ token when required) -> direct HLS/MP4/DASH.
@@ -226,6 +226,46 @@ function searchUrls(base,q){
     base+"/search/"+e+".html"
   ];
 }
+function exactSlugUrls(base,info,type,season){
+  var names=[];
+  function add(x){x=clean(x);if(x&&names.indexOf(x)<0)names.push(x);}
+  add(info.title);add(info.originalTitle);
+  if(type==="tv"){
+    add(info.title+" Season "+season);
+    add(info.originalTitle+" Season "+season);
+  }
+  var out=[];
+  names.forEach(function(n){
+    var sl=norm(n).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+    if(!sl)return;
+    out.push(base+"/movie/"+sl+".html");
+    if(info.year)out.push(base+"/movie/"+sl+"-"+info.year+".html");
+  });
+  return out;
+}
+function directSlugProbe(base,info,type,season){
+  var urls=exactSlugUrls(base,info,type,season),i=0;
+  function next(){
+    if(i>=urls.length)return Promise.resolve([]);
+    var u=urls[i++];
+    return cachedText(u,{headers:baseHeaders(base,base+"/yes.html")},10000)
+      .then(function(h){
+        var title=stripTags((h.match(/<title[^>]*>([\s\S]*?)<\/title>/i)||[])[1]||"");
+        if(/404\s+not\s+found/i.test(title)||/404\s+not\s+found/i.test(h.slice(0,1200))){
+          diag("SLUG · "+u+" · 404");return next();
+        }
+        var m=u.match(/\/movie\/([^\/?#]+?)-(\d+)\.html/i);
+        if(m){
+          diag("SLUG · direct hit id "+m[2]);
+          return [{url:u,id:m[2],slug:m[1],title:title||m[1]}];
+        }
+        diag("SLUG · "+u+" · page exists but no numeric movie id");
+        return next();
+      })
+      .catch(function(e){diag("SLUG · "+u+" · "+(e&&e.message?e.message:e));return next();});
+  }
+  return warmBase(base).then(next);
+}
 function filterUrls(base,type,year){
   var kind=type==="tv"?"series":"movies", y=year||"all";
   return [
@@ -306,8 +346,14 @@ function queriesFor(info,type,season){
 }
 function findPage(info,type,season){
   var bases=currentBases(),queries=queriesFor(info,type,season),jobs=[];
-  bases.forEach(function(b){queries.forEach(function(q){jobs.push(searchOne(b,q));});});
-  return Promise.all(jobs).then(function(groups){
+  return Promise.all(bases.map(function(b){return directSlugProbe(b,info,type,season);}))
+  .then(function(ds){
+    var direct=[];
+    ds.forEach(function(g){(g||[]).forEach(function(c){direct.push(c);});});
+    if(direct.length)return direct;
+    bases.forEach(function(b){queries.forEach(function(q){jobs.push(searchOne(b,q));});});
+    return Promise.all(jobs);
+  }).then(function(groups){
     var all=[],seen={};
     groups.forEach(function(g){(g||[]).forEach(function(c){if(!seen[c.url]){seen[c.url]=1;all.push(c);}});});
     all.sort(function(a,b){return scoreCandidate(b,info,type,season)-scoreCandidate(a,info,type,season);});

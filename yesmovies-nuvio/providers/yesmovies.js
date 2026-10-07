@@ -1,8 +1,8 @@
 // YesMovies Local for Nuvio
 // v0.2.0
 // Flow:
-// TMDB metadata -> YesMovies search -> movie/season page -> /ajax/v4_movie_episodes/{id}
-// -> movie_embed and/or movie_sources (+ token when required) -> direct HLS/MP4/DASH.
+// TMDB metadata -> YesMovies /searching JSON -> movie/season page
+// -> inline episode id -> Ployan token -> /get -> direct HLS.
 // No iframe/web-player result is returned to Nuvio.
 
 var DEFAULT_BASES=[
@@ -734,7 +734,7 @@ function resolveStreams(id,type,season,episode){
     var finalRows=out.map(function(r,i){
       var q=r.quality||"Auto",s=r.server&&r.server!=="?"?("S"+r.server):("S"+(i+1));
       var name="YesMovies · "+s+" · "+q;
-      return{name:name,title:name,url:r.url,quality:q,type:r.type,provider:"yesmovies-direct",headers:r.headers};
+      return{name:name,title:name,url:r.url,quality:q,type:r.type,provider:"yesmovies-direct",headers:r.headers,subtitles:[]};
     });
     lookupCache[key]={expires:now()+20*60*1000,rows:finalRows};
     log("verified streams="+finalRows.length);

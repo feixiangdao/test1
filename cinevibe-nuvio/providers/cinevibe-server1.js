@@ -1,5 +1,5 @@
 // CineVibe Local for Nuvio
-// v0.1.2
+// v0.1.3
 // CineVibe.cc Server 1 compatible route:
 // TMDB -> MovieBox / OneRoom (aoneroom) -> direct HLS/DASH/MP4.
 //
@@ -11,7 +11,7 @@
 //
 // React Native / Hermes friendly: Promise chains, no async/await.
 
-var MAIN_URL = "https://themoviebox.org";
+var MAIN_URL = "https://officialmoviebox.com";
 var API_BASE = "https://h5-api.aoneroom.com";
 var REFERER = "https://themoviebox.org/";
 var DEFAULT_TMDB_API_KEY = "1865f43a0549ca50d341dd9ab8b29f49";
@@ -147,6 +147,8 @@ function baseHeaders(){
   return {
     "Accept": "application/json",
     "User-Agent": UA,
+    "Origin": MAIN_URL,
+    "X-Request-Lang": "en",
     "X-Client-Info": JSON.stringify({ timezone: "Asia/Jakarta" }),
     "Content-Type": "application/json"
   };
@@ -169,6 +171,7 @@ function mergeHeaders(a, b){
 function fetchJson(url, opt, label){
   opt = opt || {};
   try { opt.skipSizeCheck = true; } catch(_) {}
+  try { opt.credentials = "include"; } catch(_) {}
   return fetch(url, opt).then(function(r){
     if(!r || !r.ok) throw new Error((label || "HTTP") + " " + (r ? r.status : "no-response"));
     return r.text().then(function(t){
@@ -194,6 +197,16 @@ function getTmdbInfo(tmdbId, mediaType){
     });
 }
 
+function tokenFromResponse(r){
+  var xUser = "";
+  try { xUser = clean(r && r.headers && r.headers.get && r.headers.get("x-user")); } catch(_) {}
+  if(!xUser) return "";
+  try {
+    var j = JSON.parse(xUser);
+    return clean(j && j.token);
+  } catch(_) { return ""; }
+}
+
 function getBearerToken(){
   if(bearerToken && bearerExpiry > now()) return Promise.resolve(bearerToken);
 
@@ -201,7 +214,6 @@ function getBearerToken(){
   try {
     h = mergeHeaders(baseHeaders(), {
       "Authorization": "",
-      "X-Request-Lang": "en",
       "X-Client-Token": clientTimeToken(),
       "Referer": MAIN_URL + "/"
     });
@@ -209,27 +221,40 @@ function getBearerToken(){
     return Promise.reject(e);
   }
 
-  return fetch(API_BASE + "/wefeed-h5api-bff/home?host=themoviebox.org", {
+  // Current MovieBox web flow obtains a guest token from an unauthenticated API
+  // response. subject/filter is more reliable for this than the old /home call.
+  return fetch(API_BASE + "/wefeed-h5api-bff/subject/filter", {
+    method: "POST",
     headers: h,
+    body: JSON.stringify({ page:1, perPage:1, channelId:1 }),
+    credentials: "include",
     skipSizeCheck: true
   }).then(function(r){
-    if(!r || !r.ok) throw new Error("home " + (r ? r.status : "no-response"));
-    var xUser = "";
-    try { xUser = clean(r.headers && r.headers.get && r.headers.get("x-user")); } catch(_) {}
-    if(xUser){
-      try {
-        var j = JSON.parse(xUser);
-        var t = clean(j && j.token);
-        if(t){
-          bearerToken = t;
-          bearerExpiry = now() + 20 * 60 * 1000;
-          diag("AUTH · bearer ok");
-          return t;
-        }
-      } catch(_) {}
+    if(!r || !r.ok) throw new Error("auth " + (r ? r.status : "no-response"));
+    var t = tokenFromResponse(r);
+    if(t){
+      bearerToken = t;
+      bearerExpiry = now() + 20 * 60 * 1000;
+      diag("AUTH · bearer ok");
+      return t;
     }
-    diag("AUTH · no bearer, continue anonymous");
-    return "";
+    // Some mirrors issue x-user on /home instead.
+    return fetch(API_BASE + "/wefeed-h5api-bff/home?host=officialmoviebox.com", {
+      headers: h,
+      credentials: "include",
+      skipSizeCheck: true
+    }).then(function(r2){
+      if(!r2 || !r2.ok) throw new Error("home " + (r2 ? r2.status : "no-response"));
+      var t2 = tokenFromResponse(r2);
+      if(t2){
+        bearerToken = t2;
+        bearerExpiry = now() + 20 * 60 * 1000;
+        diag("AUTH · bearer ok via home");
+        return t2;
+      }
+      diag("AUTH · no bearer");
+      return "";
+    });
   }).catch(function(e){
     diag("AUTH · " + (e && e.message ? e.message : e));
     return "";
@@ -291,7 +316,6 @@ function searchSubject(info, mediaType, token){
   try {
     h = mergeHeaders(baseHeaders(), {
       "Authorization": token ? ("Bearer " + token) : "",
-      "X-Request-Lang": "en",
       "X-Client-Token": clientTimeToken(),
       "Referer": MAIN_URL + "/"
     });
@@ -319,37 +343,83 @@ function searchSubject(info, mediaType, token){
   });
 }
 
-function playSubject(item, season, episode){
+function playerReferer(item){
+  var subjectId = clean(item && item.subjectId);
+  var detailPath = clean(item && item.detailPath);
+  return MAIN_URL + "/movies/" + detailPath +
+    "?id=" + encodeURIComponent(subjectId) +
+    "&type=/movie/detail&detailSe=&detailEp=&lang=en";
+}
+
+function warmPlayer(item){
+  var ref = playerReferer(item);
+  return fetch(ref, {
+    headers: {
+      "User-Agent": UA,
+      "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+      "Referer": MAIN_URL + "/"
+    },
+    credentials: "include",
+    skipSizeCheck: true
+  }).then(function(r){
+    diag("WARM · " + (r && r.ok ? "ok" : ("HTTP " + (r ? r.status : "?"))));
+    return ref;
+  }).catch(function(e){
+    diag("WARM · " + (e && e.message ? e.message : e));
+    return ref;
+  });
+}
+
+function apiRowsFromData(d){
+  var rows = [];
+  rows = rows
+    .concat(Array.isArray(d && d.streams) ? d.streams : [])
+    .concat(Array.isArray(d && d.hls) ? d.hls : [])
+    .concat(Array.isArray(d && d.dash) ? d.dash : [])
+    .concat(Array.isArray(d && d.downloads) ? d.downloads : [])
+    .concat(Array.isArray(d && d.list) ? d.list : []);
+  return rows.filter(function(x){ return !(x && x.vipLocked === true); });
+}
+
+function playSubject(item, season, episode, token){
   var subjectId = clean(item && item.subjectId);
   var detailPath = clean(item && item.detailPath);
   if(!subjectId || !detailPath) return Promise.reject(new Error("match missing id/path"));
 
-  var h;
-  try {
-    h = mergeHeaders(baseHeaders(), {
-      "X-Request-Lang": "en",
-      "X-Client-Token": clientTimeToken(),
-      "Referer": MAIN_URL + "/movies/" + detailPath
+  return warmPlayer(item).then(function(ref){
+    var h;
+    try {
+      h = mergeHeaders(baseHeaders(), {
+        "Authorization": token ? ("Bearer " + token) : "",
+        "X-Client-Token": clientTimeToken(),
+        "Referer": ref
+      });
+    } catch(e) {
+      return Promise.reject(e);
+    }
+
+    function endpoint(name){
+      var u = API_BASE + "/wefeed-h5api-bff/subject/" + name + "?subjectId=" +
+        encodeURIComponent(subjectId) +
+        "&se=" + encodeURIComponent(String(season || 0)) +
+        "&ep=" + encodeURIComponent(String(episode || 0)) +
+        "&detailPath=" + encodeURIComponent(detailPath);
+      return fetchJson(u, { headers:h, credentials:"include" }, name)
+        .then(function(x){
+          var d = x.data && x.data.data;
+          if(!d) return [];
+          return apiRowsFromData(d);
+        }).catch(function(e){
+          diag(name.toUpperCase() + " · " + (e && e.message ? e.message : e));
+          return [];
+        });
+    }
+
+    return Promise.all([endpoint("play"), endpoint("download")]).then(function(all){
+      var rows = (all[0] || []).concat(all[1] || []);
+      diag("MEDIA · " + rows.length + " raw rows");
+      return rows;
     });
-  } catch(e) {
-    return Promise.reject(e);
-  }
-
-  var u = API_BASE + "/wefeed-h5api-bff/subject/play?subjectId=" +
-    encodeURIComponent(subjectId) +
-    "&se=" + encodeURIComponent(String(season || 0)) +
-    "&ep=" + encodeURIComponent(String(episode || 0)) +
-    "&detailPath=" + encodeURIComponent(detailPath);
-
-  return fetchJson(u, { headers:h }, "play").then(function(x){
-    var d = x.data && x.data.data;
-    if(!d || !d.hasResource) throw new Error("no resource");
-    var rows = []
-      .concat(Array.isArray(d.streams) ? d.streams : [])
-      .concat(Array.isArray(d.hls) ? d.hls : [])
-      .concat(Array.isArray(d.dash) ? d.dash : []);
-    diag("PLAY · " + rows.length + " raw streams");
-    return rows;
   });
 }
 
@@ -361,7 +431,7 @@ function mediaTypeFromUrl(u){
 }
 
 function qualityOf(row){
-  var q = clean(row && (row.resolutions || row.resolution || row.quality || row.label));
+  var q = clean(row && (row.resolutions || row.resolution || row.quality || row.label || row.res));
   var m = q.match(/(2160|1440|1080|720|480|360|240)/);
   if(m) return m[1] === "2160" ? "4K" : (m[1] + "p");
   return q ? q.replace(/p$/i,"") + "p" : "Auto";
@@ -370,7 +440,7 @@ function qualityOf(row){
 function normalizeStreams(rows, title, mediaType, season, episode){
   var out = [], seen = {};
   (rows || []).forEach(function(row, idx){
-    var u = clean(row && row.url);
+    var u = clean(row && (row.url || row.file || row.path || row.streamUrl));
     if(!/^https?:\/\//i.test(u) || seen[u]) return;
     seen[u] = 1;
     var q = qualityOf(row);
@@ -419,7 +489,7 @@ function getStreams(tmdbId, mediaType, season, episode){
     .then(function(info){
       return getBearerToken().then(function(token){
         return searchSubject(info, mediaType, token).then(function(item){
-          return playSubject(item, season, episode).then(function(rows){
+          return playSubject(item, season, episode, token).then(function(rows){
             var streams = normalizeStreams(rows, info.title, mediaType, season, episode);
             if(!streams.length) throw new Error("no direct http streams");
             diag("OK · " + streams.length + " playable rows");

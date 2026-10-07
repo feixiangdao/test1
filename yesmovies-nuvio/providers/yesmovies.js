@@ -1044,8 +1044,8 @@ function getStreams(tmdbId,mediaType,season,episode){
       });
     });
     all.sort(function(a,b){
-      var sa=/· S(\d+)/.test(a.name||"")?parseInt(RegExp.$1,10):9;
-      var sb=/· S(\d+)/.test(b.name||"")?parseInt(RegExp.$1,10):9;
+      var ma=clean(a.name).match(/· S(\d+)/),mb=clean(b.name).match(/· S(\d+)/);
+      var sa=ma?parseInt(ma[1],10):9,sb=mb?parseInt(mb[1],10):9;
       if(sa!==sb)return sa-sb;
       return(parseInt(b.quality,10)||0)-(parseInt(a.quality,10)||0);
     });

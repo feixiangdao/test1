@@ -1,5 +1,5 @@
 // YesMovies Local for Nuvio
-// v0.1.3
+// v0.1.4
 // Flow:
 // TMDB metadata -> YesMovies search -> movie/season page -> /ajax/v4_movie_episodes/{id}
 // -> movie_embed and/or movie_sources (+ token when required) -> direct HLS/MP4/DASH.
@@ -226,6 +226,39 @@ function searchUrls(base,q){
     base+"/search/"+e+".html"
   ];
 }
+function filterUrls(base,type,year){
+  var kind=type==="tv"?"series":"movies", y=year||"all";
+  return [
+    base+"/movie/filter/"+kind+"/latest/all/all/"+y+"/all/all/page-1.html",
+    base+"/movie/filter/"+kind+"/latest/all/all/"+y+"/all/all/",
+    base+"/movie/filter/"+kind+".html"
+  ];
+}
+function scanFilter(base,info,type,season){
+  var urls=filterUrls(base,type,info.year),i=0;
+  function next(){
+    if(i>=urls.length)return Promise.resolve([]);
+    var u=urls[i++];
+    return cachedText(u,{headers:baseHeaders(base,base+"/")},90000)
+      .then(function(h){
+        var rows=extractMovieLinks(h,base);
+        if(rows.length){
+          var ranked=rows.slice().sort(function(a,b){
+            return scoreCandidate(b,info,type,season)-scoreCandidate(a,info,type,season);
+          });
+          var sc=ranked.length?scoreCandidate(ranked[0],info,type,season):0;
+          diag("FILTER · "+u+" · "+rows.length+" items · best score "+sc);
+          if(sc>=35)return ranked;
+        }else diag("FILTER · "+u+" · parsed 0 items");
+        return next();
+      })
+      .catch(function(e){
+        diag("FILTER · "+u+" · "+(e&&e.message?e.message:e));
+        return next();
+      });
+  }
+  return warmBase(base).then(next);
+}
 function warmBase(base){
   if(warmCache[base])return warmCache[base];
   warmCache[base]=fetchText(base+"/",{headers:baseHeaders(base,base+"/")},7000,"warmup")
@@ -278,10 +311,21 @@ function findPage(info,type,season){
     var all=[],seen={};
     groups.forEach(function(g){(g||[]).forEach(function(c){if(!seen[c.url]){seen[c.url]=1;all.push(c);}});});
     all.sort(function(a,b){return scoreCandidate(b,info,type,season)-scoreCandidate(a,info,type,season);});
-    if(!all.length){diag("SEARCH · no YesMovies result");throw new Error("no YesMovies search result");}
+    if(all.length&&scoreCandidate(all[0],info,type,season)>=35)return all;
+    diag("SEARCH · blocked/empty; switching to filter index");
+    return Promise.all(bases.map(function(b){return scanFilter(b,info,type,season);}))
+      .then(function(gs){
+        var x=[],ss={};
+        gs.forEach(function(g){(g||[]).forEach(function(c){if(!ss[c.url]){ss[c.url]=1;x.push(c);}});});
+        x.sort(function(a,b){return scoreCandidate(b,info,type,season)-scoreCandidate(a,info,type,season);});
+        return x;
+      });
+  }).then(function(all){
+    if(!all.length){diag("LOOKUP · no YesMovies result");throw new Error("no YesMovies result");}
     var best=all[0],sc=scoreCandidate(best,info,type,season);
     if(sc<35){diag("MATCH · title score "+sc+" too weak");throw new Error("title match too weak");}
     best.base=originOf(best.url)||bases[0];
+    diag("MATCH · "+(best.title||best.slug||best.id)+" · score "+sc+" · id "+best.id);
     log("matched "+best.title+" id="+best.id+" score="+sc+" "+best.url);
     return best;
   });

@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.51.0",
+  "version": "4.52.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1473,6 +1473,27 @@
       ],
       "filename": "providers/bingr-corvus.js",
       "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-dulo-auto",
+      "name": "NoctraTV · Dulo · Auto",
+      "description": "noctratv.com Dulo Auto source. Uses the current signed MZone playback session and returns validated direct media only. Registered disabled until focused live verification succeeds.",
+      "version": "0.1.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/dulo-auto.js",
+      "enabled": false,
       "formats": [
         "m3u8",
         "mp4"

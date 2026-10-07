@@ -1,8 +1,8 @@
 // YesMovies Local for Nuvio
-// v0.2.0
+// v0.2.1
 // Flow:
 // TMDB metadata -> YesMovies /searching JSON -> movie/season page
-// -> inline episode id -> Ployan token -> /get -> direct HLS.
+// -> Nuvio episode number -> Ployan token -> /get -> direct HLS + Ployan subtitles.
 // No iframe/web-player result is returned to Nuvio.
 
 var DEFAULT_BASES=[
@@ -493,33 +493,9 @@ function wantEpisode(row,type,episode){
   return !!(m&&Number(m[1])===n);
 }
 function loadEpisodeItems(match,type,episode){
-  if(type==="movie"){
-    diag("EPISODES · movie episode id 1");
-    return Promise.resolve([{id:"1",server:"1",label:"Movie"}]);
-  }
-  return fetchText(match.url,{headers:baseHeaders(match.base,match.base+"/yes.html")},9000,"episode page").then(function(html){
-    var block="";
-    var bm=html.match(/<ul\b[^>]*id=["']episodes-sv-1["'][^>]*>([\s\S]*?)<\/ul>/i);
-    if(bm)block=bm[1];
-    if(!block)block=html;
-    var rows=[],re=/<li\b([^>]*\bep-item\b[^>]*)>([\s\S]*?)<\/li>/ig,m;
-    while((m=re.exec(block))!==null){
-      var tag=m[1],body=m[2],id=attr(tag,"data-id"),label="";
-      var lm=body.match(/\btitle=["']([^"']+)["']/i);
-      if(lm)label=decodeHtml(lm[1]);
-      if(!label)label=decodeHtml(body.replace(/<[^>]+>/g," "));
-      if(id)rows.push({id:id,server:"1",label:label});
-    }
-    var want=Number(episode)||1,selected=rows.filter(function(r){
-      var m=lower(r.label).match(/episode\s*0*(\d+)/i);
-      if(m)return Number(m[1])===want;
-      return Number(r.id)===want;
-    });
-    if(!selected.length&&rows[want-1])selected=[rows[want-1]];
-    diag("EPISODES · inline "+rows.length+" rows · selected "+selected.length);
-    if(!selected.length)throw new Error("episode not found in inline page");
-    return selected;
-  });
+  var eid=type==="tv"?(Number(episode)||1):1;
+  diag("EPISODES · "+(type==="tv"?("TV E"+eid):"movie")+" · direct id "+eid);
+  return Promise.resolve([{id:String(eid),server:"1",label:type==="tv"?("Episode "+eid):"Movie"}]);
 }
 
 function directUrlsFromObject(obj){
@@ -620,16 +596,45 @@ function getSourcePayloads(match,row){
     return ok;
   });
 }
+function fetchPloyanSubtitles(mid,eid){
+  var sid=subtitleId(mid,eid);
+  var u=PLOYAN+"/sub/"+sid+"/index.json";
+  var h={"User-Agent":UA,"Accept":"application/json, text/plain, */*","Referer":PLOYAN+"/","Origin":PLOYAN};
+  return fetchText(u,{headers:h},7000,"ployan subtitles").then(function(t){
+    var j=jsonMaybe(t),arr=Array.isArray(j)?j:[];
+    var out=[];
+    arr.forEach(function(x){
+      if(!x||!x.file)return;
+      var su=/^https?:\/\//i.test(x.file)?x.file:(PLOYAN+String(x.file));
+      out.push({
+        url:su,
+        language:clean(x.lang)||"und",
+        name:clean(x.label)||clean(x.lang)||"Subtitle",
+        headers:{"Referer":PLOYAN+"/","User-Agent":UA}
+      });
+    });
+    diag("SUB · "+out.length+" track(s)");
+    return out;
+  }).catch(function(e){
+    log("subtitle "+(e&&e.message?e.message:e));
+    diag("SUB · unavailable");
+    return[];
+  });
+}
+
 function resolveRow(match,row){
   var sv="1",eid=clean(row.id)||"1";
   var stamp=Math.floor(now()/1000);
   var plain=String(match.id)+"+"+eid+"+"+sv+"+"+stamp;
-  return ployanToken(plain).then(function(token){
-    var watch=PLOYAN+"/watch/?v"+sv+eid;
-    var h={"User-Agent":UA,"Accept":"application/json, text/plain, */*","Referer":watch,"Origin":PLOYAN};
-    return fetchText(PLOYAN+"/get/"+token,{headers:h},9000,"ployan get");
-  }).then(function(t){
-    var j=jsonMaybe(t);
+  return Promise.all([
+    ployanToken(plain).then(function(token){
+      var watch=PLOYAN+"/watch/?v"+sv+eid;
+      var h={"User-Agent":UA,"Accept":"application/json, text/plain, */*","Referer":watch,"Origin":PLOYAN};
+      return fetchText(PLOYAN+"/get/"+token,{headers:h},9000,"ployan get");
+    }),
+    fetchPloyanSubtitles(match.id,eid)
+  ]).then(function(parts){
+    var t=parts[0],subs=parts[1]||[],j=jsonMaybe(t);
     if(!j||Number(j.code)!==200||!j.info){
       diag("PLOYAN · invalid response for episode "+eid);
       throw new Error("ployan refused token");
@@ -640,7 +645,7 @@ function resolveRow(match,row){
     }
     var hls=PLOYAN+"/hls/"+clean(j.info)+"/master.m3u8";
     diag("PLOYAN · direct HLS resolved · episode "+eid);
-    return[{url:hls,referer:PLOYAN+"/",server:"1"}];
+    return[{url:hls,referer:PLOYAN+"/",server:"1",subtitles:subs}];
   });
 }
 
@@ -681,8 +686,8 @@ function verifyAndExpand(row){
     return fetchText(row.url,{headers:h},8000,"HLS").then(function(t){
       if(t.indexOf("#EXTM3U")<0)throw new Error("not HLS");
       var vars=parseMaster(t,row.url);
-      if(!vars.length){var qm=t.match(/\/(2160|1440|1080|720|480|360)\//);return[{url:row.url,quality:qm?(qm[1]+"p"):"Auto",type:"hls",headers:h,server:row.server}];}
-      return vars.map(function(v){return{url:v.url,quality:v.quality,type:"hls",headers:h,server:row.server};});
+      if(!vars.length){var qm=t.match(/\/(2160|1440|1080|720|480|360)\//);return[{url:row.url,quality:qm?(qm[1]+"p"):"Auto",type:"hls",headers:h,server:row.server,subtitles:row.subtitles||[]}];}
+      return vars.map(function(v){return{url:v.url,quality:v.quality,type:"hls",headers:h,server:row.server,subtitles:row.subtitles||[]};});
     });
   }
   if(kind==="mpd"){
@@ -734,7 +739,7 @@ function resolveStreams(id,type,season,episode){
     var finalRows=out.map(function(r,i){
       var q=r.quality||"Auto",s=r.server&&r.server!=="?"?("S"+r.server):("S"+(i+1));
       var name="YesMovies · "+s+" · "+q;
-      return{name:name,title:name,url:r.url,quality:q,type:r.type,provider:"yesmovies-direct",headers:r.headers,subtitles:[]};
+      return{name:name,title:name,url:r.url,quality:q,type:r.type,provider:"yesmovies-direct",headers:r.headers,subtitles:r.subtitles||[]};
     });
     lookupCache[key]={expires:now()+20*60*1000,rows:finalRows};
     log("verified streams="+finalRows.length);

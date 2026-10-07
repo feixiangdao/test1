@@ -1,13 +1,13 @@
 {
   "name": "CineVibe Local",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "CineVibe.cc direct provider. Current Server 1 chain: CineVibe → vidsrc.wtf API 1 → Viduki V1, resolved to direct CDN media URLs.",
   "scrapers": [
     {
       "id": "cinevibe-server1",
       "name": "CineVibe · Server 1",
-      "description": "Current CineVibe Server 1: vidsrc.wtf API 1 / Viduki V1 → direct CDN HLS.",
-      "version": "0.2.0",
+      "description": "Current CineVibe Server 1: vidsrc.wtf API 1 / Viduki V1 → portable direct CDN HLS; IP-bound resolver-only routes are filtered.",
+      "version": "0.2.1",
       "author": "CineVibe Local",
       "supportedTypes": [
         "movie",

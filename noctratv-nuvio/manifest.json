@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.54.0",
+  "version": "4.55.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1515,6 +1515,27 @@
       ],
       "filename": "providers/popwatch-cinextream-direct.js",
       "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-mzone-gap-probe",
+      "name": "NoctraTV · MZone GapProbe",
+      "description": "Research bundle for current Noctra/MZone source IDs not yet promoted to standalone providers: Dulo Auto, Cineflix Latino/Castellano/Subbed, CinemaOS Helios/Selene/Eos, and 1Shows Jill. Returns only validated direct media. Disabled by default while individual sources are being verified.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "research-mzone-easy-gaps.js",
+      "enabled": false,
       "formats": [
         "m3u8",
         "mp4"

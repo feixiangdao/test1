@@ -8,8 +8,7 @@ var API=BASE+"/api/proxy";
 var SALT="c1n3t4r-0bf5c4t10n-s4lt-v1-2024-09";
 var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36";
 var SERVERS=[
-  {name:"Nest",movie:true,tv:true},
-  {name:"Light",movie:true,tv:true}
+  {name:"Nest",movie:true,tv:true}
 ];
 
 function clean(v){return v==null?"":String(v).trim();}

@@ -1,13 +1,13 @@
 {
   "name": "YFlix Local",
-  "version": "0.1.0",
-  "description": "Independent YFlix.in provider for Nuvio. Server 1 calls the same PlayAPI backend used by the current YFlix frontend and returns its direct HLS/MP4/MKV streams with required playback headers.",
+  "version": "0.1.1",
+  "description": "Independent YFlix.in provider for Nuvio. Server 1 calls the same PlayAPI backend used by the current YFlix frontend and returns working direct streams with required playback headers; DahmerMovies is temporarily filtered after device playback failures.",
   "scrapers": [
     {
       "id": "yflix-server1",
       "name": "YFlix · Server 1",
-      "description": "YFlix Server 1 (Multi Source): direct PlayAPI stream API using TMDB IDs. Returns all current upstream streams and per-stream request headers.",
-      "version": "0.1.0",
+      "description": "YFlix Server 1 (Multi Source): direct PlayAPI stream API using TMDB IDs. Returns current upstream streams and per-stream request headers, excluding the currently incompatible DahmerMovies route.",
+      "version": "0.1.1",
       "author": "YFlix Local",
       "supportedTypes": ["movie", "tv"],
       "filename": "providers/yflix-server1.js",

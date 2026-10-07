@@ -5,25 +5,41 @@ on:
       - '.github/workflows/yflix-s4-research.yml'
   workflow_dispatch:
 jobs:
-  inspect:
+  probe:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Inspect FilmU TV-capable endpoints
+      - name: Probe FilmU Nebula MovieBoxV2
         shell: bash
         run: |
-          python - <<'PY'
-          import re, urllib.request
-          u='https://embed.filmu.in/assets/servers-B7U1aDDl.js'
-          req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0','Referer':'https://embed.filmu.in/tv/108978/1/1'})
-          s=urllib.request.urlopen(req,timeout=20).read().decode('utf-8','replace')
-          terms=['MovieBoxV2','FilmU Nebula','/api/apollo?','singularity-tv','VidRock','PrimeVids','FilmU Hindi']
-          for term in terms:
-              print('\n=== '+term+' ===')
-              pos=0
-              for z in range(5):
-                  i=s.find(term,pos)
-                  if i<0:break
-                  print(re.sub(r'\s+',' ',s[max(0,i-2000):i+3500])[:5500])
-                  pos=i+len(term)
-          PY
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36';
+          const urls=[
+            'https://backend-api2-bxhuur-7f7bc0-15-235-147-53.sslip.io/scrape/MovieBoxV2/movie/tt0816692?tmdbId=157336&title=Interstellar&year=2014',
+            'https://backend-api2-bxhuur-7f7bc0-15-235-147-53.sslip.io/scrape/MovieBoxV2/tv/tt9288030?tmdbId=108978&title=Reacher&year=2022&season=1&episode=1'
+          ];
+          async function run(){
+            for(const u of urls){
+              try{
+                const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':UA},signal:AbortSignal.timeout(20000)});
+                const tx=await r.text();
+                console.log('API',r.status,'LEN',tx.length,u);
+                console.log(tx.slice(0,10000));
+                if(!r.ok) continue;
+                const j=JSON.parse(tx);
+                const rows=(j.sources||[]).filter(x=>x&&x.url&&x.type!=='subtitle'&&x.quality!=='subtitle');
+                for(const x of rows.slice(0,4)){
+                  try{
+                    const h=Object.assign({'User-Agent':UA},x.headers||{});
+                    const pr=await fetch(x.url,{headers:h,signal:AbortSignal.timeout(12000)});
+                    const ct=pr.headers.get('content-type')||'';
+                    let first='';
+                    if(x.url.includes('.m3u8')||/mpegurl/i.test(ct)) first=(await pr.text()).slice(0,120).replace(/\n/g,'\\n');
+                    console.log('PROBE',x.name,x.quality,x.type,pr.status,ct,first);
+                  }catch(e){console.log('PROBE_ERR',x.name,String(e.message||e));}
+                }
+              }catch(e){console.log('API_ERR',u,String(e.message||e));}
+            }
+          }
+          run().catch(e=>{console.error(e);process.exit(1)});
+          NODE

@@ -1,0 +1,32 @@
+name: Research NoctraTV 1Shows More
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-noctra-1shows-more.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Extract current 1Shows registry entries
+        run: |
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+          (async()=>{
+            const u='https://noctratv.com/assets/pStreamBackend-BO-fiiV-.js';
+            const r=await fetch(u,{headers:{'User-Agent':UA,'Accept':'application/javascript,*/*'}});
+            if(!r.ok)throw new Error('bundle HTTP '+r.status);
+            const s=await r.text();
+            for(const key of ['site-oneshows-jill','site-oneshows-ethan','site-oneshows-leon','site-oneshows-ada','site-oneshows-claire','site-oneshows-rebecca']){
+              const i=s.indexOf(key);
+              console.log('\n=== '+key+' @'+i+' ===');
+              if(i>=0)console.log(s.slice(Math.max(0,i-500),Math.min(s.length,i+1000)));
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

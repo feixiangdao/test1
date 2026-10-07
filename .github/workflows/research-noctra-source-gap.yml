@@ -1,0 +1,57 @@
+name: Research NoctraTV Source Gap
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-noctra-source-gap.yml'
+
+jobs:
+  gap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Extract current Noctra source registry and compare manifest
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+          const urls=[
+            'https://noctratv.com/assets/pStreamBackend-BO-fiiV-.js',
+            'https://noctratv.com/assets/index-B_JGO8C1.js',
+            'https://noctratv.com/assets/vortexApiSource-B-QupYve.js'
+          ];
+          async function txt(u){
+            const r=await fetch(u,{headers:{'User-Agent':UA,'Accept':'application/javascript,*/*'}});
+            if(!r.ok)throw new Error(u+' HTTP '+r.status);
+            return r.text();
+          }
+          function cleanName(s){return String(s||'').replace(/\\u00b7/g,'·').replace(/\\xB7/g,'·')}
+          (async()=>{
+            const manifest=JSON.parse(fs.readFileSync('noctratv-nuvio/manifest.json','utf8'));
+            const manifestNames=manifest.scrapers.map(x=>String(x.name||'').toLowerCase());
+            const manifestIds=new Set(manifest.scrapers.map(x=>String(x.id||'').toLowerCase()));
+            const found=new Map();
+            for(const u of urls){
+              let s;try{s=await txt(u)}catch(e){console.log('ERR '+e.message);continue}
+              const re=/{id:["']([^"']+)["'],name:["']([^"']+)["'][^}]{0,500}}/g;
+              let m;
+              while((m=re.exec(s))){
+                const id=m[1],name=cleanName(m[2]);
+                if(!/^(?:zstream-|site-|aether-)/.test(id))continue;
+                found.set(id,{id,name,asset:u});
+              }
+            }
+            console.log('SOURCE_COUNT '+found.size);
+            for(const x of found.values()){
+              const idHit=manifestIds.has(('noctra-'+x.id).toLowerCase())||manifestIds.has(x.id.toLowerCase());
+              const n=x.name.toLowerCase();
+              const nameHit=manifestNames.some(m=>m.includes(n)||n.includes(m.replace(/^noctratv · /,'')));
+              console.log((idHit||nameHit?'COVERED ':'GAP ') + x.id+' | '+x.name);
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE

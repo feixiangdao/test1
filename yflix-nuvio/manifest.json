@@ -1,18 +1,32 @@
 {
   "name": "YFlix Local",
-  "version": "0.1.1",
-  "description": "Independent YFlix.in provider for Nuvio. Server 1 calls the same PlayAPI backend used by the current YFlix frontend and returns working direct streams with required playback headers; DahmerMovies is temporarily filtered after device playback failures.",
+  "version": "0.2.0",
+  "description": "Independent YFlix.in providers for Nuvio. S1 uses the current PlayAPI backend; S2 resolves VidBolt multi-language streams directly.",
   "scrapers": [
     {
       "id": "yflix-server1",
       "name": "YFlix · Server 1",
-      "description": "YFlix Server 1 (Multi Source): direct PlayAPI stream API using TMDB IDs. Returns current upstream streams and per-stream request headers, excluding the currently incompatible DahmerMovies route.",
-      "version": "0.1.1",
+      "description": "YFlix Server 1 (Multi Source): direct PlayAPI stream API using TMDB IDs. DahmerMovies is filtered after device playback failures.",
+      "version": "0.2.0",
       "author": "YFlix Local",
       "supportedTypes": ["movie", "tv"],
       "filename": "providers/yflix-server1.js",
       "enabled": true,
       "formats": ["m3u8", "mp4", "mkv"],
+      "contentLanguage": ["multi"],
+      "limited": false,
+      "supportsExternalPlayer": true
+    },
+    {
+      "id": "yflix-server2",
+      "name": "YFlix · Server 2",
+      "description": "YFlix Server 2 (Multi Dubbed): direct VidBolt backend. Callisto provides multi-language HLS/MP4 for movies and TV; Orion adds a direct movie HLS fallback.",
+      "version": "0.2.0",
+      "author": "YFlix Local",
+      "supportedTypes": ["movie", "tv"],
+      "filename": "providers/yflix-server2.js",
+      "enabled": true,
+      "formats": ["m3u8", "mp4"],
       "contentLanguage": ["multi"],
       "limited": false,
       "supportsExternalPlayer": true

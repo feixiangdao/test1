@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.56.0",
+  "version": "4.57.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1557,6 +1557,48 @@
         "tv"
       ],
       "filename": "research-mzone-easy-gaps.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-peachify",
+      "name": "NoctraTV · Peachify / Phoenix",
+      "description": "Current NoctraTV top-level Phoenix source (real provider: peachify). Uses the current generic /mplayer/peachify/resolve contract with TMDB metadata and an ephemeral MZone v2 playback session. Returns only media that passes local HLS/MP4 verification. Experimental until Android/Nuvio playback is verified.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/peachify.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-anipm",
+      "name": "NoctraTV · AniPM / Hoshi",
+      "description": "Current NoctraTV top-level Hoshi source (real provider: anipm). Uses the current generic /mplayer/anipm/resolve contract with TMDB metadata and an ephemeral MZone v2 playback session. Returns only media that passes local HLS/MP4 verification. Experimental until Android/Nuvio playback is verified.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/anipm.js",
       "enabled": false,
       "formats": [
         "m3u8",

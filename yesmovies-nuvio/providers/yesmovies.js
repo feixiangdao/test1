@@ -1,9 +1,10 @@
 // YesMovies Local for Nuvio
-// v0.2.5
+// v0.2.6
 // Flow:
 // TMDB metadata -> YesMovies /searching JSON -> movie/season page
-// -> Nuvio episode number -> Ployan token -> /get -> direct HLS + Ployan subtitles.
-// No iframe/web-player result is returned to Nuvio.
+// -> S1: Nuvio episode number -> Ployan token -> direct HLS.
+// -> S2: TMDB -> data.vidsrcme.ru -> WASM/ChaCha20 -> tokenized HLS.
+// S2 is isolated: failure never blocks the proven S1 route.
 
 var DEFAULT_BASES=[
   "https://ww2.yesmovies.ag",
@@ -13,10 +14,12 @@ var DEFAULT_BASES=[
 var DEFAULT_TMDB_API_KEY="1865f43a0549ca50d341dd9ab8b29f49";
 var UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36";
 var PLOYAN="https://ployan.me";
+var S2_API="https://data.vidsrcme.ru/api.php";
 
 var pageCache={};
 var lookupCache={};
 var warmCache={};
+var s2Cache={};
 var DIAG=[];
 
 function diag(msg){
@@ -751,6 +754,234 @@ function verifyAndExpand(row){
   return Promise.resolve([]);
 }
 
+
+/* =========================
+ * S2 isolated resolver
+ * Current chain verified against Interstellar:
+ * data.vidsrcme.ru API -> encrypted stream_urls + wasm_url
+ * -> recover ChaCha20 key from WASM data segments -> HLS.
+ * ========================= */
+function s2FetchOk(url,opt,label,ms){
+  opt=opt||{};
+  try{opt.skipSizeCheck=true;}catch(_){}
+  return timeout(fetch(url,opt),ms||10000,label||url).then(function(r){
+    if(!r||!r.ok)throw new Error((label||"HTTP")+" "+(r?r.status:"no-response"));
+    return r;
+  });
+}
+function s2Rd32(b,o){return ((b[o]|(b[o+1]<<8)|(b[o+2]<<16)|(b[o+3]<<24))>>>0);}
+function s2Rotl(x,n){return ((x<<n)|(x>>>(32-n)))>>>0;}
+function s2ChaChaBlock(k,c,n){
+  var st=[1634760805,857760878,2036477234,1797285236,k[0],k[1],k[2],k[3],k[4],k[5],k[6],k[7],c>>>0,n[0]>>>0,n[1]>>>0,n[2]>>>0];
+  var x=st.slice();
+  function q(a,b,c0,d){
+    x[a]=(x[a]+x[b])>>>0;x[d]=s2Rotl(x[d]^x[a],16);
+    x[c0]=(x[c0]+x[d])>>>0;x[b]=s2Rotl(x[b]^x[c0],12);
+    x[a]=(x[a]+x[b])>>>0;x[d]=s2Rotl(x[d]^x[a],8);
+    x[c0]=(x[c0]+x[d])>>>0;x[b]=s2Rotl(x[b]^x[c0],7);
+  }
+  for(var i=0;i<10;i++){
+    q(0,4,8,12);q(1,5,9,13);q(2,6,10,14);q(3,7,11,15);
+    q(0,5,10,15);q(1,6,11,12);q(2,7,8,13);q(3,4,9,14);
+  }
+  var out=new Uint8Array(64);
+  for(var j=0;j<16;j++){
+    var w=(x[j]+st[j])>>>0;
+    out[j*4]=w&255;out[j*4+1]=(w>>>8)&255;out[j*4+2]=(w>>>16)&255;out[j*4+3]=(w>>>24)&255;
+  }
+  return out;
+}
+function s2Leb(b,p){
+  var r=0,shift=0,v=0;
+  do{
+    if(p>=b.length)throw new Error("WASM leb overflow");
+    v=b[p++];r|=(v&127)<<shift;
+    if((v&128)===0)break;
+    shift+=7;
+  }while(shift<35);
+  return[r>>>0,p];
+}
+function s2WasmSegments(b){
+  if(!b||b.length<8||b[0]!==0||b[1]!==97||b[2]!==115||b[3]!==109)throw new Error("bad WASM");
+  var out=[],p=8;
+  while(p<b.length){
+    var id=b[p++],r=s2Leb(b,p),len=r[0];p=r[1];
+    var end=p+len;if(end>b.length)throw new Error("WASM section overflow");
+    if(id===11){
+      r=s2Leb(b,p);var cnt=r[0];p=r[1];
+      for(var i=0;i<cnt;i++){
+        r=s2Leb(b,p);var flags=r[0];p=r[1];var off=-1;
+        if(flags===0||flags===1){
+          if(flags===1){r=s2Leb(b,p);p=r[1];}
+          if(b[p]===0x41){p++;r=s2Leb(b,p);off=r[0];p=r[1];}
+          if(b[p]===0x0b)p++;
+        }else if(flags===2){
+          r=s2Leb(b,p);p=r[1];
+          if(b[p]===0x41){p++;r=s2Leb(b,p);off=r[0];p=r[1];}
+          if(b[p]===0x0b)p++;
+        }
+        r=s2Leb(b,p);var dl=r[0];p=r[1];
+        var data=b.slice(p,p+dl);p+=dl;
+        if(off>=0)out.push({off:off,data:data});
+      }
+    }
+    p=end;
+  }
+  return out;
+}
+function s2RecoverKey(wasm,enc){
+  var segs=s2WasmSegments(wasm),base=null;
+  for(var i=0;i<segs.length;i++){
+    if(segs[i].off===0&&segs[i].data.length>=32){base=segs[i];break;}
+  }
+  if(!base)throw new Error("WASM base key segment missing");
+  var nonce=[s2Rd32(enc,0),s2Rd32(enc,4),s2Rd32(enc,8)];
+  for(var c=0;c<segs.length;c++){
+    var d=segs[c];
+    if(d.off<256||d.data.length<32)continue;
+    var kw=[];
+    for(var j=0;j<8;j++)kw.push((s2Rd32(base.data,j*4)^s2Rd32(d.data,j*4))>>>0);
+    var ks=s2ChaChaBlock(kw,0,nonce);
+    if(((enc[12]^ks[0])&255)===104&&((enc[13]^ks[1])&255)===116&&((enc[14]^ks[2])&255)===116&&((enc[15]^ks[3])&255)===112)return kw;
+  }
+  throw new Error("ChaCha key recovery failed");
+}
+function s2Base64Bytes(s){
+  s=clean(s).replace(/\s+/g,"");
+  var abc="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  var out=[],buf=0,bits=0;
+  for(var i=0;i<s.length;i++){
+    var ch=s.charAt(i);if(ch==="=")break;
+    var v=abc.indexOf(ch);if(v<0)continue;
+    buf=(buf<<6)|v;bits+=6;
+    if(bits>=8){bits-=8;out.push((buf>>bits)&255);}
+  }
+  return new Uint8Array(out);
+}
+function s2Utf8(b){
+  var str="",i;
+  for(i=0;i<b.length;i++)str+=String.fromCharCode(b[i]);
+  try{return decodeURIComponent(escape(str));}catch(_){return str;}
+}
+function s2DecryptUrls(encB64,wasm){
+  var enc=s2Base64Bytes(encB64);
+  if(enc.length<16)throw new Error("encrypted stream_urls too short");
+  var key=s2RecoverKey(wasm,enc);
+  var nonce=[s2Rd32(enc,0),s2Rd32(enc,4),s2Rd32(enc,8)];
+  var ct=enc.slice(12),out=new Uint8Array(ct.length);
+  for(var b=0;b<Math.ceil(ct.length/64);b++){
+    var ks=s2ChaChaBlock(key,b,nonce);
+    for(var j=0;j<64&&b*64+j<ct.length;j++)out[b*64+j]=ct[b*64+j]^ks[j];
+  }
+  return s2Utf8(out).split(/\r?\n/).map(clean).filter(function(x){return /^https?:\/\//i.test(x);});
+}
+function s2QualityFromName(name){
+  var m=clean(name).match(/(?:\[|\.|\s)(2160|1440|1080|720|480|360)p(?:\]|\.|\s|\/)/i);
+  return m?m[1]+"p":"Auto";
+}
+function s2TokenFromText(t){
+  t=clean(t);if(!t)return"";
+  if(t.charAt(0)==="{"){
+    try{var j=JSON.parse(t);return clean(j.token||j.data||j.result);}catch(_){}
+  }
+  return t;
+}
+function s2PrepareUrl(u){
+  var o=originOf(u);if(!o)return Promise.resolve(null);
+  return s2FetchOk(o+"/generate.php",{headers:{"User-Agent":UA,"Accept":"*/*"}},"S2 token",7000)
+    .then(function(r){return r.text();})
+    .then(function(t){
+      var tok=s2TokenFromText(t);
+      if(!tok)return u;
+      return u+(u.indexOf("?")>=0?"&":"?")+"token="+encodeURIComponent(tok);
+    }).catch(function(){return u;});
+}
+function s2ApiPayload(id,type,season,episode){
+  var u=S2_API+"?type="+(type==="tv"?"tv":"movie")+"&tmdb="+encodeURIComponent(id)+"&stream_urls";
+  if(type==="tv")u+="&season="+encodeURIComponent(season)+"&episode="+encodeURIComponent(episode);
+  return s2FetchOk(u,{
+    headers:{
+      "User-Agent":UA,
+      "Accept":"application/json",
+      "Referer":"https://cloudorchestranova.com/"
+    }
+  },"S2 API",10000).then(function(r){return r.json();});
+}
+function s2ExtractRawUrls(j){
+  if(!j||String(j.status_code)!=="200"||!j.data)throw new Error("API status "+(j&&j.status_code));
+  var su=j.data.stream_urls,file=clean(j.data.file_name);
+  if(Array.isArray(su))return Promise.resolve({urls:su,file:file});
+  if(typeof su!=="string"||!su||!j.vs||!j.vs.wasm_url)throw new Error("encrypted stream data missing");
+  return s2FetchOk(j.vs.wasm_url,{
+    headers:{"User-Agent":UA,"Referer":"https://cloudorchestranova.com/"}
+  },"S2 WASM",10000)
+    .then(function(r){return r.arrayBuffer();})
+    .then(function(buf){
+      var urls=s2DecryptUrls(su,new Uint8Array(buf));
+      return{urls:urls,file:file};
+    });
+}
+function s2VerifyOne(raw,fallbackQ){
+  return s2PrepareUrl(raw).then(function(u){
+    if(!u)return[];
+    return fetchText(u,{headers:{"User-Agent":UA}},9000,"S2 HLS").then(function(t){
+      if(t.indexOf("#EXTM3U")<0)throw new Error("not HLS");
+      var vars=parseMaster(t,u);
+      if(vars.length){
+        return vars.map(function(v){
+          return{url:v.url,quality:v.quality||fallbackQ||"Auto",type:"hls",headers:{"User-Agent":UA},server:"2",subtitles:[]};
+        });
+      }
+      var qm=t.match(/\/(2160|1440|1080|720|480|360)(?:p)?\//i);
+      return[{url:u,quality:qm?(qm[1]+"p"):(fallbackQ||"Auto"),type:"hls",headers:{"User-Agent":UA},server:"2",subtitles:[]}];
+    });
+  }).catch(function(e){
+    log("S2 host "+originOf(raw)+" "+(e&&e.message?e.message:e));
+    return[];
+  });
+}
+function resolveS2Streams(id,type,season,episode){
+  var key=[type,id,season||0,episode||0].join(":");
+  var hit=s2Cache[key];
+  if(hit&&hit.expires>now())return Promise.resolve(hit.rows);
+  return s2ApiPayload(id,type,season,episode)
+    .then(function(j){
+      var f=clean(j&&j.data&&j.data.file_name);
+      log("S2 API "+(f||"200"));
+      return s2ExtractRawUrls(j);
+    })
+    .then(function(x){
+      var fallback=s2QualityFromName(x.file);
+      log("S2 decrypted urls="+x.urls.length+" fallback="+fallback);
+      if(!x.urls.length)throw new Error("no decrypted URLs");
+      return Promise.all(x.urls.slice(0,4).map(function(u){return s2VerifyOne(u,fallback);}));
+    })
+    .then(function(groups){
+      var all=[];groups.forEach(function(g){all=all.concat(g||[]);});
+      var seen={},out=[];
+      all.forEach(function(x){
+        var k=x.url+"|"+x.quality;
+        if(!seen[k]){seen[k]=1;out.push(x);}
+      });
+      out.sort(function(a,b){return(parseInt(b.quality,10)||0)-(parseInt(a.quality,10)||0);});
+      var rows=out.map(function(x){
+        var q=x.quality||"Auto",name="YesMovies · S2 · "+q;
+        return{name:name,title:name,url:x.url,quality:q,type:"hls",provider:"yesmovies-direct",headers:x.headers||{"User-Agent":UA},subtitles:[],server:"2"};
+      });
+      s2Cache[key]={expires:now()+10*60*1000,rows:rows};
+      if(rows.length)diag("S2 · "+rows.length+" playable HLS");
+      else diag("S2 · no playable HLS");
+      return rows;
+    })
+    .catch(function(e){
+      var m=e&&e.message?e.message:e;
+      log("S2 ERROR "+m);
+      diag("S2 · "+m);
+      s2Cache[key]={expires:now()+2*60*1000,rows:[]};
+      return[];
+    });
+}
+
 function resolveStreams(id,type,season,episode){
   var key=[type,id,season||0,episode||0].join(":");
   var hit=lookupCache[key];
@@ -796,19 +1027,41 @@ function getStreams(tmdbId,mediaType,season,episode){
   mediaType=mediaType==="tv"?"tv":"movie";
   if(!tmdbId){diag("INPUT · missing TMDB id");return Promise.resolve(statusRows());}
   if(mediaType==="tv"&&(!season||!episode)){diag("INPUT · TV season/episode missing");return Promise.resolve(statusRows());}
-  return resolveStreams(String(tmdbId),mediaType,season,episode).then(function(rows){
-    return rows&&rows.length?rows:statusRows();
+  var id=String(tmdbId);
+  return Promise.all([
+    resolveStreams(id,mediaType,season,episode).catch(function(e){
+      var m=e&&e.message?e.message:e;
+      log("S1 ERROR "+m);diag("S1 · "+m);return[];
+    }),
+    resolveS2Streams(id,mediaType,season,episode)
+  ]).then(function(groups){
+    var all=[],seen={},out=[];
+    groups.forEach(function(g){
+      (g||[]).forEach(function(r){
+        if(!r||r.quality==="Status"||/^data:/i.test(clean(r.url)))return;
+        var k=clean(r.url)+"|"+clean(r.quality)+"|"+clean(r.name);
+        if(!seen[k]){seen[k]=1;all.push(r);}
+      });
+    });
+    all.sort(function(a,b){
+      var sa=/· S(\d+)/.test(a.name||"")?parseInt(RegExp.$1,10):9;
+      var sb=/· S(\d+)/.test(b.name||"")?parseInt(RegExp.$1,10):9;
+      if(sa!==sb)return sa-sb;
+      return(parseInt(b.quality,10)||0)-(parseInt(a.quality,10)||0);
+    });
+    out=all;
+    log("combined verified streams="+out.length);
+    return out.length?out:statusRows();
   }).catch(function(e){
     var m=e&&e.message?e.message:e;
-    log("ERROR "+m);
-    diag("RUNTIME · "+m);
+    log("ERROR "+m);diag("RUNTIME · "+m);
     return statusRows();
   });
 }
 function onSettings(){
   return[
     {type:"header",label:"YesMovies Local"},
-    {type:"info",label:"使用 YesMovies 当前 /searching 目录与 Ployan direct API，直接返回验证过的 HLS。"},
+    {type:"info",label:"使用 YesMovies 当前 /searching + Ployan S1，并并行尝试 S2（VidSrc/VSEmbed WASM/ChaCha20）真实 HLS。"},
     {
       type:"text",
       key:"baseUrl",

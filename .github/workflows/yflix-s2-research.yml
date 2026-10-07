@@ -5,54 +5,36 @@ on:
       - '.github/workflows/yflix-s2-research.yml'
   workflow_dispatch:
 jobs:
-  inspect:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      - name: Inspect VidBolt app bundle only
+      - name: Smoke test YFlix S2 provider
         shell: bash
         run: |
-          python - <<'PY'
-          import re, urllib.request
-          U='https://vidbolt.xyz/assets/index-CWZT0e_1.js'
-          H={
-            'User-Agent':'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36',
-            'Referer':'https://vidbolt.xyz/movie/157336',
-            'Accept':'*/*'
+          curl -fsSL https://raw.githubusercontent.com/feixiangdao/test1/main/yflix-nuvio/providers/yflix-server2.js -o /tmp/yflix-s2.js
+          node - <<'NODE'
+          const p=require('/tmp/yflix-s2.js');
+          async function check(url, headers){
+            try{
+              const r=await fetch(url,{headers:headers||{},signal:AbortSignal.timeout(12000)});
+              const ct=r.headers.get('content-type')||'';
+              const text=(ct.includes('mpegurl')||url.includes('.m3u8')||url.includes('workers.dev')) ? (await r.text()).slice(0,80) : '';
+              return {status:r.status,ct,text};
+            }catch(e){return {error:String(e.message||e)}}
           }
-          req=urllib.request.Request(U,headers=H)
-          js=urllib.request.urlopen(req,timeout=25).read().decode('utf-8','replace')
-          print('LEN',len(js))
-
-          # Absolute URLs/domains
-          urls=sorted(set(re.findall(r'https?://[^"\\\'\x60\\s<>]+',js)))
-          print('ABS_URLS')
-          for u in urls:
-              if not any(x in u for x in ['google','cloudflare','fonts.','gstatic','themoviedb.org','image.tmdb.org','flagcdn']):
-                  print(u[:500])
-
-          # String literals containing likely API/media terms
-          pats=[
-            r'["\\\']([^"\\\']*(?:/api/|m3u8|mp4|playlist|source|stream|server|provider|tmdb|embed|vidsrc|vidlink|flix|dub)[^"\\\']*)["\\\']'
-          ]
-          vals=set()
-          for pat in pats:
-              for m in re.finditer(pat,js,re.I):
-                  s=m.group(1)
-                  if 2 < len(s) < 500:
-                      vals.add(s)
-          print('INTERESTING_STRINGS')
-          for s in sorted(vals):
-              print(s[:500])
-
-          # Context around high-signal function calls / endpoints
-          for needle in ['fetch(', 'axios', '/api/', 'sources', 'streams', 'providers', 'servers', 'm3u8', 'decrypt', 'atob(', 'CryptoJS', 'tmdbId']:
-              print('===',needle,'===')
-              start=0; count=0; low=js.lower(); nd=needle.lower()
-              while count<20:
-                  i=low.find(nd,start)
-                  if i<0: break
-                  frag=re.sub(r'\\s+',' ',js[max(0,i-350):min(len(js),i+900)])
-                  print(frag[:1300])
-                  start=i+len(nd); count+=1
-          PY
+          async function run(){
+            const m=await p.getStreams('157336','movie');
+            console.log('MOVIE_COUNT',m.length);
+            console.log('MOVIE_NAMES',m.slice(0,12).map(x=>x.name));
+            const t=await p.getStreams('108978','tv',1,1);
+            console.log('TV_COUNT',t.length);
+            console.log('TV_NAMES',t.slice(0,12).map(x=>x.name));
+            if(!m.length||!t.length) process.exit(2);
+            const tests=[];
+            for(const x of m.slice(0,3)) tests.push({name:x.name,result:await check(x.url,x.headers)});
+            for(const x of t.slice(0,2)) tests.push({name:x.name,result:await check(x.url,x.headers)});
+            console.log('PROBES',JSON.stringify(tests));
+          }
+          run().catch(e=>{console.error(e);process.exit(1)});
+          NODE

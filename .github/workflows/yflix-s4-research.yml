@@ -7,39 +7,35 @@ on:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
-      - name: Probe FilmU live APIs
+      - name: Probe FilmU same-origin proxy
         shell: bash
         run: |
           python - <<'PY'
-          import json, urllib.request, urllib.parse
+          import urllib.request, json
           UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'
-          ORIGIN='https://embed.filmu.in'
-          KEY='09eb429913afb6b1cc90f23746f41fb3279aed77726c625c40672b81444c0bac'
-          def req(url,headers=None):
-              h={'User-Agent':UA,'Accept':'application/json','Referer':ORIGIN+'/movie/157336','Origin':ORIGIN}
-              if headers:h.update(headers)
-              r=urllib.request.Request(url,headers=h)
+          urls=[
+          'https://embed.filmu.in/api/proxy?b64path=L3NjcmFwZS9BbGxtb3ZpZWxhbmQvbW92aWUvdHQwODE2NjkyP3RtZGJJZD0xNTczMzYmdGl0bGU9SW50ZXJzdGVsbGFyJnllYXI9MjAxNA%3D%3D',
+          'https://embed.filmu.in/api/proxy?b64path=L3NjcmFwZS9BbGxtb3ZpZWxhbmQvdHYvdHQ5Mjg4MDMwP3RtZGJJZD0xMDg5NzgmdGl0bGU9UmVhY2hlciZ5ZWFyPTIwMjImc2Vhc29uPTEmZXBpc29kZT0x',
+          'https://embed.filmu.in/api/proxy?b64path=L3NjcmFwZS9QcmltZVZpZHMvbW92aWUvdHQwODE2NjkyP3RtZGJJZD0xNTczMzYmdGl0bGU9SW50ZXJzdGVsbGFyJnllYXI9MjAxNA%3D%3D',
+          'https://embed.filmu.in/api/proxy?b64path=L3NjcmFwZS9RdWFzYXIvbW92aWUvdHQwODE2NjkyP3RtZGJJZD0xNTczMzYmdGl0bGU9SW50ZXJzdGVsbGFyJnllYXI9MjAxNA%3D%3D'
+          ]
+          for u in urls:
+              req=urllib.request.Request(u,headers={
+                'User-Agent':UA,
+                'Accept':'application/json, text/plain, */*',
+                'Origin':'https://embed.filmu.in',
+                'Referer':'https://embed.filmu.in/movie/157336',
+                'Sec-Fetch-Site':'same-origin',
+                'Sec-Fetch-Mode':'cors',
+                'Sec-Fetch-Dest':'empty'
+              })
               try:
-                  with urllib.request.urlopen(r,timeout=35) as x:
-                      body=x.read().decode('utf-8','replace')
-                      print('\nURL',url,'STATUS',x.status,'CT',x.headers.get('content-type'),'LEN',len(body))
-                      print(body[:7000])
+                  with urllib.request.urlopen(req,timeout=15) as r:
+                      b=r.read().decode('utf-8','replace')
+                      print('STATUS',r.status,'LEN',len(b),'URL',u)
+                      print(b[:6000])
               except Exception as e:
-                  print('\nURL',url,'ERR',repr(e))
-
-          req('https://embed.filmu.in/api/singularity-movie?id=157336')
-          req('https://embed.filmu.in/api/singularity-tv?tmdb=108978&s=1&e=1')
-          req('https://movieapi4.filmu.in/imdb/streams/tt0816692')
-          req('https://movieapi4.filmu.in/imdb/streams/tt9288030?season=1&episode=1')
-
-          base='https://box.filmu.in'
-          providers=['Citadel','PrimeVids','Quasar','Nova','Allmovieland','MovieBoxV2','Vaplayer']
-          for p in providers:
-              u=base+'/scrape/'+urllib.parse.quote(p)+'/movie/tt0816692?tmdbId=157336&title=Interstellar&year=2014'
-              req(u,{'x-api-key':KEY})
-          for p in providers:
-              u=base+'/scrape/'+urllib.parse.quote(p)+'/tv/tt9288030?tmdbId=108978&title=Reacher&year=2022&season=1&episode=1'
-              req(u,{'x-api-key':KEY})
+                  print('ERR',repr(e),'URL',u)
           PY

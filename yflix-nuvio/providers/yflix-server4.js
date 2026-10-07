@@ -1,5 +1,5 @@
 // YFlix Local for Nuvio
-// v0.3.0 - YFlix Server 4 / FilmU
+// v0.3.1 - YFlix Server 4 / FilmU
 //
 // Current YFlix S4 iframe:
 //   https://embed.filmu.in/movie/{tmdb}
@@ -16,6 +16,9 @@ var FILMU_PROXY = "https://api.filmu.in";
 var TMDB = "https://api.themoviedb.org/3";
 var DEFAULT_TMDB_API_KEY = "1865f43a0549ca50d341dd9ab8b29f49";
 var UA = "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36";
+var DIAG=[];
+function diag(msg){msg=clean(msg).replace(/\s+/g," ").slice(0,160);if(msg&&DIAG.indexOf(msg)<0)DIAG.push(msg);}
+function statusRows(){var a=DIAG.slice(-4);if(!a.length)a=["No stream returned"];return a.map(function(msg,i){var n="YFlix · S4 · DIAG "+(i+1)+" · "+msg;return{name:n,title:n,url:"about:error",quality:"Status",type:"diagnostic",provider:"yflix-server4",headers:{},subtitles:[]};});}
 
 function clean(v){ return v == null ? "" : String(v).trim(); }
 
@@ -209,7 +212,7 @@ function callSingularity(tmdbId,mediaType,season,episode){
   return fetchJson(u,{headers:apiHeaders(tmdbId,mediaType,season,episode)})
     .then(normalizeSingularity)
     .catch(function(e){
-      console.warn("[YFlix S4] Singularity "+(e&&e.message?e.message:e));
+      var m=(e&&e.message?e.message:e);console.warn("[YFlix S4] Singularity "+m);diag("Singularity · "+m);
       return [];
     });
 }
@@ -231,7 +234,7 @@ function callPulsar(info,mediaType,season,episode){
   return fetchJson(u,{headers:apiHeaders(info.tmdbId,mediaType,season,episode)})
     .then(normalizePulsar)
     .catch(function(e){
-      console.warn("[YFlix S4] Pulsar "+(e&&e.message?e.message:e));
+      var m=(e&&e.message?e.message:e);console.warn("[YFlix S4] Pulsar "+m);diag("Pulsar · "+m);
       return [];
     });
 }
@@ -249,17 +252,18 @@ function dedupeSort(rows){
 }
 
 function getStreams(tmdbId,mediaType,season,episode){
-  if(!tmdbId) return Promise.resolve([]);
+  DIAG=[];
+  if(!tmdbId){diag("missing TMDB id");return Promise.resolve(statusRows());}
   mediaType=mediaType==="tv"?"tv":"movie";
   season=parseInt(season,10)||0;
   episode=parseInt(episode,10)||0;
-  if(mediaType==="tv"&&(!season||!episode)) return Promise.resolve([]);
+  if(mediaType==="tv"&&(!season||!episode)){diag("TV missing season/episode");return Promise.resolve(statusRows());}
 
   var singular=callSingularity(String(tmdbId),mediaType,season,episode);
   var pulsar=getTmdbInfo(String(tmdbId),mediaType)
     .then(function(info){return callPulsar(info,mediaType,season,episode);})
     .catch(function(e){
-      console.warn("[YFlix S4] TMDB/Pulsar "+(e&&e.message?e.message:e));
+      var m=(e&&e.message?e.message:e);console.warn("[YFlix S4] TMDB/Pulsar "+m);diag("TMDB/Pulsar · "+m);
       return [];
     });
 
@@ -274,10 +278,11 @@ function getStreams(tmdbId,mediaType,season,episode){
 
     var out=dedupeSort(chosen);
     console.log("[YFlix S4] tmdb="+tmdbId+" type="+mediaType+" pulsar="+p.length+" singularity="+s.length+" out="+out.length);
+    if(!out.length){diag(mediaType+" · 0 playable streams");return statusRows();}
     return out;
   }).catch(function(e){
-    console.error("[YFlix S4] "+(e&&e.message?e.message:e));
-    return [];
+    var m=(e&&e.message?e.message:e);console.error("[YFlix S4] "+m);diag("runtime · "+m);
+    return statusRows();
   });
 }
 

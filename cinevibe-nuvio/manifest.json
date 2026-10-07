@@ -1,13 +1,13 @@
 {
   "name": "CineVibe Local",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Independent CineVibe.cc provider for Nuvio. First build reproduces CineVibe Server 1 using the OneRoom/MovieBox backend directly, without depending on vidsuper.net.",
   "scrapers": [
     {
       "id": "cinevibe-server1",
       "name": "CineVibe · Server 1",
       "description": "CineVibe Server 1 compatible route: TMDB → MovieBox/OneRoom → direct HLS/DASH/MP4 with playback headers.",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "author": "CineVibe Local",
       "supportedTypes": ["movie", "tv"],
       "filename": "providers/cinevibe-server1.js",

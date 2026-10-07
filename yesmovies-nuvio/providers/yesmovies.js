@@ -1,5 +1,5 @@
 // YesMovies Local for Nuvio
-// v0.2.2
+// v0.2.3
 // Flow:
 // TMDB metadata -> YesMovies /searching JSON -> movie/season page
 // -> Nuvio episode number -> Ployan token -> /get -> direct HLS + Ployan subtitles.
@@ -350,75 +350,71 @@ function apiFindPage(info,type,season){
   function normalizeTitle(v){
     return simple(v).replace(/\s+season\s+\d+$/i,"").trim();
   }
+  function tokenQueries(v){
+    var stop={the:1,a:1,an:1,and:1,or:1,of:1,to:1,in:1,on:1,for:1,with:1,at:1,by:1,from:1,season:1};
+    var parts=normalizeTitle(v).split(/\s+/).filter(function(x){return x&&x.length>=3&&!stop[x];});
+    var out=[];
+    parts.forEach(function(x){if(out.indexOf(x)<0)out.push(x);});
+    if(!out.length&&parts.length===0){
+      var one=normalizeTitle(v);if(one)out.push(one);
+    }
+    return out;
+  }
   var queries=[];
-  function addQuery(v){
-    v=clean(v);if(!v)return;
-    if(queries.indexOf(v)<0)queries.push(v);
+  function addTokens(v){
+    tokenQueries(v).forEach(function(x){if(queries.indexOf(x)<0)queries.push(x);});
   }
-  addQuery(info.title);
-  addQuery(info.originalTitle);
-
-  function queryUrls(base,q){
-    var enc=encodeURIComponent(q),plus=enc.replace(/%20/g,"+");
-    var a=[base+"/searching?q="+plus+"&limit=40&offset=0"];
-    if(enc!==plus)a.push(base+"/searching?q="+enc+"&limit=40&offset=0");
-    return a;
-  }
+  addTokens(info.title);
+  addTokens(info.originalTitle);
 
   function scoreRows(arr,q){
     var wantType=type==="tv"?"s":"m";
     var target=normalizeTitle(info.title||info.originalTitle||q);
-    var ranked=arr.map(function(x){
+    return arr.map(function(x){
       var title=decodeHtml(x&&x.t),baseTitle=normalizeTitle(title),sc=0;
       if(clean(x&&x.d)===wantType)sc+=45; else sc-=80;
-      if(baseTitle===target)sc+=120;
+      if(baseTitle===target)sc+=140;
       else sc+=Math.max(titleScore(baseTitle,target),titleScore(baseTitle,normalizeTitle(q)));
       if(type==="tv"){
-        if(Number(x&&x.n)===Number(season))sc+=70; else sc-=50;
-      }else if(info.year&&Number(x&&x.y)===Number(info.year))sc+=30;
+        if(Number(x&&x.n)===Number(season))sc+=80; else sc-=60;
+      }else if(info.year&&Number(x&&x.y)===Number(info.year))sc+=35;
       return{x:x,score:sc,title:title};
     }).sort(function(a,b){return b.score-a.score;});
-    return ranked;
   }
 
   function tryBase(base){
     var qi=0;
     function nextQuery(){
       if(qi>=queries.length)return Promise.resolve(null);
-      var q=queries[qi++],urls=queryUrls(base,q),ui=0;
-      function nextUrl(){
-        if(ui>=urls.length)return nextQuery();
-        var u=urls[ui++];
-        var mode=u.indexOf("+")>=0?"plus":"pct";
-        return fetchText(u,{headers:baseHeaders(base,base+"/search.html","application/json, text/plain, */*")},9000,"searching")
-          .then(function(t){
-            var j=jsonMaybe(t),arr=j&&Array.isArray(j.data)?j.data:[];
-            diag("SEARCHING · "+mode+" · "+q+" · "+arr.length);
-            if(!arr.length)return nextUrl();
-            var ranked=scoreRows(arr,q),best=ranked[0];
-            if(!best||best.score<100){
-              diag("SEARCHING · best "+(best?best.score:0)+" too weak");
-              return nextUrl();
-            }
-            var slug=clean(best.x.s),idm=slug.match(/-(\d+)$/);
-            if(!slug||!idm){
-              diag("SEARCHING · result missing internal id");
-              return nextUrl();
-            }
-            return{
-              url:base+"/movie/"+slug+".html",
-              id:idm[1],
-              slug:slug,
-              title:best.title,
-              year:Number(best.x.y)||0,
-              base:base
-            };
-          }).catch(function(e){
-            diag("SEARCHING · "+mode+" · "+(e&&e.message?e.message:e));
-            return nextUrl();
-          });
-      }
-      return nextUrl();
+      var q=queries[qi++];
+      var u=base+"/searching?q="+encodeURIComponent(q)+"&limit=40&offset=0";
+      return fetchText(u,{headers:baseHeaders(base,base+"/search.html","application/json, text/plain, */*")},9000,"searching")
+        .then(function(t){
+          var j=jsonMaybe(t),arr=j&&Array.isArray(j.data)?j.data:[];
+          diag("SEARCHING · token "+q+" · "+arr.length);
+          if(!arr.length)return nextQuery();
+          var ranked=scoreRows(arr,q),best=ranked[0];
+          if(!best||best.score<120){
+            diag("SEARCHING · token "+q+" · best "+(best?best.score:0));
+            return nextQuery();
+          }
+          var slug=clean(best.x.s),idm=slug.match(/-(\d+)$/);
+          if(!slug||!idm){
+            diag("SEARCHING · result missing internal id");
+            return nextQuery();
+          }
+          return{
+            url:base+"/movie/"+slug+".html",
+            id:idm[1],
+            slug:slug,
+            title:best.title,
+            year:Number(best.x.y)||0,
+            base:base
+          };
+        }).catch(function(e){
+          diag("SEARCHING · token "+q+" · "+(e&&e.message?e.message:e));
+          return nextQuery();
+        });
     }
     return nextQuery();
   }

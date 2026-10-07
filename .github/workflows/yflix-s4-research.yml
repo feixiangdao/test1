@@ -9,15 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Probe FilmU Pulsar final HLS
+      - name: Probe FilmU Pulsar with playback headers
         shell: bash
         run: |
           node - <<'NODE'
           const origin='https://embed.filmu.in';
           const ua='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36';
           const path='/scrape/Allmovieland/movie/tt0816692?tmdbId=157336&title=Interstellar&year=2014';
-          const b64=Buffer.from(path,'utf8').toString('base64');
-          const api=origin+'/api/proxy?b64path='+encodeURIComponent(b64);
+          const api=origin+'/api/proxy?b64path='+encodeURIComponent(Buffer.from(path).toString('base64'));
           async function run(){
             const r=await fetch(api,{headers:{
               'User-Agent':ua,'Accept':'application/json, text/plain, */*',
@@ -30,10 +29,14 @@ jobs:
               let u=x.url||'';
               if(u.startsWith('/')) u='https://api.filmu.in'+u;
               try{
-                const pr=await fetch(u,{headers:{'User-Agent':ua},signal:AbortSignal.timeout(12000)});
+                const pr=await fetch(u,{headers:{
+                  'User-Agent':ua,
+                  'Origin':origin,
+                  'Referer':origin+'/'
+                },signal:AbortSignal.timeout(12000)});
                 const ct=pr.headers.get('content-type')||'';
                 const tx=await pr.text();
-                console.log('PROBE',x.name,x.quality,pr.status,ct,tx.slice(0,120).replace(/\n/g,'\\n'));
+                console.log('PROBE',x.name,x.quality,pr.status,ct,tx.slice(0,140).replace(/\n/g,'\\n'));
               }catch(e){console.log('PROBE_ERR',x.name,String(e.message||e));}
             }
           }

@@ -5,46 +5,26 @@ on:
       - '.github/workflows/yflix-research.yml'
   workflow_dispatch:
 jobs:
-  inspect:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Inspect PlayAPI module config
+      - name: Run YFlix provider smoke tests
         shell: bash
         run: |
-          python - <<'PY'
-          import re, urllib.request, urllib.parse
-          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/153 Safari/537.36'
-          page='https://player.playapi.eu.cc/movie/157336'
-          def get(url):
-              req=urllib.request.Request(url,headers={'User-Agent':UA,'Accept':'text/html,*/*','Referer':page})
-              with urllib.request.urlopen(req,timeout=20) as r:
-                  return r.read().decode('utf-8','replace')
-          html=get(page)
-          srcs=re.findall(r'<script[^>]+src=["\\\']([^"\\\']+)',html,re.I)
-          scripts=[]
-          for src in srcs:
-              u=urllib.parse.urljoin(page,src)
-              if urllib.parse.urlparse(u).netloc==urllib.parse.urlparse(page).netloc:
-                  scripts.append(u)
-          print('SCRIPTS',scripts)
-          for u in scripts:
-              js=get(u)
-              print('MAIN',u,'BYTES',len(js))
-              imports=re.findall(r'from\\s+["\\\']([^"\\\']+\\.js)["\\\']',js)
-              print('IMPORTS',imports)
-              for needle in ['getApiBaseUrl','apiUrl','fetch(apiUrl)','/api/','streams?','tmdbId']:
-                  for m in list(re.finditer(re.escape(needle),js,re.I))[:6]:
-                      print('CTX',needle,re.sub(r'\\s+',' ',js[max(0,m.start()-500):m.start()+900]))
-              for imp in imports:
-                  iu=urllib.parse.urljoin(u,imp)
-                  if urllib.parse.urlparse(iu).netloc != urllib.parse.urlparse(page).netloc:
-                      continue
-                  try: txt=get(iu)
-                  except Exception as e:
-                      print('IMPORT_FAIL',iu,repr(e)); continue
-                  if any(k in iu.lower() for k in ['config','server','api']):
-                      print('FILE_BEGIN',iu)
-                      print(txt[:30000])
-                      print('FILE_END',iu)
-          PY
+          curl -fsSL https://raw.githubusercontent.com/feixiangdao/test1/main/yflix-nuvio/providers/yflix-server1.js -o /tmp/yflix.js
+          node - <<'NODE'
+          const p=require('/tmp/yflix.js');
+          async function run(){
+            const m=await p.getStreams('157336','movie');
+            console.log('MOVIE_COUNT',m.length);
+            console.log('MOVIE_FIRST',JSON.stringify(m.slice(0,3).map(x=>({name:x.name,quality:x.quality,type:x.type,url:x.url.slice(0,90),headers:x.headers}))));
+            const t=await p.getStreams('108978','tv',1,1);
+            console.log('TV_COUNT',t.length);
+            console.log('TV_FIRST',JSON.stringify(t.slice(0,3).map(x=>({name:x.name,quality:x.quality,type:x.type,url:x.url.slice(0,90),headers:x.headers}))));
+            if(!m.length || !t.length) process.exit(2);
+            if(!m.some(x=>x.type==='hls')) process.exit(3);
+            if(!t.some(x=>x.type==='mp4')) process.exit(4);
+          }
+          run().catch(e=>{console.error(e);process.exit(1)});
+          NODE

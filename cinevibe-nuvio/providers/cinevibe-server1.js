@@ -1,5 +1,5 @@
 // CineVibe Local for Nuvio
-// v0.1.1
+// v0.1.2
 // CineVibe.cc Server 1 compatible route:
 // TMDB -> MovieBox / OneRoom (aoneroom) -> direct HLS/DASH/MP4.
 //
@@ -31,21 +31,10 @@ function diag(msg){
 }
 function resetDiag(){ DIAG = []; }
 
-function diagRows(){
-  var rows = DIAG.length ? DIAG.slice(-6) : ["No route returned a stream"];
-  return rows.map(function(msg, i){
-    var label = "CineVibe · DIAG " + (i + 1) + " · " + msg;
-    return {
-      name: "CineVibe · Server 1",
-      title: label,
-      url: "data:application/vnd.apple.mpegurl;base64,I0VYVE0zVQojRVhULVgtVkVSU0lPTjozCiNFWFQtWC1FTkRMSVNUCg==",
-      quality: "Status",
-      type: "hls",
-      provider: "cinevibe-server1",
-      headers: {},
-      subtitles: []
-    };
-  });
+function flushDiag(){
+  try {
+    if(DIAG.length) console.log("[CineVibe] " + DIAG.join(" | "));
+  } catch(_) {}
 }
 
 function tmdbKey(){
@@ -422,7 +411,8 @@ function getStreams(tmdbId, mediaType, season, episode){
   if(!tmdbId) return Promise.resolve([]);
   if(mediaType === "tv" && (!season || !episode)){
     diag("TV · missing season/episode");
-    return Promise.resolve(diagRows());
+    flushDiag();
+    return Promise.resolve([]);
   }
 
   return getTmdbInfo(String(tmdbId), mediaType)
@@ -440,7 +430,8 @@ function getStreams(tmdbId, mediaType, season, episode){
     })
     .catch(function(e){
       diag("FAIL · " + (e && e.message ? e.message : e));
-      return diagRows();
+      flushDiag();
+      return [];
     });
 }
 

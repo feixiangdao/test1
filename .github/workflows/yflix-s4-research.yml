@@ -9,55 +9,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Probe FilmU same-origin live routes
+      - name: Probe FilmU Pulsar final HLS
         shell: bash
         run: |
           node - <<'NODE'
-          const UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36';
           const origin='https://embed.filmu.in';
-          const cases=[
-            origin+'/api/singularity-movie?id=157336',
-            origin+'/api/singularity-tv?tmdb=108978&s=1&e=1',
-            origin+'/api/apollo?type=movie&id=tt0816692&tmdbId=157336&title=Interstellar&year=2014',
-            origin+'/api/apollo?type=tv&id=tt9288030&tmdbId=108978&title=Reacher&year=2022&season=1&episode=1'
-          ];
-          async function probeSource(x){
-            if(!x || !x.url || !/^https?:/.test(x.url)) return;
-            try{
-              const h=Object.assign({'User-Agent':UA},x.headers||{});
-              const r=await fetch(x.url,{headers:h,signal:AbortSignal.timeout(10000)});
-              const ct=r.headers.get('content-type')||'';
-              let first='';
-              if(/mpegurl/i.test(ct)||x.url.includes('.m3u8')) first=(await r.text()).slice(0,100).replace(/\n/g,'\\n');
-              console.log('STREAM',x.name||'',x.quality||'',r.status,ct,first);
-            }catch(e){console.log('STREAM_ERR',x.name||'',String(e.message||e));}
-          }
+          const ua='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36';
+          const path='/scrape/Allmovieland/movie/tt0816692?tmdbId=157336&title=Interstellar&year=2014';
+          const b64=Buffer.from(path,'utf8').toString('base64');
+          const api=origin+'/api/proxy?b64path='+encodeURIComponent(b64);
           async function run(){
-            for(const u of cases){
+            const r=await fetch(api,{headers:{
+              'User-Agent':ua,'Accept':'application/json, text/plain, */*',
+              'Origin':origin,'Referer':origin+'/movie/157336',
+              'Sec-Fetch-Site':'same-origin','Sec-Fetch-Mode':'cors','Sec-Fetch-Dest':'empty'
+            },signal:AbortSignal.timeout(20000)});
+            const j=await r.json();
+            console.log('API',r.status,'COUNT',(j.sources||[]).length);
+            for(const x of (j.sources||[])){
+              let u=x.url||'';
+              if(u.startsWith('/')) u='https://api.filmu.in'+u;
               try{
-                const r=await fetch(u,{
-                  headers:{
-                    'User-Agent':UA,
-                    'Accept':'application/json, text/plain, */*',
-                    'Origin':origin,
-                    'Referer':origin+'/movie/157336',
-                    'Sec-Fetch-Site':'same-origin',
-                    'Sec-Fetch-Mode':'cors',
-                    'Sec-Fetch-Dest':'empty'
-                  },
-                  signal:AbortSignal.timeout(20000)
-                });
-                const tx=await r.text();
-                console.log('API',r.status,'LEN',tx.length,u);
-                console.log(tx.slice(0,9000));
-                if(!r.ok) continue;
-                const j=JSON.parse(tx);
-                const rows=[];
-                if(Array.isArray(j.sources)) rows.push(...j.sources);
-                if(Array.isArray(j.streams)) rows.push(...j.streams);
-                if(j.url) rows.push({url:(j.multilingual&&j.multilingual_url)||j.url,quality:j.quality||'1080p'});
-                for(const x of rows.slice(0,4)) await probeSource(x);
-              }catch(e){console.log('API_ERR',u,String(e.message||e));}
+                const pr=await fetch(u,{headers:{'User-Agent':ua},signal:AbortSignal.timeout(12000)});
+                const ct=pr.headers.get('content-type')||'';
+                const tx=await pr.text();
+                console.log('PROBE',x.name,x.quality,pr.status,ct,tx.slice(0,120).replace(/\n/g,'\\n'));
+              }catch(e){console.log('PROBE_ERR',x.name,String(e.message||e));}
             }
           }
           run().catch(e=>{console.error(e);process.exit(1)});

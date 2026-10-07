@@ -1,6 +1,6 @@
 // YesMovies S3 Lab for Nuvio
-// EXPERIMENTAL and isolated from stable YesMovies Local v0.2.5.
-// Route: TMDB -> YesMovies internal id -> Ployan server 5 -> Vidara -> HLS.
+// EXPERIMENTAL and isolated from stable YesMovies Local v0.2.6.
+// Route: TMDB -> YesMovies internal id -> Ployan server 5 -> full Vidara filecode -> /api/stream -> HLS.
 
 var UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36";
 var TMDB_KEY="1865f43a0549ca50d341dd9ab8b29f49";
@@ -116,35 +116,46 @@ function ployanS3(mid,eid){
     return decryptInfo(j.info);
   });
 }
-function stripTimedCode(embed){
+function parseVidaraEmbed(embed){
   var m=clean(embed).match(/^(https?:\/\/[^/]+)\/e\/([^/?#]+)/i);
   if(!m)throw new Error("S3 is not a Vidara embed");
-  var code=m[2].replace(/-\d{10}$/,"");
-  return{url:m[1]+"/e/"+code,code:code};
+  return{origin:m[1],url:m[1]+"/e/"+m[2],code:m[2]};
 }
-function titleOf(html){var m=String(html||"").match(/<title[^>]*>([\s\S]*?)<\/title>/i);return m?clean(m[1].replace(/<[^>]+>/g," ")):"";}
-function validateAndResolveVidara(embed,mid,eid){
-  var v=stripTimedCode(embed);
-  diag("VIDARA · "+v.code);
-  return fetchOk(v.url,{headers:{"User-Agent":UA,"Accept":"text/html,*/*"}}, "Vidara page",10000).then(function(r){
-    var finalUrl=r.url||v.url;
-    return r.text().then(function(html){return{finalUrl:finalUrl,html:html};});
-  }).then(function(p){
-    var ttl=titleOf(p.html),expected=String(mid)+"-"+String(eid);
-    diag("VIDARA · title "+(ttl||"?")+" · expected "+expected);
-    if(ttl&&ttl!==expected&&ttl.indexOf(expected)<0)throw new Error("Vidara content mismatch");
-    var om=p.finalUrl.match(/^(https?:\/\/[^/]+)/i),origin=om?om[1]:"https://vidara.to";
-    var api=origin+"/api/stream";
-    return fetchOk(api,{
-      method:"POST",
-      headers:{"User-Agent":UA,"Accept":"application/json","Content-Type":"application/json","Origin":origin,"Referer":p.finalUrl},
-      body:JSON.stringify({filecode:v.code,device:"web"})
-    },"Vidara API",10000).then(function(r){return r.json();}).then(function(j){
-      var u=clean(j&&j.streaming_url);if(!u)throw new Error("Vidara streaming_url missing");
-      return{url:u,origin:origin,referer:p.finalUrl};
-    });
+function normTitle(v){
+  return lower(v).replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").replace(/\s+/g," ").trim();
+}
+function titleLooksRight(apiTitle,info){
+  var a=normTitle(apiTitle),b=normTitle(info&&info.title),c=normTitle(info&&info.originalTitle);
+  if(!a)return false;
+  if(b&&(a===b||a.indexOf(b)>=0||b.indexOf(a)>=0))return true;
+  if(c&&(a===c||a.indexOf(c)>=0||c.indexOf(a)>=0))return true;
+  return false;
+}
+function validateAndResolveVidara(embed,info){
+  var v=parseVidaraEmbed(embed);
+  diag("VIDARA · full code "+v.code);
+  var api=v.origin+"/api/stream";
+  return fetchOk(api,{
+    method:"POST",
+    headers:{
+      "User-Agent":UA,
+      "Accept":"application/json, text/plain, */*",
+      "Content-Type":"application/json",
+      "Origin":v.origin,
+      "Referer":v.origin+"/",
+      "X-Requested-With":"XMLHttpRequest"
+    },
+    body:JSON.stringify({filecode:v.code,device:"web"})
+  },"Vidara API",10000).then(function(r){return r.json();}).then(function(j){
+    if(j&&j.error)throw new Error("Vidara "+clean(j.error));
+    var u=clean(j&&j.streaming_url),ttl=clean(j&&j.title);
+    diag("VIDARA · title "+(ttl||"?"));
+    if(!u)throw new Error("Vidara streaming_url missing");
+    if(!titleLooksRight(ttl,info))throw new Error("Vidara content mismatch");
+    return{url:u,origin:v.origin,referer:v.origin+"/"};
   });
 }
+
 function abs(base,u){if(/^https?:\/\//i.test(u))return u;var m=base.match(/^(https?:\/\/[^/]+)/i);if(u.charAt(0)==="/")return(m?m[1]:"")+u;return base.replace(/[^/]*(?:\?.*)?$/,"")+u;}
 function parseMaster(t,u){
   var lines=String(t||"").replace(/\r/g,"").split("\n"),out=[];
@@ -173,7 +184,7 @@ function getStreams(tmdbId,mediaType,season,episode){
   var info,match,eid=mediaType==="tv"?Number(episode)||1:1;
   return tmdbInfo(String(tmdbId),mediaType).then(function(x){info=x;diag("TMDB · "+x.title);return findYesMovies(x,mediaType,season);})
     .then(function(x){match=x;return ployanS3(match.id,eid);})
-    .then(function(embed){diag("S3 · "+embed.replace(/-\d{10}(?=$|[?#])/,"-<time>"));return validateAndResolveVidara(embed,match.id,eid);})
+    .then(function(embed){diag("S3 · "+embed.replace(/-\d{10}(?=$|[?#])/,"-<time>"));return validateAndResolveVidara(embed,info);})
     .then(verifyHls)
     .then(function(rows){
       if(!rows.length){diag("VERIFY · no HLS");return statusRows();}

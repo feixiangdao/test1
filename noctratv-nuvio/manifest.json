@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.58.0",
+  "version": "4.59.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -1647,6 +1647,49 @@
         "m3u8",
         "mp4",
         "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-onetouchtv",
+      "name": "NoctraTV · OneTouchTV / Atlas",
+      "description": "Current NoctraTV top-level Atlas source (real provider: onetouchtv). Uses the dedicated /mplayer/onetouchtv/resolve route with an ephemeral MZone v2 playback session and validates returned HLS/DASH/MP4 before exposing it to Nuvio.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/onetouchtv.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    },
+    {
+      "id": "noctra-videasy-cdn",
+      "name": "NoctraTV · Videasy CDN / Nova",
+      "description": "Current NoctraTV top-level Nova source. Mirrors the current /mplayer/videasy/resolve flow with preferredProvider=neon2, strict original-audio mode, NoctraTV's keyless TMDB proxy, MZone relay wrapping, and media verification.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/videasy-cdn.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4"
       ],
       "contentLanguage": [
         "multi"

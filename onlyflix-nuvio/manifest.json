@@ -1,13 +1,13 @@
 {
   "name": "OnlyFlix Local",
-  "version": "0.10.9",
-  "description": "OnlyFlix local DNS-test build. NontonGo 0.10.9 restores the original domain-based Soap2Cloud route (no Cloudflare IP override) and keeps detailed status-0 diagnostics.",
+  "version": "0.11.0",
+  "description": "OnlyFlix local build. NontonGo 0.11.0 keeps the domain-based Soap2Cloud route and returns all verified qualities sequentially using the known-playable Base64 TS-fix format.",
   "scrapers": [
     {
       "id": "onlyflix-cdnm",
       "name": "OnlyFlix · CDNM",
       "description": "Pure local CDNM with device-side TMDB→IMDb lookup, PlayerJS #2 decoding and explicit 1080p/720p/480p/360p/240p variants when available.",
-      "version": "0.10.9",
+      "version": "0.11.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -27,7 +27,7 @@
       "id": "onlyflix-vidapi",
       "name": "OnlyFlix · VidAPI",
       "description": "Pure local VidAPI/VAPlayer. Master HLS playlists are expanded into explicit resolution streams with actual pixel dimensions.",
-      "version": "0.10.9",
+      "version": "0.11.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
@@ -46,14 +46,14 @@
     {
       "id": "onlyflix-nontongo",
       "name": "OnlyFlix · NontonGo",
-      "description": "Domain-based NontonGo DNS test. Uses snowy-morning.soapsoap123.workers.dev directly, with the known-playable single 1080p TS-fix and detailed FetchBridge diagnostics.",
-      "version": "0.10.9",
+      "description": "Domain-based NontonGo multi-resolution build. 1080p/720p/360p Soap2Cloud variants are processed sequentially, malformed EXT-X-MAP is removed, and each repaired playlist is returned as Base64 data HLS.",
+      "version": "0.11.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/onlyflix-nontongo-domain0109.js",
+      "filename": "providers/onlyflix-nontongo-domain-multires0110.js",
       "enabled": true,
       "formats": [
         "m3u8"
@@ -67,7 +67,7 @@
       "id": "onlyflix-vidfast",
       "name": "OnlyFlix · VidFast",
       "description": "Pure local VidFast using the direct VA upstream source=vidfast path. Master HLS playlists are expanded into explicit resolution streams. No helper resolver.",
-      "version": "0.10.9",
+      "version": "0.11.0",
       "author": "OnlyFlix Local",
       "supportedTypes": [
         "movie",

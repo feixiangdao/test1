@@ -1,0 +1,21 @@
+{
+  "name": "YesMovies S3 Lab",
+  "version": "0.1.0",
+  "description": "Experimental isolated YesMovies Server 3 Vidara resolver with content-match guard.",
+  "scrapers": [
+    {
+      "id": "yesmovies-s3-lab",
+      "name": "YesMovies S3 · Lab",
+      "description": "YesMovies S3 → Ployan embed → Vidara → verified HLS variants; rejects mismatched upstream content.",
+      "version": "0.1.0",
+      "author": "YesMovies Lab",
+      "supportedTypes": ["movie", "tv"],
+      "filename": "providers/yesmovies-s3.js",
+      "enabled": true,
+      "formats": ["m3u8"],
+      "contentLanguage": ["multi"],
+      "limited": true,
+      "hasSettings": false
+    }
+  ]
+}

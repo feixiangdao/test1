@@ -8,13 +8,8 @@ var API=BASE+"/api/proxy";
 var SALT="c1n3t4r-0bf5c4t10n-s4lt-v1-2024-09";
 var UA="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36";
 var SERVERS=[
-  {name:"Hable",movie:true,tv:false},
   {name:"Nest",movie:true,tv:true},
-  {name:"Orion",movie:true,tv:true},
-  {name:"Light",movie:true,tv:true},
-  {name:"Space",movie:true,tv:true},
-  {name:"Luna",movie:true,tv:true},
-  {name:"Kuro",movie:true,tv:false}
+  {name:"Light",movie:true,tv:true}
 ];
 
 function clean(v){return v==null?"":String(v).trim();}
@@ -116,6 +111,43 @@ function qualityLabel(q,url,body){
   if(n>=2160)return"4K";
   return n?n+"p":"Auto";
 }
+function absUrl(u,base){
+  try{return new URL(u,base).toString();}catch(_){return clean(u);}
+}
+function firstMediaLine(body){
+  var lines=String(body||"").split(/\r?\n/);
+  for(var i=0;i<lines.length;i++){
+    var q=lines[i].trim();
+    if(q&&q.charAt(0)!=="#")return q;
+  }
+  return "";
+}
+function bestVariant(body,base){
+  var lines=String(body||"").split(/\r?\n/),best=null;
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i].trim();
+    if(line.indexOf("#EXT-X-STREAM-INF:")!==0)continue;
+    var m=/RESOLUTION=\d+x(\d+)/i.exec(line),h=m?parseInt(m[1],10)||0:0;
+    var uri="";
+    for(var j=i+1;j<lines.length;j++){
+      var x=lines[j].trim();
+      if(x&&x.charAt(0)!=="#"){uri=absUrl(x,base);break;}
+    }
+    if(uri&&(!best||h>best.height))best={url:uri,height:h};
+  }
+  return best;
+}
+function probeSegment(url,h){
+  return fetch(url,{headers:Object.assign({},h,{"Range":"bytes=0-65535"})}).then(function(r){
+    if(!(r.ok||r.status===206))throw new Error("segment HTTP "+r.status);
+    var ct=clean(r.headers.get("content-type")).toLowerCase();
+    if(/text\/html|application\/json/.test(ct))throw new Error("segment is error page");
+    return r.arrayBuffer();
+  }).then(function(b){
+    if(!b||!b.byteLength)throw new Error("empty segment");
+    return true;
+  });
+}
 function validate(row){
   var u=clean(row&&row.url);
   if(!/^https?:\/\//i.test(u))return Promise.resolve(null);
@@ -131,10 +163,30 @@ function validate(row){
   }
   return fetch(u,{headers:h}).then(function(r){
     if(!r.ok)throw new Error("HLS HTTP "+r.status);
-    return r.text();
-  }).then(function(body){
-    if(String(body||"").indexOf("#EXTM3U")!==0)throw new Error("not HLS");
-    return{url:u,type:"hls",quality:qualityLabel(row.quality,u,body),headers:h};
+    return r.text().then(function(body){return{body:body,finalUrl:r.url||u};});
+  }).then(function(x){
+    var body=String(x.body||"");
+    if(body.indexOf("#EXTM3U")!==0)throw new Error("not HLS");
+    var masterQuality=qualityLabel(row.quality,u,body);
+    var v=bestVariant(body,x.finalUrl);
+    if(v){
+      return fetch(v.url,{headers:h}).then(function(r){
+        if(!r.ok)throw new Error("variant HTTP "+r.status);
+        return r.text().then(function(child){return{child:child,finalUrl:r.url||v.url};});
+      }).then(function(y){
+        if(String(y.child||"").indexOf("#EXTM3U")!==0)throw new Error("bad variant HLS");
+        var first=firstMediaLine(y.child);
+        if(!first)throw new Error("variant has no media");
+        return probeSegment(absUrl(first,y.finalUrl),h).then(function(){
+          return{url:u,type:"hls",quality:v.height?qualityLabel(v.height+"p",u):masterQuality,headers:h};
+        });
+      });
+    }
+    var first=firstMediaLine(body);
+    if(!first)throw new Error("HLS has no media");
+    return probeSegment(absUrl(first,x.finalUrl),h).then(function(){
+      return{url:u,type:"hls",quality:masterQuality,headers:h};
+    });
   });
 }
 function one(server,tmdbId,mediaType,season,episode){

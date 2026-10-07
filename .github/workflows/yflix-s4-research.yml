@@ -9,50 +9,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      - name: Extract targeted FilmU provider definitions
+      - name: Extract FilmU endpoint templates
         shell: bash
         run: |
           python - <<'PY'
           import re, urllib.request
-          U='https://embed.filmu.in/assets/servers-B7U1aDDl.js'
-          req=urllib.request.Request(U,headers={
-            'User-Agent':'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36',
-            'Referer':'https://embed.filmu.in/movie/157336'
-          })
-          txt=urllib.request.urlopen(req,timeout=25).read().decode('utf-8','replace')
-          print('LEN',len(txt))
-          needles=[
-            'Multi-language HD stream',
-            'Premium HD streams',
-            'PrimeVids',
-            'StreamVault',
-            'High quality Hindi stream',
-            'High quality English stream',
-            'Direct-play Hindi stream',
-            'Top multi-server streaming',
-            'Fast direct-play stream',
-            'Reliable multi-title HD source',
-            'https://api.filmu.in',
-            'https://movieapi4.filmu.in',
-            'https://ott.filmu.in',
-            'https://box.filmu.in',
-            'https://prime.filmu.in',
-            'https://server2.filmu.in',
-            'https://rive.filmu.in',
-            'https://wormhole.filmu.in'
+          u='https://embed.filmu.in/assets/servers-B7U1aDDl.js'
+          req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0','Referer':'https://embed.filmu.in/movie/157336'})
+          s=urllib.request.urlopen(req,timeout=25).read().decode('utf-8','replace')
+          terms=[
+            '/api/singularity-',
+            '/scrape/Citadel/',
+            '/scrape/PrimeVids/',
+            '/scrape/Quasar/',
+            '/scrape/Nova/',
+            '/scrape/Allmovieland/',
+            '/stream/solstice/',
+            '/stream/flowcast/',
+            'movieapi4.filmu.in',
+            'api.filmu.in',
+            'ott.filmu.in',
+            'box.filmu.in',
+            'wormhole.filmu.in/proxy'
           ]
-          for needle in needles:
-              print('\n===== '+needle+' =====')
-              low=txt.lower(); nd=needle.lower(); start=0; count=0
-              while count<8:
-                  i=low.find(nd,start)
+          for term in terms:
+              print('\n=== '+term+' ===')
+              pos=0
+              for z in range(8):
+                  i=s.find(term,pos)
                   if i<0: break
-                  frag=re.sub(r'\s+',' ',txt[max(0,i-1400):min(len(txt),i+2500)])
-                  print(frag[:3900])
-                  start=i+len(nd); count+=1
-
-          print('\n===== LIKELY PROVIDER OBJECTS =====')
-          for m in re.finditer(r'(?:name|scraperName|label|description):["\'][^"\']*(?:PrimeVids|StreamVault|Multi-language|Hindi|English|multi-server)[^"\']*["\']',txt,re.I):
-              i=m.start()
-              print(re.sub(r'\s+',' ',txt[max(0,i-1800):min(len(txt),i+3500)])[:5300])
+                  print(re.sub(r'\s+',' ',s[max(0,i-1200):i+2200])[:3400])
+                  pos=i+len(term)
           PY

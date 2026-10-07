@@ -43,7 +43,13 @@ jobs:
               while((m=re.exec(s))){
                 const id=m[1],name=cleanName(m[2]);
                 if(!/^(?:zstream-|site-|aether-)/.test(id))continue;
-                found.set(id,{id,name,asset:u});
+                const raw=m[0];
+                const movie=/movie:!0/.test(raw),tv=/tv:!0/.test(raw);
+                const enabled=/enabled:!0/.test(raw);
+                const sm=/source:["']([^"']+)["']/.exec(raw);
+                const sv=/service:["']([^"']+)["']/.exec(raw);
+                const rm=/reason:["']([^"']+)["']/.exec(raw);
+                found.set(id,{id,name,asset:u,movie,tv,enabled,source:sm?sm[1]:"",service:sv?sv[1]:"",reason:rm?rm[1]:""});
               }
             }
             console.log('SOURCE_COUNT '+found.size);
@@ -51,7 +57,10 @@ jobs:
               const idHit=manifestIds.has(('noctra-'+x.id).toLowerCase())||manifestIds.has(x.id.toLowerCase());
               const n=x.name.toLowerCase();
               const nameHit=manifestNames.some(m=>m.includes(n)||n.includes(m.replace(/^noctratv · /,'')));
-              console.log((idHit||nameHit?'COVERED ':'GAP ') + x.id+' | '+x.name);
+              console.log((idHit||nameHit?'COVERED ':'GAP ') + x.id+' | '+x.name+
+                ' | enabled='+x.enabled+' movie='+x.movie+' tv='+x.tv+
+                ' source='+x.source+' service='+x.service+
+                (x.reason?' | reason='+x.reason:''));
             }
           })().catch(e=>{console.error(e);process.exitCode=1});
           NODE

@@ -5,37 +5,25 @@ on:
       - '.github/workflows/yflix-s4-research.yml'
   workflow_dispatch:
 jobs:
-  probe:
+  inspect:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Probe FilmU same-origin proxy
+      - name: Inspect FilmU TV-capable endpoints
         shell: bash
         run: |
           python - <<'PY'
-          import urllib.request, json
-          UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'
-          urls=[
-          'https://embed.filmu.in/api/proxy?b64path=L3NjcmFwZS9BbGxtb3ZpZWxhbmQvbW92aWUvdHQwODE2NjkyP3RtZGJJZD0xNTczMzYmdGl0bGU9SW50ZXJzdGVsbGFyJnllYXI9MjAxNA%3D%3D',
-          'https://embed.filmu.in/api/proxy?b64path=L3NjcmFwZS9BbGxtb3ZpZWxhbmQvdHYvdHQ5Mjg4MDMwP3RtZGJJZD0xMDg5NzgmdGl0bGU9UmVhY2hlciZ5ZWFyPTIwMjImc2Vhc29uPTEmZXBpc29kZT0x',
-          'https://embed.filmu.in/api/proxy?b64path=L3NjcmFwZS9QcmltZVZpZHMvbW92aWUvdHQwODE2NjkyP3RtZGJJZD0xNTczMzYmdGl0bGU9SW50ZXJzdGVsbGFyJnllYXI9MjAxNA%3D%3D',
-          'https://embed.filmu.in/api/proxy?b64path=L3NjcmFwZS9RdWFzYXIvbW92aWUvdHQwODE2NjkyP3RtZGJJZD0xNTczMzYmdGl0bGU9SW50ZXJzdGVsbGFyJnllYXI9MjAxNA%3D%3D'
-          ]
-          for u in urls:
-              req=urllib.request.Request(u,headers={
-                'User-Agent':UA,
-                'Accept':'application/json, text/plain, */*',
-                'Origin':'https://embed.filmu.in',
-                'Referer':'https://embed.filmu.in/movie/157336',
-                'Sec-Fetch-Site':'same-origin',
-                'Sec-Fetch-Mode':'cors',
-                'Sec-Fetch-Dest':'empty'
-              })
-              try:
-                  with urllib.request.urlopen(req,timeout=15) as r:
-                      b=r.read().decode('utf-8','replace')
-                      print('STATUS',r.status,'LEN',len(b),'URL',u)
-                      print(b[:6000])
-              except Exception as e:
-                  print('ERR',repr(e),'URL',u)
+          import re, urllib.request
+          u='https://embed.filmu.in/assets/servers-B7U1aDDl.js'
+          req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0','Referer':'https://embed.filmu.in/tv/108978/1/1'})
+          s=urllib.request.urlopen(req,timeout=20).read().decode('utf-8','replace')
+          terms=['MovieBoxV2','FilmU Nebula','/api/apollo?','singularity-tv','VidRock','PrimeVids','FilmU Hindi']
+          for term in terms:
+              print('\n=== '+term+' ===')
+              pos=0
+              for z in range(5):
+                  i=s.find(term,pos)
+                  if i<0:break
+                  print(re.sub(r'\s+',' ',s[max(0,i-2000):i+3500])[:5500])
+                  pos=i+len(term)
           PY

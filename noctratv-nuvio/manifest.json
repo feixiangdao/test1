@@ -1,6 +1,6 @@
 {
   "name": "NoctraTV Local",
-  "version": "4.55.0",
+  "version": "4.56.0",
   "description": "Direct local providers mapped from the current noctratv.com MPlayer Source menu. Each source resolves media on the Nuvio device; no iframe/web-player fallback.",
   "scrapers": [
     {
@@ -22,6 +22,28 @@
         "multi"
       ],
       "limited": false
+    },
+    {
+      "id": "noctra-vidup",
+      "name": "NoctraTV · VidUp / Orion",
+      "description": "Current NoctraTV top-level Orion source (real provider: vidup). Uses the current MZone v2 challenge/session flow with an ephemeral P-256 key, calls /mplayer/vidup/resolve, rejects silent provider fallback, and returns only validated HLS/DASH/MP4. Experimental until Android/Nuvio playback is verified.",
+      "version": "1.0.0",
+      "author": "NoctraTV Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidup.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
     },
     {
       "id": "noctra-vidrock",

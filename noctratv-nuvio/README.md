@@ -87,3 +87,16 @@ Vidy、CineJoy、Orion、Lyra、Phoenix、KissKH、LMScript、Atlas、Vega、Hex
 - NoctraTV · Novera · VidZee Hindi v3
 
 这些研究 Provider 均已独立注册，不与 Stellar/Cinejoy 合并。
+
+## v4.55.0 继续研究
+
+新增 **NoctraTV · MZone GapProbe** 研究 Provider（默认关闭），复用仓库现有研究解析器统一探测当前尚未拆成独立 Provider 的 MZone source IDs：
+
+- Dulo · Auto
+- Cineflix · Latino / Castellano / Subbed
+- CinemaOS · Helios / Selene / Eos
+- 1Shows · Jill
+
+其中 Dulo 与 1Shows 已有独立 Provider，GapProbe 主要用于继续验证 Cineflix 与 CinemaOS 三个未独立落地的 Source family。只有最终媒体通过 HLS/MP4 校验才会返回，HTML/iframe 不返回。
+
+当前 manifest 版本：**4.55.0**，共 **74 个 Provider**（包含研究 Provider）。

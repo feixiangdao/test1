@@ -1,6 +1,8 @@
 // YesMovies S3 Lab for Nuvio
 // EXPERIMENTAL and isolated from stable YesMovies Local v0.2.6.
-// Route: TMDB -> YesMovies internal id -> Ployan server 5 -> full Vidara filecode -> /api/stream -> HLS.
+// v0.1.2
+// Route: TMDB -> YesMovies internal id -> Ployan server 5 -> Vidara /api/stream.
+// Tests full code first, then legacy base-code fallback; both require strict TMDB title validation.
 
 var UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36";
 var TMDB_KEY="1865f43a0549ca50d341dd9ab8b29f49";
@@ -131,28 +133,39 @@ function titleLooksRight(apiTitle,info){
   if(c&&(a===c||a.indexOf(c)>=0||c.indexOf(a)>=0))return true;
   return false;
 }
-function validateAndResolveVidara(embed,info){
-  var v=parseVidaraEmbed(embed);
-  diag("VIDARA · full code "+v.code);
-  var api=v.origin+"/api/stream";
+function vidaraApiTry(origin,code,info,label){
+  var api=origin+"/api/stream";
+  diag("VIDARA · try "+label+" · "+code);
   return fetchOk(api,{
     method:"POST",
     headers:{
       "User-Agent":UA,
       "Accept":"application/json, text/plain, */*",
       "Content-Type":"application/json",
-      "Origin":v.origin,
-      "Referer":v.origin+"/",
+      "Origin":origin,
+      "Referer":origin+"/",
       "X-Requested-With":"XMLHttpRequest"
     },
-    body:JSON.stringify({filecode:v.code,device:"web"})
-  },"Vidara API",10000).then(function(r){return r.json();}).then(function(j){
-    if(j&&j.error)throw new Error("Vidara "+clean(j.error));
+    body:JSON.stringify({filecode:code,device:"web"})
+  },"Vidara API "+label,10000).then(function(r){return r.json();}).then(function(j){
+    if(j&&j.error)throw new Error(clean(j.error));
     var u=clean(j&&j.streaming_url),ttl=clean(j&&j.title);
-    diag("VIDARA · title "+(ttl||"?"));
-    if(!u)throw new Error("Vidara streaming_url missing");
-    if(!titleLooksRight(ttl,info))throw new Error("Vidara content mismatch");
-    return{url:u,origin:v.origin,referer:v.origin+"/"};
+    diag("VIDARA · "+label+" title "+(ttl||"?"));
+    if(!u)throw new Error("streaming_url missing");
+    if(!titleLooksRight(ttl,info))throw new Error("content mismatch");
+    return{url:u,origin:origin,referer:origin+"/",code:code,label:label,title:ttl};
+  });
+}
+function validateAndResolveVidara(embed,info){
+  var v=parseVidaraEmbed(embed);
+  var full=v.code,base=full.replace(/-\d{10}$/,"");
+  return vidaraApiTry(v.origin,full,info,"full").catch(function(e1){
+    diag("VIDARA · full failed · "+(e1&&e1.message?e1.message:e1));
+    if(base===full)throw e1;
+    return vidaraApiTry(v.origin,base,info,"base").catch(function(e2){
+      diag("VIDARA · base failed · "+(e2&&e2.message?e2.message:e2));
+      throw new Error("Vidara full/base both failed");
+    });
   });
 }
 

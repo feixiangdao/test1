@@ -1,5 +1,5 @@
 // YesMovies Local for Nuvio
-// v0.1.2
+// v0.1.3
 // Flow:
 // TMDB metadata -> YesMovies search -> movie/season page -> /ajax/v4_movie_episodes/{id}
 // -> movie_embed and/or movie_sources (+ token when required) -> direct HLS/MP4/DASH.
@@ -15,6 +15,7 @@ var UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) C
 
 var pageCache={};
 var lookupCache={};
+var warmCache={};
 var DIAG=[];
 
 function diag(msg){
@@ -22,7 +23,12 @@ function diag(msg){
   if(msg&&DIAG.indexOf(msg)<0)DIAG.push(msg);
 }
 function statusRows(){
-  var a=DIAG.slice(-5);
+  var a=[];
+  if(DIAG.length<=8)a=DIAG.slice(0);
+  else a=DIAG.slice(0,5).concat(DIAG.slice(-3));
+  var seen={},b=[];
+  a.forEach(function(x){if(x&&!seen[x]){seen[x]=1;b.push(x);}});
+  a=b;
   if(!a.length)a=["No route returned a stream"];
   return a.map(function(msg,i){
     var name="YesMovies · DIAG "+(i+1)+" · "+msg;
@@ -114,6 +120,10 @@ function xhrHeaders(base,referer){
 function fetchText(url,opt,ms,label){
   opt=opt||{};
   try{opt.skipSizeCheck=true;}catch(_){}
+  if(/yesmovies\.ag/i.test(url)){
+    try{opt.credentials="include";}catch(_){}
+    try{opt.redirect="follow";}catch(_){}
+  }
   return timeout(fetch(url,opt),ms||9000,label||url).then(function(r){
     if(!r||!r.ok)throw new Error((label||"HTTP")+" "+(r?r.status:"no-response"));
     return r.text();
@@ -211,10 +221,23 @@ function scoreCandidate(c,info,type,season){
 function searchUrls(base,q){
   var e=slugQuery(q);
   return [
-    base+"/search/"+e+".html",
     base+"/movie/search/"+e+".html",
-    base+"/search?keyword="+e
+    base+"/search/"+e+"/page-1.html",
+    base+"/search/"+e+".html"
   ];
+}
+function warmBase(base){
+  if(warmCache[base])return warmCache[base];
+  warmCache[base]=fetchText(base+"/",{headers:baseHeaders(base,base+"/")},7000,"warmup")
+    .then(function(t){
+      diag("WARMUP · "+base+" · ok "+String(t||"").length+" bytes");
+      return true;
+    })
+    .catch(function(e){
+      diag("WARMUP · "+base+" · "+(e&&e.message?e.message:e));
+      return false;
+    });
+  return warmCache[base];
 }
 function searchOne(base,q){
   var urls=searchUrls(base,q),i=0;
@@ -224,7 +247,11 @@ function searchOne(base,q){
     return cachedText(u,{headers:baseHeaders(base,base+"/")},90000)
       .then(function(h){
         var rows=extractMovieLinks(h,base);
-        if(rows.length){log("search "+u+" => "+rows.length);return rows;}
+        if(rows.length){
+          diag("SEARCH · "+u+" · ok "+rows.length+" results");
+          log("search "+u+" => "+rows.length);return rows;
+        }
+        diag("SEARCH · "+u+" · HTTP 200 but parsed 0 results");
         return next();
       })
       .catch(function(e){
@@ -232,7 +259,7 @@ function searchOne(base,q){
         log(m);diag(m);return next();
       });
   }
-  return next();
+  return warmBase(base).then(next);
 }
 function queriesFor(info,type,season){
   var q=[];
@@ -369,7 +396,7 @@ function nestedMedia(pageUrl,referer,depth){
 function tokenXY(base,match,row){
   var u=base+"/ajax/movie_token?eid="+encodeURIComponent(row.id)+"&mid="+encodeURIComponent(match.id)+"&_="+now();
   return fetchText(u,{headers:xhrHeaders(base,match.url)},7000,"token").then(function(t){
-    var x="",y="",mx=t.match(/_x\s*=\s*["']([^"']+)["']/),my=t.match(/_y\s*=\s*["']([^"']+)["']/);
+    var x="",y="",mx=t.match(/(?:^|[^A-Za-z0-9_])_?x\s*=\s*["']([^"']+)["']/),my=t.match(/(?:^|[^A-Za-z0-9_])_?y\s*=\s*["']([^"']+)["']/);
     if(mx)x=mx[1]; if(my)y=my[1];
     if(!x||!y){
       var j=jsonMaybe(t);

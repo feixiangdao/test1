@@ -421,32 +421,75 @@ function resolveAjaxV1(tmdb,type,season,episode,meta){
     });
   });
 }
+
+// Nuvio hides a provider when it returns zero result rows. The diagnostic
+// row is explicitly NON-PLAYABLE and displays why V1 has no real stream.
+// It is the same status-row mechanism used by our established YesMovies and
+// NOVIPNOAD providers; it is not a fabricated video or iframe playback URL.
+function statusRow(reason){
+  var msg=clean(reason).replace(/\s+/g," ").slice(0,135)||"没有取得可播放的视频流";
+  var name="VidPlay · V1 · 诊断（不可播放）："+msg;
+  return {name:name,title:name,
+    url:"data:application/vnd.apple.mpegurl;base64,I0VYVE0zVQojRVhULVgtVkVSU0lPTjozCiNFWFQtWC1FTkRMSVNUCg==",
+    quality:"Status",type:"hls",provider:"vidplay-direct-lab",headers:{},subtitles:[]};
+}
+function briefError(e){
+  return clean(e&&e.message||e).replace(/https?:\/\/\S+/g,"[URL]").slice(0,68)||"未知错误";
+}
+function withinBudget(p,ms){
+  if(typeof setTimeout!=="function")return p;
+  var handle;
+  var watchdog=new Promise(function(_,reject){
+    handle=setTimeout(function(){reject(new Error("查询超过 "+Math.ceil(ms/1000)+" 秒"));},ms);
+  });
+  return Promise.race([p,watchdog]).then(function(v){
+    if(typeof clearTimeout==="function")clearTimeout(handle);return v;
+  },function(e){
+    if(typeof clearTimeout==="function")clearTimeout(handle);throw e;
+  });
+}
 function getStreams(id,mediaType,season,episode){
   var type=mediaType==="tv"?"tv":"movie",tmdb=clean(id);
-  if(!/^\d+$/.test(tmdb))return Promise.resolve([]);
+  if(!/^\d+$/.test(tmdb))return Promise.resolve([statusRow("影片 ID 无效")]);
   season=parseInt(season,10)||0;episode=parseInt(episode,10)||0;
-  if(type==="tv"&&(!season||!episode))return Promise.resolve([]);
-  return tmdbMeta(tmdb,type).then(function(meta){
+  if(type==="tv"&&(!season||!episode))return Promise.resolve([statusRow("缺少季或集编号")]);
+  var reasons=[];
+  var work=tmdbMeta(tmdb,type).then(function(meta){
+    if(!meta)reasons.push("元数据服务不可用");
     var route=type==="movie"&&meta&&meta.imdb
       ?resolveYthd(meta.imdb,BASE+"/").catch(function(e){
-        log("V1 YTHD: "+(e&&e.message||e));return[];
+        var issue=briefError(e);
+        log("V1 YTHD: "+issue);reasons.push("播放器："+issue);return[];
       }):Promise.resolve([]);
     return route.then(function(rows){
       if(rows.length)return rows;
       return resolveAjaxV1(tmdb,type,season,episode,meta).catch(function(e){
-        log("V1 AJAX: "+(e&&e.message||e));return[];
+        var issue=briefError(e);
+        log("V1 AJAX: "+issue);reasons.push("站点备用接口："+issue);return[];
       });
     });
   }).then(function(rows){
-    var all=[],seen={};rows.forEach(function(r){if(r&&!seen[r.url]){seen[r.url]=1;all.push(r);}});
+    var all=[],seen={};
+    (rows||[]).forEach(function(r){
+      if(!r||!r.url||r.quality==="Status"||/^data:/i.test(r.url)||seen[r.url])return;
+      seen[r.url]=1;all.push(r);
+    });
     log("V1 "+type+" "+tmdb+" verified streams="+all.length);
-    return all;
+    if(all.length)return all;
+    return [statusRow(reasons.length?reasons.join("；"):"V1 当前未返回可播放直链")];
+  }).catch(function(e){
+    var issue=briefError(e);log("V1 runtime: "+issue);
+    return[statusRow("查询异常："+issue)];
+  });
+  return withinBudget(work,7000).catch(function(e){
+    var issue=briefError(e);log("V1 timeout: "+issue);
+    return[statusRow(issue+"；站点访问可能被限制")];
   });
 }
 function onSettings(){
   return [
     {type:"header",label:"VidPlay · V1 only (experimental)"},
-    {type:"info",label:"V1 retrieves a public TMDB-to-IMDb lookup, then resolves the ythd.org playback chain. Only verified HLS/MP4/DASH streams are shown. Server-side browser verification or missing player-signed tokens prevent direct Nuvio playback. No V2/V3."},
+    {type:"info",label:"V1 retrieves a public TMDB-to-IMDb lookup, then resolves the ythd.org playback chain. Only verified HLS/MP4/DASH streams are playable. If V1 requires browser verification, a clearly labeled NON-PLAYABLE diagnostic/status row is shown to keep the provider visible. Requests have a 7s time budget. No V2/V3."},
     {type:"text",key:"tmdbApiKey",label:"TMDB key (optional fallback only)",defaultValue:"",isPassword:true}
   ];
 }

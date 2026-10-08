@@ -10,7 +10,14 @@ async function req(url,referer){
   const t=await r.text();
   return{r,t};
 }
-function parseCfg(html,label){let m=html.match(new RegExp("window\\\\."+label+"\\\\s*=\\\\s*(\\\\{[^\\\\n]*?\\\\})\\\\s*;"));return m?JSON.parse(m[1]):null;}
+function parseCfg(html,label){
+  const re=label==="CFG"
+    ? /window\.CFG\s*=\s*(\{[^\n]*?\})\s*;/i
+    : /window\.CONFIG\s*=\s*(\{[^\n]*?\})\s*;/i;
+  const m=html.match(re);
+  if(!m)return null;
+  try{return JSON.parse(m[1])}catch(e){return null}
+}
 (async()=>{
   const traces=[];
   const tests=[

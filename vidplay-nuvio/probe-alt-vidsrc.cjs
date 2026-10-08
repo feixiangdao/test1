@@ -25,6 +25,7 @@ function parseCfg(html,label){let m=html.match(new RegExp("window\\\\."+label+"\
       if(!one.r.ok){traces.push(x);continue}
       let j=JSON.parse(one.t);
       x.bootstrap.hasSrc=!!j.src;
+      x.bootstrap.srcShape=shape(j.src);
       let playerPage=new URL(j.src||"",PLAYER);
       if(playerPage.origin!==PLAYER||!playerPage.pathname.startsWith("/embed/")){x.error="unexpected embed host";traces.push(x);continue;}
       x.playerPage=shape(playerPage.href);

@@ -9,6 +9,7 @@ on:
       - 'flixer-provider-lab/local-environment.js'
       - 'flixer-provider-lab/pack-local.mjs'
       - 'flixer-provider-lab/test-local-bundle.mjs'
+      - 'flixer-provider-lab/test-local-live.mjs'
       - '.github/workflows/flixer-live-parity.yml'
   workflow_dispatch:
 jobs:
@@ -49,3 +50,5 @@ jobs:
           node --check /tmp/flixer-local-candidate.js
           node -e 'const {parse}=require("hermes-parser");const fs=require("fs");const s=fs.readFileSync("/tmp/flixer-local-candidate.js","utf8");parse(s,{sourceType:"script"});console.log("LOCAL_BUNDLE_HERMES_PARSE_PASS",s.length)'
           node flixer-provider-lab/test-local-bundle.mjs
+      - name: Verify unsigned-secret-free direct Node network retrieval from local Provider
+        run: node flixer-provider-lab/test-local-live.mjs

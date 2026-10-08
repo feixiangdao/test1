@@ -1,0 +1,19 @@
+name: VidPlay V1 backend reuse feasibility
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'vidplay-nuvio/probe-reuse-vidsrc.cjs'
+      - '.github/workflows/probe-reuse-vidsrc.yml'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node vidplay-nuvio/probe-reuse-vidsrc.cjs

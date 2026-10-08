@@ -9,68 +9,44 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Probe current VidBolt servers
+      - name: Probe Quasar file candidates
         shell: bash
         run: |
           set -e
           python3 - <<'PY'
-          import requests,re,json,urllib.parse
+          import requests,json,re,subprocess,tempfile,os
           S=requests.Session();S.headers.update({"User-Agent":"Mozilla/5.0"})
-
-          def duration(url,headers=None):
-            try:
-              r=S.get(url,timeout=25,headers=headers or {})
-              if r.status_code!=200:return {"status":r.status_code,"head":r.text[:80]}
-              txt=r.text
-              if "#EXTM3U" not in txt:return {"status":200,"not_hls":True,"ct":r.headers.get("content-type")}
-              vals=[float(x) for x in re.findall(r'#EXTINF:([0-9.]+)',txt)]
-              if vals:return {"status":200,"minutes":round(sum(vals)/60,2),"segments":len(vals)}
-              for line in txt.replace("\r","").split("\n"):
-                line=line.strip()
-                if line and not line.startswith("#"):
-                  return {"status":200,"master":True,"child":duration(urllib.parse.urljoin(url,line),headers)}
-              return {"status":200,"empty":True}
-            except Exception as e:return {"error":repr(e)}
-
           cases=[
-            ("Interstellar","movie","tt0816692",157336,"Interstellar",2014,None,None),
-            ("ReacherS01E01","tv","tt9288030",108978,"Reacher",2022,1,1)
+            ("Interstellar","https://scraper.vidbolt.xyz/scrape/Quasar/movie/tt0816692?tmdbId=157336"),
+            ("ReacherS01E01","https://scraper.vidbolt.xyz/scrape/Quasar/tv/tt9288030?tmdbId=108978&season=1&episode=1")
           ]
-          for label,kind,imdb,tmdb,title,year,season,episode in cases:
+          for label,api in cases:
             print("\n###",label)
-            specs=[]
-            q_fast=f"tmdbId={tmdb}&imdbId={imdb}"
-            q_nin=f"title={urllib.parse.quote(title)}&year={year}&tmdbId={tmdb}"
-            q_saf=f"tmdbId={tmdb}&imdbId={imdb}&title={urllib.parse.quote(title)}&year={year}"
-            q_nova=f"tmdbId={tmdb}"
-            if kind=="tv":
-              extra=f"&season={season}&episode={episode}"
-              q_fast+=extra;q_nin+=extra;q_saf+=extra;q_nova+=extra
-            specs=[
-              ("FastVa",f"https://scraper.vidbolt.xyz/scrape/FastVa/{kind}/{imdb}?{q_fast}"),
-              ("Ninetta",f"https://scraper.vidbolt.xyz/scrape/Ninetta/{kind}/{imdb}?{q_nin}"),
-              ("Saffron",f"https://scraper.vidbolt.xyz/scrape/Saffron/{kind}/{imdb}?{q_saf}"),
-              ("Nova",f"https://scraper.vidbolt.xyz/scrape/Nova/{kind}/{imdb}?{q_nova}")
-            ]
-            for name,url in specs:
+            r=S.get(api,timeout=40,headers={"Accept":"application/json","Referer":"https://vidbolt.xyz/"})
+            print("API",r.status_code,len(r.text))
+            if r.status_code!=200:continue
+            rows=(r.json().get("sources") or [])
+            candidates=[]
+            for row in rows:
+              u=row.get("url",""); typ=str(row.get("type","")).lower()
+              if "m3u8" in u.lower() or typ in ("m3u8","hls"):continue
+              candidates.append(row)
+            print("FILE_ROWS",len(candidates))
+            for idx,row in enumerate(candidates[:12]):
+              u=row.get("url","");h=row.get("headers") or {}
+              h={k:v for k,v in h.items() if k.lower() not in ("range","connection","accept-encoding")}
+              name=row.get("name","")
+              print("\nROW",idx,name,row.get("quality"),row.get("language"))
               try:
-                r=S.get(url,timeout=40,headers={"Accept":"application/json","Referer":"https://vidbolt.xyz/"})
-                print("\nSERVER",name,"API",r.status_code,"LEN",len(r.text))
-                if r.status_code!=200:
-                  print(r.text[:500]);continue
-                j=r.json(); rows=j.get("sources") or []
-                print("ROWS",len(rows))
-                for idx,row in enumerate(rows[:20]):
-                  u=row.get("url",""); typ=str(row.get("type","")).lower()
-                  print("ROW",idx,row.get("name"),row.get("quality"),row.get("language"),u[:260])
-                  if "m3u8" in u.lower() or typ in ("m3u8","hls"):
-                    print("PROBE",json.dumps(duration(u,row.get("headers") or {}),ensure_ascii=False))
-                  else:
-                    try:
-                      rr=S.get(u,timeout=15,headers={**(row.get("headers") or {}),"Range":"bytes=0-1023"},stream=True)
-                      print("FILEPROBE",rr.status_code,rr.headers.get("content-type"),rr.headers.get("content-range"),rr.headers.get("content-length"))
-                      rr.close()
-                    except Exception as e: print("FILEERR",repr(e))
+                rr=S.get(u,timeout=20,headers={**h,"Range":"bytes=0-65535"},stream=True)
+                print("RANGE",rr.status_code,rr.headers.get("content-type"),rr.headers.get("content-range"),rr.headers.get("content-length"),rr.url)
+                data=b""
+                if rr.status_code in (200,206):
+                  for chunk in rr.iter_content(65536):
+                    data+=chunk
+                    if len(data)>=65536:break
+                rr.close()
+                print("BYTES",len(data),data[:16].hex())
               except Exception as e:
-                print("\nSERVER",name,"ERR",repr(e))
+                print("RANGEERR",repr(e))
           PY

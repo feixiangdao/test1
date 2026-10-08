@@ -6,9 +6,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
-      - name: Test patched CineSrc Surge with normal module runner
+      - name: Test patched CineSrc Surge once
         shell: bash
         run: |
           set -e
@@ -16,53 +16,37 @@ jobs:
           cd /tmp/cs
           python3 -c "p='src/protection/host.js';s=open(p).read();old=\"headers.set('x-cs-r', requestToken)\n      }\";new=\"headers.set('x-cs-r', requestToken)\n        if (protectionHeader) headers.set('x-cs-q', protectionHeader)\n        if (requestPacket) headers.set('x-cs-p', requestPacket)\n      }\";assert old in s;open(p,'w').write(s.replace(old,new))"
           npm ci >/dev/null
-          cat > /tmp/cs/test-surge.mjs <<'NODE'
+          cat > /tmp/cs/test-one.mjs <<'NODE'
           import { parseStreamQuery, fetchProviderCatalog, resolveProviderStream } from './src/resolve/live.js';
-
-          function walkUrls(v, out) {
-            if (!v) return;
-            if (typeof v === 'string') {
-              if (/^https?:\/\//i.test(v)) out.push(v);
-              return;
-            }
-            if (Array.isArray(v)) {
-              for (const x of v) walkUrls(x, out);
-              return;
-            }
-            if (typeof v === 'object') {
-              for (const k of Object.keys(v)) walkUrls(v[k], out);
-            }
-          }
-
-          async function test(label, query) {
-            const input=parseStreamQuery(query);
+          const input=parseStreamQuery({id:'157336',type:'movie'});
+          try {
             const cat=await fetchProviderCatalog(input);
-            console.log('CATALOG',label,JSON.stringify(cat.providers));
-            for (const id of ['surge','nebula','wave']) {
-              try {
-                const r=await resolveProviderStream(input,id);
-                console.log('RESULT',label,id,JSON.stringify(r,null,2));
-                const urls=[]; walkUrls(r,urls);
-                console.log('URLS',label,id,JSON.stringify(urls));
-                for (const u of urls.filter(x=>/m3u8|playlist/i.test(x)).slice(0,3)) {
-                  try {
-                    const p=await fetch(u,{headers:{Referer:'https://cinesrc.st/','User-Agent':'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/137.0.0.0 Mobile Safari/537.36'},signal:AbortSignal.timeout(15000)});
-                    const t=await p.text();
-                    console.log('HLS',label,id,p.status,p.headers.get('content-type'),u,t.slice(0,180).replace(/\n/g,'\\n'));
-                  } catch(e) {
-                    console.log('HLS_ERR',label,id,String(e?.message||e));
-                  }
-                }
-                if (r?.ok) return;
-              } catch(e) {
-                console.log('ERR_TYPE',label,id,typeof e,e?.constructor?.name);
-                try{console.log('ERR_JSON',label,id,JSON.stringify(e,null,2));}catch{}
-                console.log('ERR_STRING',label,id,String(e?.message||e));
-              }
+            console.log('CATALOG',JSON.stringify(cat.providers));
+            const r=await resolveProviderStream(input,'surge');
+            console.log('RESULT_JSON',JSON.stringify(r,null,2));
+            const urls=[];
+            const walk=(v)=>{
+              if(!v)return;
+              if(typeof v==='string'){if(/^https?:\/\//i.test(v))urls.push(v);return;}
+              if(Array.isArray(v)){v.forEach(walk);return;}
+              if(typeof v==='object')Object.values(v).forEach(walk);
+            };
+            walk(r);
+            console.log('URLS',JSON.stringify(urls));
+            for(const u of urls.filter(x=>/m3u8|playlist/i.test(x)).slice(0,3)){
+              try{
+                const p=await fetch(u,{headers:{Referer:'https://cinesrc.st/','User-Agent':'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/137.0.0.0 Mobile Safari/537.36'},signal:AbortSignal.timeout(15000)});
+                const t=await p.text();
+                console.log('HLS',p.status,p.headers.get('content-type'),u,t.slice(0,200).replace(/\n/g,'\\n'));
+              }catch(e){console.log('HLS_ERR',String(e?.message||e));}
             }
+          } catch(e) {
+            console.log('ERR_TYPE',typeof e,e?.constructor?.name);
+            try{console.log('ERR_JSON',JSON.stringify(e,null,2));}catch{}
+            try{console.log('ERR_KEYS',Object.getOwnPropertyNames(e));}catch{}
+            try{for(const k of Object.getOwnPropertyNames(e)){console.log('ERR_FIELD',k,JSON.stringify(e[k]));}}catch{}
+            console.log('ERR_STRING',String(e?.message||e));
           }
-
-          await test('MOVIE',{id:'157336',type:'movie'});
-          await test('TV',{id:'108978',type:'tv',season:'1',episode:'1'});
+          process.exit(0);
           NODE
-          node /tmp/cs/test-surge.mjs
+          node /tmp/cs/test-one.mjs

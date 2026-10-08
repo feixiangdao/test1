@@ -1,13 +1,13 @@
 {
   "name": "NOVIPNOAD Local Alpha",
-  "version": "0.1.5",
-  "description": "Independent NOVIPNOAD provider using first-party title/episode discovery, TMDB Chinese aliases, and direct player resolution. Includes persistent diagnostics for metadata, site transport, matching, and player resolution.",
+  "version": "0.1.6",
+  "description": "Independent NOVIPNOAD provider using first-party title/episode discovery, TMDB Chinese aliases, and direct player resolution. Uses the NOVIPNOAD WordPress REST API for search/detail discovery to avoid 403 HTML pages, with persistent diagnostics.",
   "scrapers": [
     {
       "id": "novipnoad-local",
       "name": "NOVIPNOAD Local",
       "description": "NOVIPNOAD .ca/.uk/.net search + strict movie/TV/anime/show/Chinese-season matching + direct player quality extraction.",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "author": "NOVIPNOAD Local Lab",
       "supportedTypes": [
         "movie",

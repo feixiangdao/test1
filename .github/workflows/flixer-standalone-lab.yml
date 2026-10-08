@@ -1,0 +1,37 @@
+name: Flixer standalone local-JS compatibility
+on:
+  push:
+    branches: [flixer-provider-lab-20261008]
+    paths:
+      - 'flixer-provider-lab/build-local.mjs'
+      - '.github/workflows/flixer-standalone-lab.yml'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch Flixer public wasm and glue without a browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          H=plsdontscrapemelove.flixer.su
+          IP=$(curl -fsSL --retry 2 --max-time 8 "https://dns.google/resolve?name=$H&type=A&cd=true" | jq -r '.Answer // [] | map(select(.type == 1)) | .[0].data // empty')
+          test -n "$IP"
+          echo "Flixer API DNS answer present"
+          curl -fsSL --retry 2 --max-time 20 --resolve "$H:443:$IP" "https://$H/assets/wasm/img_data_bg.wasm" -o /tmp/flixer-img-data.wasm
+          curl -fsSL --retry 2 --max-time 20 --resolve "$H:443:$IP" "https://$H/assets/wasm/img_data.js" -o /tmp/flixer-img-data.js
+          wc -c /tmp/flixer-img-data.wasm /tmp/flixer-img-data.js
+      - name: Translate WASM and run browser-free JavaScript module
+        run: |
+          npm install --no-save binaryen@132.0.0
+          node node_modules/binaryen/bin/wasm-opt /tmp/flixer-img-data.wasm --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --llvm-nontrapping-fptoint-lowering --llvm-memory-copy-fill-lowering -o /tmp/flixer-lowered.wasm
+          node node_modules/binaryen/bin/wasm2js /tmp/flixer-lowered.wasm --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext -o /tmp/flixer-wasm-translation.mjs
+          node flixer-provider-lab/build-local.mjs
+          node --check /tmp/flixer-standalone.mjs

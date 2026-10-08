@@ -54,7 +54,7 @@ function parseCfg(html,label){
       x.inner.turnstile=!!p?.turnstile;
       x.inner.hasSignedToken=!!p?.apiToken;
       x.inner.api=shape(p?.api||p?.streamBase);
-      if(!p?.apiToken||p?.turnstile){traces.push(x);continue}
+      if(!p?.apiToken){traces.push(x);continue}
       let api=new URL(p.api||p.streamBase||"", "https://data.vidsrc.sh");
       if(api.origin!=="https://data.vidsrc.sh"||api.pathname!=="/api.php"){x.error="unexpected API host";traces.push(x);continue}
       api.searchParams.set("stream_urls","");

@@ -149,6 +149,13 @@ function discoverReferer(meta,type,season,episode){
     return ref;
   }).catch(function(e){log("site search unavailable: "+(e&&e.message||e));return"";});
 }
+// Some Nuvio QuickJS versions expose Uint8Array but lack .slice().
+function v1BytesSlice(source,start,end){
+  var count=Math.max(0,Math.min(source.length,end==null?source.length:end)-start);
+  var out=new Uint8Array(count);
+  for(var i=0;i<count;i++)out[i]=source[start+i]&255;
+  return out;
+}
 function s2Rd32(b,o){return ((b[o]|(b[o+1]<<8)|(b[o+2]<<16)|(b[o+3]<<24))>>>0);}
 function s2Rotl(x,n){return ((x<<n)|(x>>>(32-n)))>>>0;}
 function s2ChaChaBlock(k,c,n){
@@ -201,7 +208,7 @@ function s2WasmSegments(b){
           if(b[p]===0x0b)p++;
         }
         r=s2Leb(b,p);var dl=r[0];p=r[1];
-        var data=b.slice(p,p+dl);p+=dl;
+        var data=v1BytesSlice(b,p,p+dl);p+=dl;
         if(off>=0)out.push({off:off,data:data});
       }
     }
@@ -248,7 +255,7 @@ function s2DecryptUrls(encB64,wasm){
   if(enc.length<16)throw new Error("encrypted stream_urls too short");
   var key=s2RecoverKey(wasm,enc);
   var nonce=[s2Rd32(enc,0),s2Rd32(enc,4),s2Rd32(enc,8)];
-  var ct=enc.slice(12),out=new Uint8Array(ct.length);
+  var ct=v1BytesSlice(enc,12,enc.length),out=new Uint8Array(ct.length);
   for(var b=0;b<Math.ceil(ct.length/64);b++){
     var ks=s2ChaChaBlock(key,b,nonce);
     for(var j=0;j<64&&b*64+j<ct.length;j++)out[b*64+j]=ct[b*64+j]^ks[j];

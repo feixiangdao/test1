@@ -6,197 +6,32 @@ on:
 jobs:
   trace:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 4
     steps:
-      - name: Solve live CineSrc challenges and test current stream action
+      - name: Extract exact getStream call arguments
         shell: bash
         run: |
           set -e
-          node - <<'NODE'
-          const crypto=require('crypto');
-          const ORIGIN='https://cinesrc.st';
-          const PAGE=ORIGIN+'/embed/movie/157336';
-          const UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36';
-          const ACTION_PROVIDERS='00709a44ddb018c921339ab3213396ad85c0dc0237';
-          const ACTION_STREAM='7e278c7b1a4440a99a81b5c121b5f93193ce0a3f64';
-          const jar={};
-
-          function addCookies(res){
-            const arr=typeof res.headers.getSetCookie==='function'?res.headers.getSetCookie():[];
-            for(const x of arr){
-              const p=x.split(';')[0],i=p.indexOf('=');
-              if(i>0)jar[p.slice(0,i)]=p.slice(i+1);
-            }
-          }
-          function cookie(){return Object.keys(jar).map(k=>k+'='+jar[k]).join('; ')}
-          function b64url(s){return Buffer.from(s).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
-          function b64urlBuf(s){return Buffer.from(String(s).replace(/-/g,'+').replace(/_/g,'/'),'base64')}
-          async function req(url,opt={}){
-            const h=new Headers(opt.headers||{});
-            h.set('User-Agent',UA);
-            if(cookie())h.set('Cookie',cookie());
-            opt.headers=h;
-            opt.signal=AbortSignal.timeout(20000);
-            const r=await fetch(url,opt);addCookies(r);return r;
-          }
-
-          const u32=x=>x>>>0;
-          const imul=(a,b)=>Math.imul(a,b)>>>0;
-          function rotl(x,n){n&=31;if(n===0)return u32(x);return u32((x<<n)|(x>>>(32-n)))}
-          function build(w,m){
-            const s=new Uint32Array(4096);
-            let x=u32(w[m&3]^u32(imul(m,0x9e3779b1)-0x61c8864f)^0xa5a5a5a5);
-            let y=0x85ebca6b;
-            for(let i=0;i<4096;i++){
-              x=u32(x+y+w[i&3]);x=u32(x^(x<<13));x=u32(x^(x>>>17));x=u32(x^(x<<5));
-              s[i]=u32(x+imul(i^m,0xc2b2ae35)+rotl(w[(i+m)&3],i+m));
-              y=u32(y-0x7a143595);
-            }
-            return s;
-          }
-          function mix(w,s,m,n){
-            const lo=n>>>0,hi=Math.floor(n/4294967296)>>>0;
-            let a=u32(w[0]^imul(m+1,0x27d4eb2d)^lo),b=u32(w[2]^rotl(lo,m+5)),c=u32(hi^(w[1]^0x165667b1)),d=u32(w[3]^rotl(u32(lo^hi),m+11)),y=2667;
-            for(let r=1;r<9;r++){
-              const v=s[(imul(c,2481)^rotl(b,r)^y^a)&4095],op=((r+m-1)&7)-1;
-              if(op===-1){a=rotl(u32(a+d+v),5);c=u32(imul(a^c,0x9e3779b1)+b)}
-              else if(op===0){b=rotl(u32(b^c^v),11);d=u32(imul(b^a,0x85ebca6b)+d)}
-              else if(op===1){c=rotl(u32(b+c+v),17);a=u32(imul(c^d,0xc2b2ae35)^a)}
-              else if(op===2){d=rotl(u32(a^d^v),23);b=u32(imul(d^c,0x27d4eb2d)+b)}
-              else if(op===3){a=u32(imul(a^v,0x165667b1)+rotl(b,7));d=u32(rotl(u32(a+c),13)^d)}
-              else if(op===4){c=u32(imul(u32(v+c),0xd3a2646c)^rotl(d,9));b=u32(rotl(c^a,19)+b)}
-              else if(op===5){b=u32(imul(b^v,0xfd7046c5)+rotl(a,3));c=u32(rotl(u32(b+d),15)^c)}
-              else {d=u32(imul(u32(d+v),0xb55a4f09)^rotl(c,21));a=u32(rotl(d^b,27)+a)}
-              y+=2667;
-            }
-            return{lo,hi,a,c,b,d};
-          }
-          function hasLeadingZeroBits(h,bits){
-            const q=bits>>3,r=bits&7;
-            for(let i=0;i<q;i++)if(h[i])return false;
-            return r===0||(h[q]>>(8-r))===0;
-          }
-          function solveStage1(data){
-            const b=b64urlBuf(data.w),difficulty=b[5],m=b[6];
-            const w=[b.readUInt32LE(8),b.readUInt32LE(12),b.readUInt32LE(16),b.readUInt32LE(20)];
-            const s=build(w,m),msg=Buffer.alloc(42);
-            b.copy(msg,0,8,24);msg[40]=2;msg[41]=m;
-            const start=Date.now();
-            for(let n=0;;n++){
-              const z=mix(w,s,m,n);
-              msg.writeUInt32LE(z.lo,16);msg.writeUInt32LE(z.hi,20);msg.writeUInt32LE(z.a,24);msg.writeUInt32LE(z.c,28);msg.writeUInt32LE(z.b,32);msg.writeUInt32LE(z.d,36);
-              const h=crypto.createHash('sha256').update(msg).digest();
-              if(hasLeadingZeroBits(h,difficulty)){
-                console.log('STAGE1_SOLVED','difficulty',difficulty,'nonce',n,'ms',Date.now()-start);
-                return'm2.'+n.toString(16);
-              }
-            }
-          }
-          function solveStage2(data){
-            const rev=s=>s.split('').reverse().join('');
-            const target=rev(data.pack[0]),salt=rev(data.pack[3]),r=rev(data.pack[4]);
-            const decode=s=>b64urlBuf(s).toString();
-            const body=decode(r.split('.')[1]);
-            const payload=decode(body.slice(body.indexOf('.')+1));
-            const difficulty=JSON.parse(payload).d,width=(difficulty+3)>>2,limit=2**difficulty,start=Date.now();
-            for(let c=0;c<limit;c++){
-              const key=c.toString(16).padStart(width,'0');
-              if(crypto.createHash('sha256').update(salt+key).digest('hex')===target){
-                console.log('STAGE2_SOLVED','difficulty',difficulty,'key',key,'ms',Date.now()-start);
-                return key;
-              }
-            }
-            throw new Error('stage2 no solution');
-          }
-
-          async function postAction(action,payload){
-            const r=await req(PAGE,{
-              method:'POST',
-              headers:{
-                'Origin':ORIGIN,'Referer':ORIGIN+'/',
-                'Content-Type':'text/plain;charset=UTF-8',
-                'Next-Action':action
-              },
-              body:JSON.stringify(payload)
-            });
-            const t=await r.text();
-            console.log('ACTION',action.slice(0,8),'HTTP',r.status,'LEN',t.length,'HEAD',t.slice(0,240).replace(/\n/g,'\\n'));
-            return{r,t};
-          }
-
-          async function main(){
-            const q=b64url(JSON.stringify(['movie','157336',null,null]));
-            const boot=await req(ORIGIN+'/api/c/bootstrap',{method:'POST',headers:{'x-cs-q':q}});
-            const bj=await boot.json();
-            console.log('BOOT',boot.status,'rlen',String(bj.r||'').length,'plen',String(bj.p||'').length,'cookies',Object.keys(jar));
-
-            const issue=await req(ORIGIN+'/api/c/issue',{
-              headers:{'x-cs-q':q,'x-cs-r':bj.r,'x-cs-p':bj.p,'Referer':PAGE}
-            });
-            const it=await issue.text();
-            console.log('ISSUE',issue.status,'LEN',it.length,'BODY',it.slice(0,1200),'cookies',Object.keys(jar));
-            if(!issue.ok)throw new Error('issue http '+issue.status);
-            const c1=JSON.parse(it);
-            const s1=solveStage1(c1);
-
-            const st2=await req(ORIGIN+'/api/c/stage2/issue',{
-              headers:{'x-cs-q':q,'x-cs-r':bj.r,'Referer':PAGE}
-            });
-            const st=await st2.text();
-            console.log('STAGE2',st2.status,'LEN',st.length,'BODY',st.slice(0,1600),'cookies',Object.keys(jar));
-            if(!st2.ok)throw new Error('stage2 http '+st2.status);
-            const c2=JSON.parse(st);
-            const s2=solveStage2(c2);
-            console.log('SOLUTIONS',s1,s2);
-
-            const encPayload={
-              url:PAGE,
-              agent:UA,
-              challenge_data:{
-                stage1:{challenge:c1,solution:s1},
-                stage2:{challenge:c2,solution:s2}
-              }
-            };
-            const encRes=await fetch('https://enc-dec.app/api/enc-cinesrc',{
-              method:'POST',
-              headers:{'content-type':'application/json','User-Agent':UA},
-              body:JSON.stringify(encPayload),
-              signal:AbortSignal.timeout(30000)
-            });
-            const encText=await encRes.text();
-            console.log('ENCDEC',encRes.status,'LEN',encText.length,'BODY',encText.slice(0,5000));
-            if(!encRes.ok)throw new Error('enc-dec http '+encRes.status);
-            const ej=JSON.parse(encText);
-            const ed=ej.result||ej.data||ej;
-            const token=String(ed.token||'')+'::c3::'+String(bj.r);
-            const key=ed.key;
-            const ap=ed.headers&&ed.headers.getProviderList||ACTION_PROVIDERS;
-            const as=ed.headers&&ed.headers.getStream||ACTION_STREAM;
-            console.log('ENC_FIELDS','token',String(ed.token||'').length,'key',String(key||'').length,'actions',ap,as);
-
-            const providers=await postAction(ap,[]);
-            const lines=providers.t.split(/\r?\n/);
-            const pline=lines.find(x=>/^1:/.test(x))||'';
-            const plist=pline?JSON.parse(pline.slice(2)):[];
-            console.log('PROVIDERS',plist.map(x=>({id:x.id,name:x.name})));
-            for(const p of plist.slice(0,6)){
-              const sr=await postAction(as,['157336','movie','$undefined','$undefined',token,p.id]);
-              if(!sr.r.ok)continue;
-              const line=sr.t.split(/\r?\n/).find(x=>/^1:/.test(x))||'';
-              console.log('STREAM_LINE',p.id,line.slice(0,800));
-              const after=line.slice(2),comma=after.indexOf(','),colon=after.indexOf(':',comma+1);
-              const encrypted=comma>=0&&colon>comma?after.slice(comma+1,colon):'';
-              if(!encrypted)continue;
-              const decRes=await fetch('https://enc-dec.app/api/dec-cinesrc',{
-                method:'POST',
-                headers:{'content-type':'application/json','User-Agent':UA},
-                body:JSON.stringify({text:encrypted,key}),
-                signal:AbortSignal.timeout(30000)
-              });
-              const dt=await decRes.text();
-              console.log('DEC',p.id,decRes.status,'LEN',dt.length,'BODY',dt.slice(0,6000));
-              if(decRes.ok)break;
-            }
-          }
-          main().catch(e=>{console.error('FATAL',e&&e.stack||e);process.exit(1)});
-          NODE
+          UA='Mozilla/5.0'
+          curl -fsSL --max-time 30 -A "$UA" 'https://cinesrc.st/embed/movie/157336' -o /tmp/page.html
+          grep -oE '<script[^>]+src="[^"]+"' /tmp/page.html | sed -E 's/.*src="([^"]+)"/\1/' | sort -u > /tmp/scripts.txt
+          n=0
+          while read -r p; do
+            [ -z "$p" ] && continue
+            n=$((n+1))
+            curl -fsSL --max-time 30 -A "$UA" -e 'https://cinesrc.st/embed/movie/157336' "https://cinesrc.st$p" -o "/tmp/js$n.js" || true
+          done < /tmp/scripts.txt
+          python3 - <<'PY'
+          import glob,re,os
+          for fn in glob.glob('/tmp/js*.js'):
+              txt=open(fn,encoding='utf-8',errors='replace').read()
+              if '7e278c7b1a4440a99a81b5c121b5f93193ce0a3f64' not in txt:
+                  continue
+              print('FILE',fn,'LEN',len(txt))
+              # d5 is the current getStream server reference in this bundle.
+              for pat in [r'await\s+d5\(',r'\bd5\(',r'getStream']:
+                  for m in re.finditer(pat,txt):
+                      i=m.start()
+                      print('\n---',pat,'@',i,'---')
+                      print(txt[max(0,i-1800):min(len(txt),i+3200)])
+          PY

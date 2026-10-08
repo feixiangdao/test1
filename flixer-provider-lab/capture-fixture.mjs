@@ -42,7 +42,9 @@ page.on("response",resp=>{
  })().catch(e=>console.log("BROWSER_CAPTURE_WARN",String(e).slice(0,120))));
 });
 try {
- await page.goto("https://flixer.su/watch/movie/9502",{waitUntil:"domcontentloaded",timeout:40000});
+ const target=process.env.FLIXER_TARGET_URL||"https://flixer.su/watch/movie/9502";
+ if(!/^https:\/\/flixer\.su\/watch\/(movie|tv)\/[0-9/]+$/.test(target))throw Error("UNSUPPORTED_TEST_TARGET");
+ await page.goto(target,{waitUntil:"domcontentloaded",timeout:40000});
  await page.waitForTimeout(16000);
  await Promise.allSettled(pending);
  const matches=cases.filter(c=>c.status===200&&c.suppliedKey.length===64&&c.body.length>100);

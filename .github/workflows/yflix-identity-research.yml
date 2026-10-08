@@ -1,0 +1,53 @@
+name: YFlix Identity Research
+on:
+  push:
+    paths:
+      - '.github/workflows/yflix-identity-research.yml'
+  workflow_dispatch:
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect FilmU and VidBolt
+        shell: bash
+        run: |
+          set -e
+          python3 - <<'PY'
+          import requests,re,urllib.parse
+          targets=[
+            ("filmu","https://embed.filmu.in/movie/157336"),
+            ("vidbolt","https://vidbolt.xyz/movie/157336")
+          ]
+          needles=["singularity","allmovieland","/api/","tmdb","imdb","scrape/","quasar","expire","auth_key","source"]
+          for name,url in targets:
+            print("\n===",name,url,"===")
+            r=requests.get(url,timeout=20,headers={"User-Agent":"Mozilla/5.0"})
+            print("HTML",r.status_code,r.url,"len",len(r.text))
+            print(r.text[:800].replace("\n"," "))
+            srcs=re.findall(r'<script[^>]+src=["\']([^"\']+)["\']',r.text,re.I)
+            print("SCRIPTS",srcs)
+            blobs=[("html",r.text)]
+            for i,src in enumerate(srcs):
+              u=urllib.parse.urljoin(r.url,src)
+              try:
+                rr=requests.get(u,timeout=20,headers={"User-Agent":"Mozilla/5.0","Referer":r.url})
+                print("SCRIPT",i,rr.status_code,u,"len",len(rr.text))
+                blobs.append((f"script{i}",rr.text))
+              except Exception as e:
+                print("SCRIPTERR",u,e)
+            for label,text in blobs:
+              low=text.lower()
+              for needle in needles:
+                n=needle.lower()
+                pos=0
+                hits=0
+                while True:
+                  idx=low.find(n,pos)
+                  if idx<0 or hits>=20: break
+                  a=max(0,idx-220); b=min(len(text),idx+420)
+                  print("\nHIT",label,needle,idx)
+                  print(text[a:b].replace("\n"," ")[:800])
+                  hits+=1
+                  pos=idx+len(n)
+          PY

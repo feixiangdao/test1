@@ -1,34 +1,50 @@
-name: YFlix S5 CineSrc Trace
+name: YFlix S5 CineSrc E2E
 on:
   push:
     paths:
       - '.github/workflows/yflix-s5-trace.yml'
 jobs:
-  trace:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Extract exact CineSrc challenge contexts
+      - name: Test current CineSrc end to end
         shell: bash
         run: |
           set -e
-          UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'
-          curl -fsSL --max-time 30 -A "$UA" -e 'https://cinesrc.st/embed/movie/157336' 'https://cinesrc.st/_next/static/chunks/f32ba640f0b58282.js' -o /tmp/cs.js
-          python3 - <<'PY'
-          import re
-          s=open('/tmp/cs.js',encoding='utf-8',errors='replace').read()
-          print('LEN',len(s))
-          terms=['/api/c/bootstrap','/api/c/issue','/api/c/stage2/issue','x-cs-q','x-cs-r','x-cs-p','next-action','actionId','/api/playlist/','playlist','Nebula']
-          for term in terms:
-              print('\n===== '+term+' =====')
-              pos=0
-              for _ in range(12):
-                  i=s.find(term,pos)
-                  if i<0: break
-                  frag=re.sub(r'\s+',' ',s[max(0,i-2600):min(len(s),i+5200)])
-                  print(frag[:7800])
-                  pos=i+len(term)
-          print('\n===== ACTION-LIKE 40-80 HEX =====')
-          vals=sorted(set(re.findall(r'["\']([0-9a-f]{40,80})["\']',s,re.I)))
-          for v in vals: print(v)
-          PY
+          git clone --depth 1 https://github.com/aloysiuschewzhiyong/notflix.git /tmp/notflix >/dev/null 2>&1
+          cd /tmp/notflix
+          cat > test-cinesrc.ts <<'TS'
+          import { fetchCinesrcStream } from './lib/sources/cinesrc';
+          function abs(base:string,ref:string){try{return new URL(ref,base).toString()}catch{return ref}}
+          async function duration(url:string,headers:Record<string,string>,depth=0):Promise<any>{
+            if(depth>4)return {ok:false,error:'depth'};
+            const r=await fetch(url,{headers,signal:AbortSignal.timeout(15000)});
+            const t=await r.text();
+            if(!r.ok||!t.startsWith('#EXTM3U'))return {ok:false,status:r.status,head:t.slice(0,100)};
+            let total=0,count=0,m; const re=/#EXTINF:([0-9.]+)/g;
+            while((m=re.exec(t))){total+=Number(m[1])||0;count++;}
+            if(count)return {ok:true,status:r.status,minutes:total/60,count};
+            const lines=t.replace(/\r/g,'').split('\n');
+            let next=''; for(const line0 of lines){const line=line0.trim();if(line&&!line.startsWith('#')){next=abs(url,line);break;}}
+            if(!next)return {ok:false,error:'no-child'};
+            return duration(next,headers,depth+1);
+          }
+          async function check(label:string,params:any){
+            const trace:string[]=[]; const started=Date.now();
+            const r=await fetchCinesrcStream(params,trace);
+            console.log('RESULT',label,JSON.stringify(r));
+            console.log('TRACE',label,JSON.stringify(trace));
+            console.log('MS',label,Date.now()-started);
+            if(r?.url){
+              const d=await duration(r.url,{Referer:r.referer,'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.37 Chrome/137.0.0.0 Safari/537.37'}).catch(e=>({ok:false,error:String(e.message||e)}));
+              console.log('DURATION',label,JSON.stringify(d));
+            }
+          }
+          async function main(){
+            await check('MOVIE',{tmdbId:'157336',imdbId:'tt0816692',mediaType:'movie'});
+            await check('TV',{tmdbId:'108978',imdbId:'tt9288030',mediaType:'tv',season:'1',episode:'1'});
+          }
+          main().catch(e=>{console.error(e);process.exit(1)});
+          TS
+          npx -y tsx test-cinesrc.ts

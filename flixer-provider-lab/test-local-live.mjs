@@ -14,7 +14,7 @@ function pinnedFetch(address,opts={}){
  return new Promise((resolve,reject)=>{
   const req=https.request({
    hostname:u.hostname,path:u.pathname+u.search,port:443,method:"GET",
-   headers:opts.headers||{},lookup:(_hostname,_opts,cb)=>cb(null,ip,4),timeout:12000
+   headers:opts.headers||{},lookup:(_hostname,_opts,cb)=>{if(typeof _opts==="function"){cb=_opts;_opts={}}if(_opts&&_opts.all)cb(null,[{address:ip,family:4}]);else cb(null,ip,4)},timeout:12000
   },res=>{
    const chunks=[];res.on("data",c=>chunks.push(c));res.on("end",()=>{
     const body=Buffer.concat(chunks).toString("utf8");

@@ -8,60 +8,57 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      - name: Trace CineSrc getStream action
+      - name: Directly trace CineSrc getStream Server Action
         shell: bash
         run: |
           set -e
           git clone --depth 1 https://github.com/sharoon7171/cinesrc-stream-resolver /tmp/cs
           cd /tmp/cs
           python3 -c "p='src/protection/host.js';s=open(p).read();old=\"headers.set('x-cs-r', requestToken)\\n      }\";new=\"headers.set('x-cs-r', requestToken)\\n        if (protectionHeader) headers.set('x-cs-q', protectionHeader)\\n        if (requestPacket) headers.set('x-cs-p', requestPacket)\\n      }\";assert old in s;open(p,'w').write(s.replace(old,new))"
-          python3 - <<'PY'
-          p='src/site/streams.js'
-          s=open(p,encoding='utf-8').read()
-          old="""  const { raw } = await postAction(embedPath, resolved.fetchStream, args, route, protectionSession.fetch, signal)
-  return protectionSession.decode(raw)"""
-          new="""  const __t0 = Date.now()
-  console.log('ACTION_POST_START', providerId, JSON.stringify(args.map((x,i)=>i===4?('[token:'+String(x).length+']'):x)))
-  const { raw, status } = await postAction(embedPath, resolved.fetchStream, args, route, protectionSession.fetch, signal)
-  console.log('ACTION_POST_DONE', providerId, 'ms', Date.now()-__t0, 'status', status, 'len', raw.length, 'head', raw.slice(0,280).replace(/\\n/g,'\\\\n'))
-  const __d0 = Date.now()
-  const decoded = await protectionSession.decode(raw)
-  console.log('ACTION_DECODE_DONE', providerId, 'ms', Date.now()-__d0, JSON.stringify(decoded).slice(0,1200))
-  return decoded"""
-          assert old in s
-          open(p,'w',encoding='utf-8').write(s.replace(old,new))
-          PY
           npm ci >/dev/null
-          cat > trace-action.mjs <<'NODE'
+          cat > direct-action.mjs <<'NODE'
           import { parseStreamQuery } from './src/resolve/live.js';
           import { createChallengeHost } from './src/protection/host.js';
           import { mintLockedSession } from './src/protection/session.js';
           import { discoverServerActions } from './src/site/actions.js';
-          import { fetchProviderStream } from './src/site/streams.js';
+          import { buildActionHeaders, SITE_ORIGIN } from './src/site/config.js';
 
           const input=parseStreamQuery({id:'157336',type:'movie'});
           const actions=await discoverServerActions(input.embedPath);
           console.log('ACTIONS',JSON.stringify(actions));
           const host=await createChallengeHost(input.embedPath);
           console.log('HOST_READY');
+
           for(const pid of ['nebula','wave','surge','storm','pulse']){
             try{
               const m0=Date.now();
               const session=await mintLockedSession(host,true);
-              console.log('MINTED',pid,Date.now()-m0,'tokenLen',session.token.length);
+              console.log('MINTED',pid,'ms',Date.now()-m0,'tokenLen',session.token.length);
+              const args=[String(input.id),'movie','$undefined','$undefined',session.token,pid];
               const controller=new AbortController();
               const timer=setTimeout(()=>controller.abort(),12000);
-              const t0=Date.now();
+              const p0=Date.now();
               try{
-                const data=await fetchProviderStream({
-                  ...input,
-                  providerId:pid,
-                  protectionSession:session,
-                  route:input.route,
-                  signal:controller.signal,
-                  actions
+                console.log('POST_START',pid);
+                const response=await session.fetch(SITE_ORIGIN+input.embedPath,{
+                  method:'POST',
+                  headers:buildActionHeaders(actions.fetchStream,input.route),
+                  body:JSON.stringify(args),
+                  signal:controller.signal
                 });
-                console.log('PROVIDER_RESULT',pid,'ms',Date.now()-t0,JSON.stringify(data).slice(0,2400));
+                console.log('POST_HEADERS',pid,'ms',Date.now()-p0,'status',response.status);
+                const raw=await response.text();
+                console.log('POST_BODY',pid,'len',raw.length,'head',raw.slice(0,600).replace(/\n/g,'\\n'));
+                const d0=Date.now();
+                try{
+                  const decoded=await Promise.race([
+                    session.decode(raw),
+                    new Promise((_,reject)=>setTimeout(()=>reject(new Error('decode_timeout')),5000))
+                  ]);
+                  console.log('DECODED',pid,'ms',Date.now()-d0,JSON.stringify(decoded).slice(0,2500));
+                }catch(e){
+                  console.log('DECODE_ERR',pid,String(e?.message||e));
+                }
               }finally{
                 clearTimeout(timer);
               }
@@ -72,4 +69,4 @@ jobs:
           try{host.release();}catch{}
           process.exit(0);
           NODE
-          node trace-action.mjs
+          node direct-action.mjs

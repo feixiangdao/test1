@@ -5,7 +5,7 @@ const targets = [
   ['Constantine', 'https://flixer.su/watch/movie/561'],
 ];
 const safe = u => { try { const x = new URL(u); return x.origin + x.pathname; } catch { return ''; } };
-const isInteresting = u => /\\.(?:m3u8|mp4|mpd)(?:[?#]|$)|\\/(?:api|sources?|servers?|embed|watch|stream|play|video|proxy|playlist)(?:\\/|\\?|$)/i.test(u);
+const isInteresting = u => ['.m3u8','.mp4','.mpd','/api/','/source','/server','/embed','/watch','/stream','/play','/video','/proxy','/playlist'].some(s => u.toLowerCase().includes(s));
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 for (const [name,url] of targets) {
   const ctx = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36', viewport: {width:1365,height:900} });

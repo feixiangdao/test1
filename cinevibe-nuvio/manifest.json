@@ -1,13 +1,13 @@
 {
   "name": "CineVibe Local",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "CineVibe.cc direct provider using Viduki V1 with server-side resolution detection and direct CDN playback.",
   "scrapers": [
     {
       "id": "cinevibe-server1",
       "name": "CineVibe · Server 1",
-      "description": "CineVibe / Viduki V1 portable direct streams. Resolution is detected server-side; Nuvio performs no HLS/TS probing.",
-      "version": "0.2.7",
+      "description": "CineVibe / Viduki V1 portable direct streams with server-side detection and conventional quality normalization for cropped widescreen encodes.",
+      "version": "0.2.8",
       "author": "CineVibe Local",
       "supportedTypes": [
         "movie",

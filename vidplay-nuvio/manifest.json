@@ -1,13 +1,13 @@
 {
   "name": "VidPlay V1 Local",
-  "version": "0.1.7",
-  "description": "VidPlay V1-only original official Nuvio Local Provider; legacy fetch response missing arrayBuffer supported through native __native_fetch bodyBase64 for WASM, validated live; on-device playback pending.",
+  "version": "0.1.8",
+  "description": "VidPlay V1-only Local Provider for official Nuvio. Supports older mobile builds with neither fetch.arrayBuffer nor native bodyBase64 using validated offline decoder parameters; real HLS tested, on-device playback pending.",
   "scrapers": [
     {
       "id": "vidplay-direct-lab",
       "name": "VidPlay · V1",
-      "description": "V1-only signed HLS; WASM via arrayBuffer or Nuvio native bodyBase64 fallback; no V2/V3. Existing manifest URL and scraper ID unchanged.",
-      "version": "0.1.7",
+      "description": "V1 only. Signed server media API with WASM or fallback decoding for older Nuvio; validates HLS and quality choices; fails closed if upstream key rotates. No V2/V3.",
+      "version": "0.1.8",
       "author": "VidPlay Lab",
       "supportedTypes": [
         "movie",

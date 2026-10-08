@@ -1,3 +1,17 @@
+# CURRENT UPDATE: VidPlay V1 v0.1.6 Android "not a function" compatibility (2026-10-08)
+
+**User-reported Android issue:** After v0.1.5, V1 pill persisted but emitted `播放器：not a function` instead of playable stream rows on *Kung Fu Panda (2008)*. This is an Android JavaScript runtime error inside V1's YTHD chain, NOT evidence that the film lacks a source.
+
+**Fix/diagnostics:**
+- Maintain exact original install URL and scraper ID. v0.1.6 includes Android-friendly binary response and `Uint8Array` error checks; rewrites WASM parser to avoid dependence on `Uint8Array.prototype.slice` (older QuickJS versions may not expose every typed-array method).
+- Introduces stage-specific exception markers, including `YTHD 页面`, `播放器入口配置`, `内层播放器页面`, `签名媒体 API`, `WASM 解密媒体地址`, and `CDN HLS 解析`. `response.arrayBuffer()` is explicitly checked before reading WASM; failures now surface exact stage and function rather than a generic `not a function`.
+- **Root cause NOT YET conclusively identified**. Official NuvioMobile's latest JS fetch polyfill supports `arrayBuffer()`, so installed builds may differ or another function may be absent; await a real on-device retest.
+- The clearly labelled **nonplayable** Status capsule fallback is retained. Only actual verified HLS media rows are presented as playable.
+- **Exact film live verification after changes:** *Kung Fu Panda (2008)* TMDB 9502 returned **272p/544p/816p HLS**, all raw V1 service requests and master HLS responded HTTP 200, 3.1s. *Life (2017)* returned **266p/534p/800p HLS**, ~2.3s. No V2 or V3. GitHub real smoke: https://github.com/feixiangdao/test1/actions/runs/37790983288 ; mocked regression including a fetch response lacking binary `arrayBuffer`: https://github.com/feixiangdao/test1/actions/runs/37790678223 .
+- Phone playback still awaiting user confirmation. Refresh v0.1.6 through the old manifest `https://raw.githubusercontent.com/feixiangdao/test1/main/vidplay-nuvio/manifest.json` and test *Kung Fu Panda* again. If Status persists, capture its precise new Chinese `播放器阶段[...]` diagnostic so the missing QuickJS method can be fixed without trial-and-error.
+
+---
+
 # CURRENT: VidPlay V1 Local v0.1.5 — real signed HLS verified (2026-10-08)
 
 **Scope:** Stock/official Nuvio Android app + this local JavaScript Provider only; no app modification, custom server, proxy or extra installer URL. The original manifest remains:

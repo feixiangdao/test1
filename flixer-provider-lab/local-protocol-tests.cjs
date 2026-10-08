@@ -22,7 +22,7 @@ for(const [key,msg] of [
 assert.equal(u.apiPath("9502","movie"),"/api/tmdb/movie/9502/images");
 assert.equal(u.apiPath("1399","tv",1,1),"/api/tmdb/tv/1399/season/1/episode/1/images");
 assert.equal(u.apiPath("a","movie"),"");
-assert.equal(u.apiPath("1399","tv",0,1),""); // S0 is invalid for this site's conventional episodes.
+assert.equal(u.apiPath("1399","tv",1,0),""); // Reject episode zero.
 (async()=>{
  const movie=await provider.getStreams("9502","movie");
  assert.equal(movie.length,1);

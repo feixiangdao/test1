@@ -24,6 +24,14 @@ const assembled = glue + "\n// wasm2js translation starts here\n" + nativeShim +
  "\nexport const _local_asm_exports = Object.keys(retasmFunc);\n";
 const file="/tmp/flixer-standalone.mjs";
 await writeFile(file,assembled);
+const hermesScript=assembled
+  .replace(/^export default __wbg_init;\s*$/gm,"")
+  .replace(/^export\s*\{\s*initSync\s*\};\s*$/gm,"")
+  .replace(/^export /gm,"")
+  .replace(/import\.meta\.url/g,'"https://flixer.su/"')
+  + '\nif(typeof module!=="undefined"&&module.exports)module.exports={get_img_key:get_img_key,process_img_data:process_img_data};\n';
+await writeFile("/tmp/flixer-hermes-syntax-preview.js",hermesScript);
+console.log("HERMES_PREVIEW_CREATED",JSON.stringify({bytes:hermesScript.length,hasStaticImport:/^import\s/m.test(hermesScript),hasStaticExport:/^export\s/m.test(hermesScript)}));
 console.log("LOCAL_BUNDLE_CREATED",JSON.stringify({bytes:assembled.length,glueBytes:glue.length,wasm2jsBytes:translated.length,hasBareWbgImport:/import\s+\*\s+as\s+wbg/.test(assembled)}));
 const env = globalThis;
 const store={};

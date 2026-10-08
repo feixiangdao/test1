@@ -12,6 +12,7 @@ on:
       - 'flixer-provider-lab/test-local-bundle.mjs'
       - 'flixer-provider-lab/test-local-live.mjs'
       - 'flixer-provider-lab/test-quickjs-cipher.mjs'
+      - 'flixer-provider-lab/test-nuvio-runtime-parity.mjs'
       - '.github/workflows/flixer-live-parity.yml'
   workflow_dispatch:
 jobs:
@@ -54,6 +55,10 @@ jobs:
           node flixer-provider-lab/test-local-bundle.mjs
       - name: Decode same-version real HLS ciphertext in QuickJS
         run: node flixer-provider-lab/test-quickjs-cipher.mjs
+      - name: Reproduce Nuvio QuickJS native fetch and call wrapper
+        run: |
+          curl --fail --silent --show-error --location --max-time 15 "https://raw.githubusercontent.com/NuvioMedia/NuvioTV/main/app/src/full/java/com/nuvio/tv/core/plugin/PluginRuntime.kt" -o /tmp/PluginRuntime.kt
+          node flixer-provider-lab/test-nuvio-runtime-parity.mjs
       - name: Verify unsigned-secret-free direct Node network retrieval from local Provider
         run: node flixer-provider-lab/test-local-live.mjs
       - name: Publish verified single-file Local provider to development branch

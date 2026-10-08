@@ -8,17 +8,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Inspect current VidBolt embedded player module
+      - name: Inspect active VidBolt provider modules
         shell: bash
         run: |
           set -e
           UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'
-          curl -fsSL --max-time 25 -A "$UA" -e 'https://vidbolt.xyz/movie/157336' 'https://vidbolt.xyz/assets/EmbeddedOnlyEmbedPage-CxGTx3In.js' -o /tmp/embed.js
-          echo 'SIZE' $(wc -c < /tmp/embed.js)
-          echo '=== FULL EMBED MODULE ==='
-          head -c 60000 /tmp/embed.js
-          echo
-          echo '=== JS ASSET REFERENCES ==='
-          grep -oE '[A-Za-z0-9._-]+\.js' /tmp/embed.js | sort -u | head -300 || true
-          echo '=== PROVIDER KEYWORDS ==='
-          grep -oEi 'Callisto|Quasar|Saffron|Orion|FastVa|Ninetta|Naija|Nova|Vidlink|Vaplayer|MovieBoxV2|Allmovieland|Darkmatter|Fourkhdhub|PlayAPI|provider[A-Za-z0-9_-]*' /tmp/embed.js | sort -u || true
+          mkdir -p /tmp/vbmods
+          mods='vaplayer-0F78SnNd.js fourkhdhub-DhLoTLQ0.js netnaija-fyGxFQcY.js vidlink-_TJ5hLAe.js vidr-_MrUkJWh.js localapiscraper-B_Gz3ANy.js oasis-Bg0zIFi7.js darkmatter-HpTILE1p.js playapi-Dh80i7LV.js allmovieland-CsLQcLP1.js callisto-Ud7vipgB.js scraperUrl-DC5Xrq2-.js'
+          for m in $mods; do
+            echo "=== $m ==="
+            curl -fsSL --max-time 25 -A "$UA" -e 'https://vidbolt.xyz/movie/157336' "https://vidbolt.xyz/assets/$m" -o "/tmp/vbmods/$m" || true
+            echo "SIZE $(wc -c < /tmp/vbmods/$m 2>/dev/null || echo 0)"
+            cat "/tmp/vbmods/$m" | head -c 18000 || true
+            echo
+          done

@@ -1,3 +1,19 @@
+
+## 2026-10-08 — NuvioMobile upstream source compatibility audit (V1 only)
+
+The Android Nuvio app's current open-source runtime confirms **the direct V1 blocker cannot be fixed solely in a local JavaScript scraper**:
+
+- [PluginRuntimeResult](https://github.com/NuvioMedia/NuvioMobile/blob/main/composeApp/src/commonMain/kotlin/com/nuvio/app/features/plugins/PluginModels.kt) specifies required \`url: String\`; no \`externalUrl\` or \`openWebView\` member is present on the plugin result model.
+- [StreamFetchSupport](https://github.com/NuvioMedia/NuvioMobile/blob/main/composeApp/src/commonMain/kotlin/com/nuvio/app/features/streams/StreamFetchSupport.kt) maps plugin result \`url\` directly into \`StreamItem.url\`, **not** \`StreamItem.externalUrl\`. It cannot bridge an HTML player iframe to native playback.
+- [StreamModels](https://github.com/NuvioMedia/NuvioMobile/blob/main/composeApp/src/commonMain/kotlin/com/nuvio/app/features/streams/StreamModels.kt) supports \`externalUrl\` on **general addon streams**, and [StreamDestination](https://github.com/NuvioMedia/NuvioMobile/blob/main/composeApp/src/commonMain/kotlin/com/nuvio/app/StreamDestination.kt) can open those externally; **neither feature is exposed for local plugin results**.
+- [FetchBridge](https://github.com/NuvioMedia/NuvioMobile/blob/main/composeApp/src/fullCommonMain/kotlin/com/nuvio/app/features/plugins/runtime/network/FetchBridge.kt) uses native HTTP requests rather than a JavaScript-capable WebView. The upstream [WebView resolver feature request #1158](https://github.com/NuvioMedia/NuvioMobile/issues/1158) remains a request, not a supported plugin API.
+- V1's actual inner player responds with required browser verification and may require server-signed single-use stream API tokens. External API requests to retrieve \`&stream_urls\` without an authorized token receive **403 invalid api token** even when metadata-only requests are HTTP 200. See [real network test](https://github.com/feixiangdao/test1/actions/runs/37786459463).
+
+**Practical consequence:** V1 works in Opera because Opera executes and satisfies browser-side playback checks. There is presently no documented local-plugin WebView API and no confirmed unrestricted raw media URL for Nuvio. Returning the YTHD iframe as \`type: "hls"\` will not work, nor will a plugin-only \`externalUrl\` field that is never mapped to \`StreamItem.externalUrl\`.
+
+**Status:** Keep the existing stable \`v0.1.4\` manifest URL and the truthful nonplayable diagnostic. Do not claim a stream is working, clone another provider's unrelated source under the name “VidPlay V1”, or bump versions until a real Nuvio-playable V1 media URL is validated. Future feasible work requires an officially supported embedded-browser resolver/native-app change, or an alternative authorized media API that can produce a directly usable HLS/MP4 URL without browser session exchange.
+
+
 # VidPlay V1 Local Lab — v0.1.4 fix (2026-10-08)
 
 **Symptom:** On Android Nuvio the VidPlay Provider capsule disappeared after searching. Live v0.1.3 returned `[]` whenever the nested YTHD player required browser verification (or the VidPlay AJAX returned HTTP 403). The client can hide a provider with no results. Actual on-device UI behavior still requires user confirmation.

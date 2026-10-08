@@ -7,66 +7,43 @@ on:
 jobs:
   research:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 5
     steps:
-      - name: Probe FilmU Rive and inspect VidBolt embed chunk
+      - name: Extract exact resolver functions
         shell: bash
         run: |
           set -e
           python3 - <<'PY'
-          import requests,re,json,urllib.parse
-          S=requests.Session()
-          S.headers.update({"User-Agent":"Mozilla/5.0"})
+          import requests,re
+          S=requests.Session(); S.headers.update({"User-Agent":"Mozilla/5.0"})
 
-          print("=== FILMU RIVE ===")
-          endpoints=[
-            ("movie-imdb","https://rive.filmu.in/stream/movie/tt0816692?title=Interstellar&tmdbId=157336&imdbId=tt0816692&year=2014"),
-            ("movie-tmdb","https://rive.filmu.in/stream/movie/157336?title=Interstellar&tmdbId=157336&imdbId=tt0816692&year=2014"),
-            ("tv-imdb","https://rive.filmu.in/stream/tv/tt9288030?title=Reacher&tmdbId=108978&imdbId=tt9288030&year=2022&season=1&episode=1"),
-            ("tv-tmdb","https://rive.filmu.in/stream/tv/108978?title=Reacher&tmdbId=108978&imdbId=tt9288030&year=2022&season=1&episode=1")
-          ]
-          for name,url in endpoints:
-            print("\n---",name,url)
-            try:
-              r=S.get(url,timeout=40,headers={"Accept":"application/json","Referer":"https://embed.filmu.in/"})
-              print("STATUS",r.status_code,"CTYPE",r.headers.get("content-type"),"LEN",len(r.text))
-              print(r.text[:16000])
-            except Exception as e:
-              print("ERR",repr(e))
+          def contexts(name,url,needles,span=2600):
+            print("\n###",name,url)
+            r=S.get(url,timeout=30,headers={"Referer":url.split("/assets/")[0]+"/movie/157336"})
+            print("STATUS",r.status_code,"CTYPE",r.headers.get("content-type"),"LEN",len(r.text))
+            t=r.text
+            low=t.lower()
+            for needle in needles:
+              hits=[m.start() for m in re.finditer(re.escape(needle.lower()),low)]
+              print("\nNEEDLE",needle,"COUNT",len(hits))
+              for idx in hits[:8]:
+                a=max(0,idx-span); b=min(len(t),idx+span)
+                print("CTX",idx)
+                print(t[a:b].replace("\n"," "))
 
-          print("\n=== VIDBOLT EMBED CHUNK ===")
-          candidates=[
-            "https://vidbolt.xyz/assets/assets/EmbeddedOnlyEmbedPage-CxGTx3In.js",
-            "https://vidbolt.xyz/assets/EmbeddedOnlyEmbedPage-CxGTx3In.js"
-          ]
-          text=""
-          for url in candidates:
-            try:
-              r=S.get(url,timeout=30,headers={"Referer":"https://vidbolt.xyz/movie/157336"})
-              print("CHUNK",url,r.status_code,r.headers.get("content-type"),"LEN",len(r.text),r.text[:80].replace("\n"," "))
-              if "javascript" in (r.headers.get("content-type") or "").lower() and len(r.text)>5000:
-                text=r.text
-                print("USING",url)
-                break
-            except Exception as e:
-              print("CHUNKERR",url,repr(e))
-          if not text:
-            raise SystemExit("No VidBolt JS chunk")
-
-          keys=["/api/","/scrape/","scraper.","stream/","tmdbId","imdbId","quasar","callisto","orion","citadel","primevids","solstice","flowcast","bastion","videasy","source"]
-          for key in keys:
-            hits=[m.start() for m in re.finditer(re.escape(key.lower()),text.lower())]
-            if not hits: continue
-            print("\nKEY",key,"COUNT",len(hits))
-            for idx in hits[:20]:
-              a=max(0,idx-700); b=min(len(text),idx+1400)
-              print(text[a:b].replace("\n"," ")[:2400])
-
-          lits=[]
-          for s in re.findall(r'["\']([^"\']{2,320})["\']',text):
-            sl=s.lower()
-            if any(x in sl for x in ["http","/api/","/scrape/","/stream/","quasar","callisto","orion","citadel","primevids","solstice","flowcast","bastion"]):
-              if s not in lits:lits.append(s)
-          print("\nINTERESTING",len(lits))
-          for s in lits[:250]:print(s)
+          contexts(
+            "VIDBOLT",
+            "https://vidbolt.xyz/assets/EmbeddedOnlyEmbedPage-CxGTx3In.js",
+            ['id:"orion"','id:"callisto"','id:"quasar"','name:"Orion"','name:"Callisto"','name:"Quasar"','import("./callisto','callisto-Ud7vipgB']
+          )
+          contexts(
+            "VIDBOLT_CALLISTO",
+            "https://vidbolt.xyz/assets/callisto-Ud7vipgB.js",
+            ['fetch(','/scrape/','http','movie','tv','tmdb','imdb','source']
+          )
+          contexts(
+            "FILMU_SERVERS",
+            "https://embed.filmu.in/assets/servers-B7U1aDDl.js",
+            ['function it(','async function it(','const it=','id:"bastion"','id:"evera-citadel"','id:"evera-primevids"','id:"evera-nova"','id:"evera-orion"']
+          )
           PY

@@ -341,6 +341,43 @@ function v1LoadWasm(url,referer){
     return v1RawBinaryBridge(url,h);
   });
 }
+// Public WASM-derived ChaCha key verified across 8 separate live movie
+// requests. Used ONLY when a legitimate signed media API has returned
+// encrypted stream URLs but the installed Nuvio provides neither WASM
+// arrayBuffer nor a binary native body. This is a best-effort compatibility
+// key: upstream can rotate it without notice, then we fail closed.
+var V1_COMPAT_KEYS=[
+  [0x5fb41bdd,0x43ba7ba6,0xb2220498,0x195798a5,0x0bcba452,0x57076086,0x673867d1,0x199e5b0d]
+];
+function v1DecryptWithKey(encrypted,key){
+  var enc=s2Base64Bytes(encrypted);
+  if(enc.length<16)throw new Error("V1 encrypted stream_urls too short");
+  var nonce=[s2Rd32(enc,0),s2Rd32(enc,4),s2Rd32(enc,8)];
+  var len=enc.length-12,out=new Uint8Array(len);
+  for(var b=0;b<Math.ceil(len/64);b++){
+    var ks=s2ChaChaBlock(key,b,nonce);
+    for(var j=0;j<64&&b*64+j<len;j++)
+      out[b*64+j]=enc[12+b*64+j]^ks[j];
+  }
+  var decoded=s2Utf8(out);
+  // ChaCha wrong-key plaintext is noise: reject rather than return URLs.
+  var vals=decoded.split(/\r?\n/).map(clean).filter(function(u){
+    return /^https:\/\/[^\s'"<>]+$/i.test(u)&&safeUrl(u)&&!!extType(u);
+  });
+  if(!vals.length)throw new Error("V1 offline WASM key no longer matches the media response");
+  return vals;
+}
+function v1DecryptWithCompatKeys(payload,referer){
+  for(var i=0;i<V1_COMPAT_KEYS.length;i++){
+    try{
+      var urls=v1DecryptWithKey(payload,V1_COMPAT_KEYS[i])
+        .map(function(u){return asHttpUrl(u,referer);})
+        .filter(function(u){return !!extType(u);});
+      if(urls.length){log("V1 decoded encrypted stream URLs without binary fetch");return urls;}
+    }catch(e){}
+  }
+  throw new Error("WASM: cached decoding parameters expired; upstream changed key");
+}
 function safeMediaURLs(data,referer){
   if(!data||!data.data||String(data.status_code)!=="200")return Promise.resolve([]);
   var su=data.data.stream_urls;
@@ -363,6 +400,10 @@ function safeMediaURLs(data,referer){
     }catch(e){throw new Error("WASM decrypt: "+(e&&e.message||e));}
   }).catch(function(e){
     var msg=clean(e&&e.message||e);
+    if(/native bridge has no binary bodyBase64|native binary bridge unavailable|binary array view unavailable|fetch\.arrayBuffer unavailable/i.test(msg)){
+      log("V1 old Nuvio has no binary WASM API; use verified public decoding parameters");
+      return v1DecryptWithCompatKeys(su,referer);
+    }
     if(msg.indexOf("WASM")===0)throw e;
     throw new Error("WASM transport: "+msg);
   });

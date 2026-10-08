@@ -301,32 +301,71 @@ function playerAPIURL(url,token,ref){
   u+=(u.indexOf("?")<0?"?":"&")+"api_token="+encodeURIComponent(token);
   return safeUrl(u)?u:"";
 }
+// Official Nuvio's native fetch bridge exposes binary bytes as bodyBase64.
+// Some installed Nuvio builds omit Response.arrayBuffer(), despite supporting
+// the same __native_fetch bridge. Use it only as a fallback for WASM binary,
+// never decode WASM via response.text() (UTF-8 destroys binary bytes).
+function validWasmBytes(bytes){
+  if(!bytes||bytes.length<8||bytes.length>4*1024*1024||
+     bytes[0]!==0||bytes[1]!==97||bytes[2]!==115||bytes[3]!==109)
+    throw new Error("WASM bytes: invalid binary header");
+  return bytes;
+}
+function v1RawBinaryBridge(url,headers){
+  if(typeof __native_fetch!=="function")
+    return Promise.reject(new Error("WASM: Nuvio native binary bridge unavailable"));
+  return __native_fetch(url,"GET",JSON.stringify(headers),"none","",true).then(function(raw){
+    var j;
+    try{j=JSON.parse(raw);}catch(e){throw new Error("WASM: native bridge invalid response");}
+    if(!j||!j.ok)throw new Error("WASM native HTTP "+(j&&j.status));
+    var b64=j.bodyBase64;
+    if(typeof b64!=="string"||!b64||b64.length>6*1024*1024)
+      throw new Error("WASM: native bridge has no binary bodyBase64");
+    return validWasmBytes(s2Base64Bytes(b64));
+  });
+}
+function v1LoadWasm(url,referer){
+  if(!/^https:\/\/data\.vidsrc(?:me\.ru|\.sh)\//i.test(url))
+    return Promise.reject(new Error("WASM: unexpected download host"));
+  var h={"User-Agent":UA,"Referer":referer,"Accept":"application/wasm"};
+  return fetch(url,{method:"GET",headers:h}).then(function(r){
+    if(!r||!r.ok)throw new Error("WASM HTTP "+(r&&r.status));
+    if(typeof r.arrayBuffer==="function"){
+      return r.arrayBuffer().then(function(buffer){
+        if(!buffer||typeof Uint8Array!=="function")
+          throw new Error("WASM: binary array view unavailable");
+        return validWasmBytes(new Uint8Array(buffer));
+      });
+    }
+    log("Nuvio has no fetch.arrayBuffer; retry WASM via native bodyBase64");
+    return v1RawBinaryBridge(url,h);
+  });
+}
 function safeMediaURLs(data,referer){
   if(!data||!data.data||String(data.status_code)!=="200")return Promise.resolve([]);
   var su=data.data.stream_urls;
   if(Array.isArray(su))return Promise.resolve(su.map(function(u){return asHttpUrl(u,referer);}).filter(function(u){return !!extType(u);}));
-  if(typeof su!=="string"||!su||!data.vs||!data.vs.wasm_url)return Promise.resolve([]);
-  var wasm=asHttpUrl(data.vs.wasm_url,referer);
+  if(typeof su!=="string"||!su||!data.vs)return Promise.resolve([]);
+  var vs=data.vs;
+  var wasm=asHttpUrl(vs.wasm_url,referer);
   if(!wasm)return Promise.resolve([]);
-  return fetch(wasm,{method:"GET",headers:{"User-Agent":UA,"Referer":referer,"Accept":"application/wasm"}})
-    .then(function(r){
-      if(!r||!r.ok)throw new Error("WASM HTTP "+(r&&r.status));
-      if(typeof r.arrayBuffer!=="function")throw new Error("WASM: Nuvio fetch.arrayBuffer unavailable");
-      return r.arrayBuffer();
-    }).then(function(buffer){
-      if(!buffer||typeof Uint8Array!=="function")throw new Error("WASM: Uint8Array unsupported");
-      var bytes;
-      try{bytes=new Uint8Array(buffer);}catch(e){throw new Error("WASM bytes: "+(e&&e.message||e));}
-      if(!bytes||!bytes.length)throw new Error("WASM bytes: empty");
-      try{
-        var urls=s2DecryptUrls(su,bytes);
-        return urls.map(function(u){return asHttpUrl(u,referer);}).filter(function(u){return !!extType(u);});
-      }catch(e){throw new Error("WASM decrypt: "+(e&&e.message||e));}
-    }).catch(function(e){
-      var msg=clean(e&&e.message||e);
-      if(msg.indexOf("WASM")===0)throw e;
-      throw new Error("WASM transport: "+msg);
-    });
+  // When the service sends an inline WASM payload, use its bytes without
+  // requiring any special fetch response method.
+  var bytesPromise;
+  if(typeof vs.wasm==="string"&&vs.wasm.length>0&&vs.wasm.length<6*1024*1024){
+    try{bytesPromise=Promise.resolve(validWasmBytes(s2Base64Bytes(vs.wasm)));}
+    catch(e){bytesPromise=v1LoadWasm(wasm,referer);}
+  }else bytesPromise=v1LoadWasm(wasm,referer);
+  return bytesPromise.then(function(bytes){
+    try{
+      var urls=s2DecryptUrls(su,bytes);
+      return urls.map(function(u){return asHttpUrl(u,referer);}).filter(function(u){return !!extType(u);});
+    }catch(e){throw new Error("WASM decrypt: "+(e&&e.message||e));}
+  }).catch(function(e){
+    var msg=clean(e&&e.message||e);
+    if(msg.indexOf("WASM")===0)throw e;
+    throw new Error("WASM transport: "+msg);
+  });
 }
 function qualifiedMedia(u,ref){
   // Stream server may publicly issue a per-host media token. This is separate

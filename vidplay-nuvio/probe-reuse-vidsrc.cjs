@@ -1,4 +1,4 @@
-const yesmovies=require('../../yesmovies-nuvio/providers/yesmovies.js');
+const yesmovies=require('../yesmovies-nuvio/providers/yesmovies.js');
 const original=globalThis.fetch;let api=[];
 globalThis.fetch=async(u,opt)=>{
  const url=String(u);let host='';try{host=new URL(url).hostname}catch(_){}

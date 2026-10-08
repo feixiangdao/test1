@@ -1,0 +1,39 @@
+name: CineSrc S5 Trace
+on:
+  push:
+    paths:
+      - '.github/workflows/cinesrc-s5-trace.yml'
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Trace CineSrc live app
+        shell: bash
+        run: |
+          set -e
+          mkdir -p /tmp/cs
+          UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36'
+          curl -fsSL --max-time 30 -A "$UA" -e 'https://www.yflix.in/' 'https://cinesrc.st/embed/movie/157336' -o /tmp/cs/page.html
+          echo '=== PAGE SIZE ==='
+          wc -c /tmp/cs/page.html
+          echo '=== SCRIPT SOURCES ==='
+          grep -oE '<script[^>]+src="[^"]+"' /tmp/cs/page.html | sed -E 's/.*src="([^"]+)"/\1/' | sort -u | tee /tmp/cs/scripts.txt || true
+          echo '=== LINK PREFETCH/PRELOAD ==='
+          grep -oE '<link[^>]+href="[^"]+"' /tmp/cs/page.html | sed -E 's/.*href="([^"]+)"/\1/' | sort -u | head -100 || true
+          n=0
+          while read -r p; do
+            [ -z "$p" ] && continue
+            n=$((n+1))
+            case "$p" in
+              http*) u="$p" ;;
+              *) u="https://cinesrc.st$p" ;;
+            esac
+            echo "FETCH $u"
+            curl -fsSL --max-time 30 -A "$UA" -e 'https://cinesrc.st/embed/movie/157336' "$u" -o "/tmp/cs/js$n.js" || true
+            echo "SIZE $(wc -c < /tmp/cs/js$n.js 2>/dev/null || echo 0)"
+          done < /tmp/cs/scripts.txt
+          echo '=== CHALLENGE / ACTION SIGNALS ==='
+          grep -RhoiE '/api/c/[A-Za-z0-9_/?=&.-]+|/api/playlist/[A-Za-z0-9_/?=&.-]+|Next-Action|server action|bootstrap|stage2|pow-worker[^"'\'' ]*|pow-v3[^"'\'' ]*|donut[^"'\'' ]*|getProviderList|getStream|sealed|pk' /tmp/cs/*.js | sort -u | head -400 || true
+          echo '=== URL SIGNALS ==='
+          grep -RhoE 'https://[A-Za-z0-9._:/?&=%+-]+' /tmp/cs/*.js | sort -u | grep -Ei 'cinesrc|bright67|api|playlist|worker|pow|donut|stream' | head -400 || true

@@ -6,57 +6,63 @@ on:
 jobs:
   trace:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 5
     steps:
-      - name: Extract CineSrc action IDs and challenge shapes
+      - name: Test CineSrc crypto script without browser DOM
         shell: bash
         run: |
           set -e
-          mkdir -p /tmp/cs
-          UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36'
-          curl -fsSL --max-time 30 -A "$UA" 'https://cinesrc.st/embed/movie/157336' -o /tmp/cs/page.html
-          grep -oE '<script[^>]+src="[^"]+"' /tmp/cs/page.html | sed -E 's/.*src="([^"]+)"/\1/' | sort -u > /tmp/cs/scripts.txt
-          n=0
-          while read -r p; do
-            [ -z "$p" ] && continue
-            n=$((n+1))
-            curl -fsSL --max-time 30 -A "$UA" -e 'https://cinesrc.st/embed/movie/157336' "https://cinesrc.st$p" -o "/tmp/cs/js$n.js" || true
-          done < /tmp/cs/scripts.txt
-          python3 - <<'PY'
-          import glob,re
-          for fn in glob.glob('/tmp/cs/js*.js'):
-              txt=open(fn,encoding='utf-8',errors='replace').read()
-              if 'getProviderList' not in txt and 'getStream' not in txt and '/api/c/bootstrap' not in txt:
-                  continue
-              print('\n=== FILE',fn,'LEN',len(txt),'===')
-              for kw in ['getProviderList','getStream','/api/c/bootstrap','/api/c/issue','/api/c/stage2/issue','/api/c/pk','pow-worker-v3.js','donut.js']:
-                  pos=0
-                  while True:
-                      i=txt.find(kw,pos)
-                      if i<0: break
-                      print('\n---',kw,'@',i,'---')
-                      print(txt[max(0,i-1400):min(len(txt),i+2400)])
-                      pos=i+len(kw)
-                      if pos>i+5000: break
-              # print server-reference-looking 40 hex ids near relevant files
-              ids=sorted(set(re.findall(r'["\']([0-9a-f]{40})["\']',txt)))
-              if ids: print('\nHEX40',ids)
-          PY
-          echo '=== CHALLENGE ENDPOINT SHAPES ==='
-          Q=$(python3 - <<'PY'
-          import base64,json
-          b=json.dumps(["movie","157336",None,None],separators=(',',':')).encode()
-          print(base64.urlsafe_b64encode(b).decode().rstrip('='))
-          PY
-          )
-          echo "Q=$Q"
-          curl -sS -D /tmp/cs/boot.h -o /tmp/cs/boot.json -X POST -H "x-cs-q: $Q" -H "User-Agent: $UA" 'https://cinesrc.st/api/c/bootstrap' || true
-          echo '--- bootstrap headers ---'; cat /tmp/cs/boot.h
-          echo '--- bootstrap body ---'; head -c 4000 /tmp/cs/boot.json; echo
-          COOKIES=$(grep -i '^set-cookie:' /tmp/cs/boot.h | sed -E 's/^set-cookie:[[:space:]]*([^;]+).*/\1/I' | paste -sd'; ' -)
-          echo "COOKIE_COUNT=$(grep -ic '^set-cookie:' /tmp/cs/boot.h || true)"
-          for ep in issue stage2/issue pk; do
-            echo "--- $ep ---"
-            curl -sS --max-time 20 -H "x-cs-q: $Q" -H "Cookie: $COOKIES" -H "User-Agent: $UA" "https://cinesrc.st/api/c/$ep" | head -c 8000
-            echo
-          done
+          curl -fsSL --max-time 30 'https://cinesrc.st/300726c-prod.js' -o /tmp/crypto.js
+          curl -fsSL --max-time 30 'https://cinesrc.st/donut.js' -o /tmp/donut.js
+          echo "CRYPTO_SIZE $(wc -c < /tmp/crypto.js)"
+          echo "DONUT_SIZE $(wc -c < /tmp/donut.js)"
+          echo '=== crypto api/browser signals ==='
+          grep -oEi 'window\.[A-Za-z0-9_$]+|document\.[A-Za-z0-9_$]+|navigator\.[A-Za-z0-9_$]+|crypto\.[A-Za-z0-9_$]+|WebAssembly|CustomEvent|addEventListener|dispatchEvent|TextEncoder|TextDecoder|atob|btoa' /tmp/crypto.js | sort -u | head -200 || true
+          echo '=== donut signals ==='
+          grep -oEi 'window\.[A-Za-z0-9_$]+|document\.[A-Za-z0-9_$]+|navigator\.[A-Za-z0-9_$]+|crypto\.[A-Za-z0-9_$]+|WebAssembly|CustomEvent|addEventListener|dispatchEvent|TextEncoder|TextDecoder|atob|btoa' /tmp/donut.js | sort -u | head -200 || true
+          node - <<'NODE'
+          const fs=require('fs'), vm=require('vm');
+          const listeners={};
+          function addEventListener(n,fn){(listeners[n]||(listeners[n]=[])).push(fn)}
+          function removeEventListener(n,fn){if(listeners[n])listeners[n]=listeners[n].filter(x=>x!==fn)}
+          function dispatchEvent(ev){for(const fn of (listeners[ev.type]||[]).slice())try{fn(ev)}catch(e){console.log('LISTENER_ERR',e.message)};return true}
+          class CE{constructor(type,opt){this.type=type;this.detail=opt&&opt.detail}}
+          const g={
+            console,
+            setTimeout,clearTimeout,setInterval,clearInterval,
+            TextEncoder,TextDecoder,URL,URLSearchParams,
+            atob:s=>Buffer.from(s,'base64').toString('binary'),
+            btoa:s=>Buffer.from(s,'binary').toString('base64'),
+            crypto:require('crypto').webcrypto,
+            WebAssembly,
+            CustomEvent:CE,
+            Event:CE,
+            addEventListener,removeEventListener,dispatchEvent,
+            fetch,
+            location:{origin:'https://cinesrc.st',href:'https://cinesrc.st/embed/movie/157336',pathname:'/embed/movie/157336',search:''},
+            navigator:{userAgent:'Mozilla/5.0',language:'en-US',languages:['en-US','en']},
+            performance:{now:()=>Date.now()},
+          };
+          g.window=g; g.self=g; g.globalThis=g;
+          g.document={
+            createElement:()=>({style:{},setAttribute(){},appendChild(){},remove(){}}),
+            head:{appendChild(){}},body:{appendChild(){}},
+            documentElement:{},
+            querySelector:()=>null,querySelectorAll:()=>[],
+            addEventListener,removeEventListener
+          };
+          const ctx=vm.createContext(g);
+          try{
+            vm.runInContext(fs.readFileSync('/tmp/crypto.js','utf8'),ctx,{timeout:10000});
+            console.log('CRYPTO_LOADED');
+            console.log('GLOBALS',Object.keys(g).filter(k=>/^__|^cs|cine/i.test(k)).slice(0,100));
+          }catch(e){console.log('CRYPTO_ERR',e && e.stack || e)}
+          try{
+            vm.runInContext(fs.readFileSync('/tmp/donut.js','utf8'),ctx,{timeout:10000});
+            console.log('DONUT_LOADED',!!g.__ss2_challenge, g.__ss2_challenge && Object.keys(g.__ss2_challenge));
+          }catch(e){console.log('DONUT_ERR',e && e.stack || e)}
+          setTimeout(()=>{
+            console.log('AFTER_GLOBALS',Object.keys(g).filter(k=>/^__|^cs|cine/i.test(k)).slice(0,100));
+            console.log('SS2',!!g.__ss2_challenge,g.__ss2_challenge&&Object.keys(g.__ss2_challenge));
+          },1000);
+          NODE

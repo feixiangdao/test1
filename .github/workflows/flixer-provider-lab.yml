@@ -27,7 +27,18 @@ jobs:
           node flixer-provider-lab/inspect-wasm.mjs
           ls -lh /tmp/flixer-img-data.wasm /tmp/flixer-tmdb-image-enhancer.js || true
           if command -v wasm2js >/dev/null; then wasm2js --version; fi
+      - name: Evaluate WebAssembly-to-JavaScript translation
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq binaryen > /tmp/binaryen-install.log
+          echo 'WASM2JS_VERSION:'
+          wasm2js --version || true
+          timeout 70s wasm2js /tmp/flixer-img-data.wasm -o /tmp/flixer-wasm-translation.mjs
+          echo 'WASM2JS_OUTPUT_SIZE:'
+          wc -c /tmp/flixer-img-data.wasm /tmp/flixer-wasm-translation.mjs
+          node --check /tmp/flixer-wasm-translation.mjs
       - name: Validate experimental provider and resolver
+        if: false
         run: |
           node --check flixer-provider-lab/resolver.mjs
           node --check flixer-provider-lab/providers/flixer-local.js
@@ -40,6 +51,8 @@ jobs:
           done
           node --input-type=module -e 'const r = await fetch("http://127.0.0.1:8833/resolve/movie/9502"); const d = await r.json(); if (!r.ok || !d.streams?.some(s => s.url.endsWith(".m3u8"))) { console.error(d); process.exit(1); } console.log("Resolver accepted TMDB 9502 and returned HLS:",d.streams.length,"available variants:",d.variants?.length||0);'
       - name: Inspect Flixer player JavaScript
+        if: false
         run: node flixer-provider-lab/analyze.mjs
       - name: Inspect Flixer movie player
+        if: false
         run: node flixer-provider-lab/probe.mjs

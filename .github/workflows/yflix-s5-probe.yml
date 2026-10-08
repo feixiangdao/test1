@@ -1,0 +1,41 @@
+name: YFlix S5 Probe
+on:
+  push:
+    paths:
+      - '.github/workflows/yflix-s5-probe.yml'
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Probe current CineSrc resolver
+        shell: bash
+        run: |
+          set -e
+          git clone --depth 1 https://github.com/aloysiuschewzhiyong/notflix.git /tmp/notflix
+          cd /tmp/notflix
+          cat > test-cinesrc.ts <<'TS'
+          import { fetchCinesrcStream } from './lib/sources/cinesrc';
+          async function probe(label:string, p:any){
+            const trace:string[]=[];
+            const started=Date.now();
+            const r=await fetchCinesrcStream(p,trace);
+            console.log('RESULT',label,JSON.stringify(r));
+            console.log('TRACE',label,JSON.stringify(trace));
+            console.log('MS',label,Date.now()-started);
+            if(r?.url){
+              try{
+                const h:any={'Referer':r.referer,'User-Agent':'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'};
+                const pr=await fetch(r.url,{headers:h,signal:AbortSignal.timeout(15000)});
+                const tx=await pr.text();
+                console.log('PLAYLIST',label,pr.status,pr.headers.get('content-type'),tx.slice(0,200).replace(/\n/g,'\\n'));
+              }catch(e:any){console.log('PLAYLIST_ERR',label,String(e?.message||e));}
+            }
+          }
+          async function main(){
+            await probe('MOVIE',{tmdbId:'157336',imdbId:'tt0816692',mediaType:'movie'});
+            await probe('TV',{tmdbId:'108978',imdbId:'tt9288030',mediaType:'tv',season:'1',episode:'1'});
+          }
+          main().catch(e=>{console.error(e);process.exit(1)});
+          TS
+          npx -y tsx test-cinesrc.ts

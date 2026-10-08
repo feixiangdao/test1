@@ -1,0 +1,42 @@
+name: Flixer local JavaScript Hermes runtime
+on:
+  push:
+    branches: [flixer-provider-lab-20261008]
+    paths: ['.github/workflows/flixer-hermes-real.yml']
+  workflow_dispatch:
+jobs:
+  hermes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch public upstream WASM and glue
+        run: |
+          set -euo pipefail
+          H=plsdontscrapemelove.flixer.su
+          IP=$(curl -fsSL --retry 2 --max-time 8 "https://dns.google/resolve?name=$H&type=A&cd=true" | jq -r '.Answer // [] | map(select(.type == 1)) | .[0].data // empty')
+          test -n "$IP"
+          curl -fsSL --retry 2 --max-time 20 --resolve "$H:443:$IP" "https://$H/assets/wasm/img_data_bg.wasm" -o /tmp/flixer-img-data.wasm
+          curl -fsSL --retry 2 --max-time 20 --resolve "$H:443:$IP" "https://$H/assets/wasm/img_data.js" -o /tmp/flixer-img-data.js
+      - name: Build JS and compile with real Hermes compiler
+        run: |
+          set -euo pipefail
+          npm install --no-save binaryen@132.0.0 hermes-compiler@250829098.0.19 hermes-engine-cli@0.12.0
+          node node_modules/binaryen/bin/wasm-opt /tmp/flixer-img-data.wasm --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --llvm-nontrapping-fptoint-lowering --llvm-memory-copy-fill-lowering -o /tmp/flixer-lowered.wasm
+          node node_modules/binaryen/bin/wasm2js /tmp/flixer-lowered.wasm --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext -o /tmp/flixer-wasm-translation.mjs
+          node flixer-provider-lab/build-local.mjs
+          find node_modules/hermes-compiler node_modules/hermes-engine-cli -name 'hermes' -o -name 'hermesc' | head -15
+          H=node_modules/hermes-compiler/hermesc/linux64-bin/hermesc
+          "$H" -version
+          "$H" -O -emit-binary -out /tmp/flixer-local-preview.hbc /tmp/flixer-hermes-syntax-preview.js
+          echo HERMES_BYTECODE_BUILD_PASS
+          wc -c /tmp/flixer-hermes-syntax-preview.js /tmp/flixer-local-preview.hbc
+          if test -x node_modules/hermes-engine-cli/linux64-bin/hermes; then
+            timeout 35s node_modules/hermes-engine-cli/linux64-bin/hermes /tmp/flixer-hermes-syntax-preview.js
+            echo HERMES_CLI_SCRIPT_RUN_PASS
+          fi

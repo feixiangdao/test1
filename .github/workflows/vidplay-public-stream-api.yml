@@ -1,0 +1,19 @@
+name: VidPlay V1 public stream API check
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'vidplay-nuvio/public-stream-api.cjs'
+      - '.github/workflows/vidplay-public-stream-api.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node vidplay-nuvio/public-stream-api.cjs

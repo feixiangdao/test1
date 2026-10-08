@@ -1,13 +1,13 @@
 {
   "name": "YFlix Local",
-  "version": "0.3.2",
-  "description": "YFlix Local v0.3.2. Device diagnostics now include Nuvio fetch statusText for HTTP 0 failures so DNS/TLS/timeout/network errors are visible.",
+  "version": "0.4.0",
+  "description": "YFlix Local v0.4.0. S2 was rebuilt around title-verified VidBolt Quasar HLS to prevent wrong-video playback. S4 was simplified to FilmU Singularity HLS after Pulsar failed on-device.",
   "scrapers": [
     {
       "id": "yflix-server1",
       "name": "YFlix · Server 1",
       "description": "YFlix Server 1 (Multi Source): direct PlayAPI stream API using TMDB IDs. DahmerMovies is filtered after device playback failures.",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "author": "YFlix Local",
       "supportedTypes": ["movie", "tv"],
       "filename": "providers/yflix-server1.js",
@@ -20,29 +20,29 @@
     {
       "id": "yflix-server2",
       "name": "YFlix · Server 2",
-      "description": "YFlix Server 2 (Multi Dubbed): direct VidBolt backend. Callisto provides multi-language HLS/MP4 for movies and TV; Orion adds a direct movie HLS fallback.",
-      "version": "0.3.2",
+      "description": "YFlix Server 2 (Multi Dubbed): strict VidBolt Quasar build. Only HLS rows whose names match the requested title/year and, for TV, exact SxxExx are returned.",
+      "version": "0.4.0",
       "author": "YFlix Local",
       "supportedTypes": ["movie", "tv"],
       "filename": "providers/yflix-server2.js",
       "enabled": true,
-      "formats": ["m3u8", "mp4"],
+      "formats": ["m3u8"],
       "contentLanguage": ["multi"],
-      "limited": false,
+      "limited": true,
       "supportsExternalPlayer": true
     },
     {
       "id": "yflix-server4",
       "name": "YFlix · Server 4",
-      "description": "YFlix Server 4 (Multi Audio): verified FilmU Pulsar multi-audio HLS plus Singularity fallback. Required FilmU Origin/Referer playback headers are preserved.",
-      "version": "0.3.2",
+      "description": "YFlix Server 4 (Multi Audio): stable FilmU Singularity HLS only. Pulsar/Allmovieland is temporarily removed after Nuvio Android playback failures.",
+      "version": "0.4.0",
       "author": "YFlix Local",
       "supportedTypes": ["movie", "tv"],
       "filename": "providers/yflix-server4.js",
       "enabled": true,
       "formats": ["m3u8"],
       "contentLanguage": ["multi"],
-      "limited": false,
+      "limited": true,
       "supportsExternalPlayer": true
     }
   ]

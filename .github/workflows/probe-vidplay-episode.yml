@@ -1,0 +1,21 @@
+name: VidPlay TV playback interface probe
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'vidplay-nuvio/probe-episode.cjs'
+      - '.github/workflows/probe-vidplay-episode.yml'
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save playwright@1.56.1
+      - run: npx playwright install chromium
+      - run: node vidplay-nuvio/probe-episode.cjs

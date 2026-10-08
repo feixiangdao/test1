@@ -616,7 +616,7 @@ function getStreams(id,mediaType,season,episode){
 function onSettings(){
   return [
     {type:"header",label:"VidPlay · V1 only (experimental)"},
-    {type:"info",label:"V1 retrieves a public TMDB-to-IMDb lookup, then resolves the ythd.org playback chain. Only verified HLS/MP4/DASH streams are playable. If V1 requires browser verification, a clearly labeled NON-PLAYABLE diagnostic/status row is shown to keep the provider visible. Requests have a 15s time budget. No V2/V3."},
+    {type:"info",label:"V1 only: uses public TMDB-to-IMDb mapping and current signed YTHD player API. Handles older Nuvio builds missing both arrayBuffer() and native binary bodyBase64 via validated offline decoding parameters. Parameters may expire when upstream rotates them. Only verified HLS is playable; otherwise explicit nonplayable Status diagnostics. No V2/V3."},
     {type:"text",key:"tmdbApiKey",label:"TMDB key (optional fallback only)",defaultValue:"",isPassword:true}
   ];
 }

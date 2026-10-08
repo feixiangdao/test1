@@ -11,6 +11,13 @@ const api=apiBase+"&api_token="+encodeURIComponent(token);
 const hlsURL="https://media.example/master.m3u8";
 const master='#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-STREAM-INF:BANDWIDTH=1500000,RESOLUTION=640x360\nhttps://media.example/360p.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=3500000,RESOLUTION=1280x720\nhttps://media.example/720p.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=5800000,RESOLUTION=1920x1080\nhttps://media.example/1080p.m3u8\n';
 const bodyJSON={status_code:"200",data:{stream_urls:[hlsURL]}};
+function assertDiagnostics(rows,label){
+  assert.equal(rows.length,1,label+" should preserve a visible diagnostic row");
+  assert.equal(rows[0].quality,"Status");
+  assert.match(rows[0].name,/VidPlay · V1 · 诊断（不可播放）/);
+  assert.match(rows[0].url,/^data:application\/vnd\.apple\.mpegurl;base64,/);
+  assert.notEqual(rows[0].type,"mp4");
+}
 let called=[];
 function mock(responder){
   called=[];
@@ -55,24 +62,24 @@ function common(u,opts){
     if(u===player)return{status:200,body:'<script>window.CONFIG = {"mediaType":"movie","imdb":"tt5442430","api":"'+apiBase+'","turnstile":true};</script>'};
     return common(u,o);
   });
-  assert.deepEqual(await getStreams(395992,"movie"),[]);
+  assertDiagnostics(await getStreams(395992,"movie"),"V1 player blocked");
   assert(!called.some(x=>x.url.startsWith(apiBase)));
-  console.log("PASS: browser verification required => zero, no fake media");
+  console.log("PASS: browser verification shows one explicitly nonplayable diagnostic; no fake media");
 
   mock((u,o)=>{
     if(u===player)return{status:200,body:'<script>window.CONFIG = {"mediaType":"movie","imdb":"tt5442430","api":"'+apiBase+'","turnstile":false};</script>'};
     return common(u,o);
   });
-  assert.deepEqual(await getStreams(395992,"movie"),[]);
+  assertDiagnostics(await getStreams(395992,"movie"),"V1 player blocked");
   assert(!called.some(x=>x.url.startsWith(apiBase)));
-  console.log("PASS: absent signed API token => fail closed");
+  console.log("PASS: absent signed API token shows diagnostic, never playable media");
 
   mock((u,o)=>{
     if(u===api)return{status:403,body:{status_code:"403",error:"invalid api token"}};
     return common(u,o);
   });
-  assert.deepEqual(await getStreams(395992,"movie"),[]);
-  console.log("PASS: server invalid api token 403 => fail closed");
+  assertDiagnostics(await getStreams(395992,"movie"),"V1 player blocked");
+  console.log("PASS: invalid signed token 403 shows diagnostic");
 
   mock((u,o)=>{
     if(u.startsWith("https://ythd.org/"))return{status:403,body:"blocked"};
@@ -125,7 +132,12 @@ function common(u,opts){
   assert(!called.some(x=>x.url.includes("api.themoviedb.org")));
   console.log("PASS: keyless TMDB-to-IMDb mapping for VidPlay V1");
 
-  assert.deepEqual(await getStreams("wrong","movie"),[]);
-  assert.deepEqual(await getStreams(125935,"tv",1,0),[]);
+  assertDiagnostics(await getStreams("wrong","movie"),"Invalid movie ID");
+  assertDiagnostics(await getStreams(125935,"tv",1,0),"Missing TV episode");
   console.log("PASS: invalid identifiers rejected");
+  // Delayed network failure: the 7s watchdog keeps a status row visible.
+  mock(()=>{throw new Error("Network unavailable");});
+  assertDiagnostics(await getStreams(395992,"movie"),"Network errors");
+  console.log("PASS: network errors keep explicit nonplayable status, not empty provider");
+
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1});

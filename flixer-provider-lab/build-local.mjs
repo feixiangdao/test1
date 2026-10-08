@@ -50,7 +50,7 @@ const nav={userAgent:"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.
 Object.defineProperty(env,"navigator",{configurable:true,value:nav});
 env.localStorage={getItem:k=>store[k]||null,setItem:(k,v)=>{store[k]=String(v)},removeItem:k=>{delete store[k]}};
 env.document={
-  getElementsByTagName:tag=>{console.log("LOCAL_DOM_GET_TAGS",tag);return tag==="script"?Array.from({length:5},()=>({src:"https://flixer.su/assets/js/index-52585954.js"})):[]},
+  getElementsByTagName:tag=>{console.log("LOCAL_DOM_GET_TAGS",tag);return tag==="body"?[{tagName:"BODY"}]:tag==="script"?Array.from({length:5},()=>({src:"https://flixer.su/assets/js/index-52585954.js"})):[]},
   createElement:tag=>tag==="canvas" ? new HTMLCanvasElementShim() : ({tagName:tag.toUpperCase()})
 };
 Object.assign(win,{window:win,self:win,screen:env.screen,navigator:nav,localStorage:env.localStorage,document:env.document,performance:env.performance});

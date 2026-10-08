@@ -88,3 +88,13 @@ The final target remains a one-file, locally executing Flixer Nuvio provider. No
   - Interop no-sample: https://github.com/feixiangdao/test1/actions/runs/37774297982
 
 All generated upstream-derived bundles remain ephemeral in the testing runner, **not committed or published**. The final Local Provider still requires an independently verified way to obtain and decode authorized media responses and Nuvio in-app execution. This manifest stays disabled.
+
+## October 8: verified browser-to-pure-JS decryption and local HLS qualities
+
+- A normal **headed Chromium** session loaded Flixer movie TMDB 9502 and returned encrypted server discovery data with HTTP 200. The browser request was sampled temporarily; no response bodies or secrets were published.
+- A completely separate **Node JS-only module**, translated from Flixer's upstream WebAssembly for research, decoded that real response into **6 server entries** without loading native WebAssembly.
+- After fixing response deduplication, the same method decrypted an **Alpha-specific encrypted response** and found **one actual HTTP media URL**. No media URL is included in the GitHub logs or committed files.
+- CI evidence: https://github.com/feixiangdao/test1/actions/runs/37775562433 and https://github.com/feixiangdao/test1/actions/runs/37776204018
+- An original local `hls.js` helper parses HLS master manifests and exposes resolution-labelled variants. Its independent unit tests passed: https://github.com/feixiangdao/test1/actions/runs/37776407842
+
+**Outstanding for installable local plugin:** reproduce the browser's legitimate signed HTTP request path from Nuvio's Hermes environment; integrate a permitted, distributable local decryption implementation; verify media URL headers and HLS playback on-device. The generated research bundle has not been committed or distributed. The lab manifest stays disabled, and no existing provider has been changed.

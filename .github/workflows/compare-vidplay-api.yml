@@ -1,0 +1,19 @@
+name: Compare VidPlay public API domains
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'vidplay-nuvio/compare-public-api.cjs'
+      - '.github/workflows/compare-vidplay-api.yml'
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node vidplay-nuvio/compare-public-api.cjs

@@ -8,26 +8,83 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe direct VidRock backends
+      - name: Fresh Quasar probe and identity validation
         shell: bash
         run: |
-          set -e
-          UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'
-          # Public API key is read from the currently deployed S4 provider so this workflow does not duplicate it.
-          KEY=$(curl -fsSL 'https://raw.githubusercontent.com/feixiangdao/test1/main/yflix-nuvio/providers/yflix-server4-v051.js' | sed -n 's/.*BOX_KEY="\([^"]*\)".*/\1/p' | head -1)
-          echo "KEY_LEN=${#KEY}"
-          probe(){
-            label="$1"; base="$2"; path="$3";
-            echo "--- $label ---"
-            rm -f /tmp/out.json
-            code=$(curl -sS -L --connect-timeout 5 --max-time 20 -A "$UA" -H "x-api-key: $KEY" -H 'Accept: application/json' -o /tmp/out.json -w '%{http_code} %{time_total}' "$base$path" || true)
-            echo "RESULT $code SIZE $(wc -c < /tmp/out.json 2>/dev/null || echo 0)"
-            head -c 24000 /tmp/out.json 2>/dev/null || true
-            echo
+          node - <<'NODE'
+          const API='https://scraper.vidbolt.xyz/scrape/Quasar/movie/tt0816692?tmdbId=157336';
+          const UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36';
+          function abs(base,ref){try{return new URL(ref,base).toString()}catch{return ref}}
+          function sumDuration(txt){
+            let total=0,count=0,m; const re=/#EXTINF:([0-9.]+)/g;
+            while((m=re.exec(String(txt||'')))){total+=Number(m[1])||0;count++;}
+            return count?total:0;
           }
-          M='/scrape/VidRock/movie/tt0816692?tmdbId=157336&title=Interstellar&year=2014'
-          T='/scrape/VidRock/tv/tt9288030?tmdbId=108978&title=Reacher&year=2022&season=1&episode=1'
-          probe 'showbox movie' 'https://showbox.filmu.in' "$M"
-          probe 'showbox TV' 'https://showbox.filmu.in' "$T"
-          probe 'sslip movie' 'https://backend-api2-bxhuur-7f7bc0-15-235-147-53.sslip.io' "$M"
-          probe 'sslip TV' 'https://backend-api2-bxhuur-7f7bc0-15-235-147-53.sslip.io' "$T"
+          async function hlsDuration(url,headers,depth=0){
+            if(depth>3) return {ok:false,error:'nesting'};
+            try{
+              const r=await fetch(url,{headers:headers||{},signal:AbortSignal.timeout(15000)});
+              const txt=await r.text();
+              if(!r.ok||!txt.startsWith('#EXTM3U')) return {ok:false,status:r.status,head:txt.slice(0,120)};
+              const sec=sumDuration(txt);
+              if(sec) return {ok:true,status:r.status,seconds:sec,minutes:sec/60};
+              const lines=txt.replace(/\r/g,'').split('\n');
+              let next='';
+              for(const ln of lines){const s=ln.trim(); if(s && !s.startsWith('#')){next=abs(url,s);break;}}
+              if(!next)return {ok:true,status:r.status,seconds:0,minutes:0,error:'master-no-child'};
+              return hlsDuration(next,headers,depth+1);
+            }catch(e){return {ok:false,error:String(e?.message||e)}}
+          }
+          async function rangeProbe(url,headers){
+            try{
+              const h=Object.assign({},headers||{}, {Range:'bytes=0-1048575'});
+              const r=await fetch(url,{headers:h,signal:AbortSignal.timeout(15000)});
+              const ab=await r.arrayBuffer();
+              return {status:r.status,len:ab.byteLength,ct:r.headers.get('content-type')||'',cr:r.headers.get('content-range')||'',head:Buffer.from(ab).subarray(0,16).toString('hex')};
+            }catch(e){return {error:String(e?.message||e)}}
+          }
+          async function main(){
+            const r=await fetch(API,{headers:{Accept:'application/json','User-Agent':UA,Referer:'https://vidbolt.xyz/'},signal:AbortSignal.timeout(20000)});
+            const j=await r.json();
+            const rows=Array.isArray(j.sources)?j.sources:[];
+            console.log('RAW_COUNT',rows.length);
+            const targets=rows.filter(x=>{
+              const n=String(x?.name||'').toLowerCase();
+              const u=String(x?.url||'').toLowerCase();
+              return n.includes('vaplayer') || n.includes('streamflix') || u.includes('/proxy/m3u8/') || n.includes('interstellar');
+            });
+            console.log('TARGET_COUNT',targets.length);
+            for(let i=0;i<targets.length;i++){
+              const x=targets[i], name=String(x.name||'');
+              const isHls=String(x.type||'').toLowerCase()==='m3u8' || String(x.url||'').includes('.m3u8') || String(x.url||'').includes('/proxy/m3u8/');
+              console.log('ROW',i,JSON.stringify({name:x.name,quality:x.quality,type:x.type,language:x.language,url:x.url,headers:x.headers}).slice(0,5000));
+              if(isHls){
+                const p=await hlsDuration(x.url,x.headers||{});
+                console.log('HLS_PROBE',i,name,JSON.stringify(p));
+              }else if(name.toLowerCase().includes('streamflix')){
+                const p=await rangeProbe(x.url,x.headers||{});
+                console.log('FILE_PROBE',i,name,JSON.stringify(p));
+              }
+            }
+          }
+          main().catch(e=>{console.error(e);process.exit(1)});
+          NODE
+
+          echo '=== FFPROBE STREAMFLIX IF PRESENT ==='
+          python3 - <<'PY'
+          import requests, subprocess
+          api='https://scraper.vidbolt.xyz/scrape/Quasar/movie/tt0816692?tmdbId=157336'
+          j=requests.get(api,headers={'Referer':'https://vidbolt.xyz/','User-Agent':'Mozilla/5.0'},timeout=20).json()
+          for x in j.get('sources',[]):
+              if 'streamflix' not in str(x.get('name','')).lower():
+                  continue
+              u=x.get('url')
+              print('FFPROBE_URL',u)
+              try:
+                  p=subprocess.run(['ffprobe','-v','error','-rw_timeout','12000000','-show_entries','format=duration,format_name','-of','json',u],capture_output=True,text=True,timeout=20)
+                  print('FFPROBE_RC',p.returncode)
+                  print(p.stdout[:3000])
+                  print(p.stderr[:1000])
+              except Exception as e:
+                  print('FFPROBE_ERR',repr(e))
+          PY

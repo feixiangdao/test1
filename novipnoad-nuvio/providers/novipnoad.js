@@ -1,7 +1,7 @@
 // NOVIPNOAD Local provider for Nuvio.
 // First-party NOVIPNOAD search/detail pages + direct player resolver based on the
 // public novipnoad-plugin protocol. Fails closed on ambiguous identity or decode errors.
-var SITE_CANDIDATES=["https://www.novipnoad.ca","https://novipnoad.ca","https://www.novipnoad.uk","https://novipnoad.uk","https://www.novipnoad.net","https://novipnoad.net"];
+var SITE_CANDIDATES=["https://www.novipnoad.ca"];
 var PLAYER="https://player.novipnoad.net";
 var UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36";
 var FALLBACK_RC4_KEY="ce974576";
@@ -81,34 +81,20 @@ function chooseMovie(items,terms,year){var cand=[];(items||[]).forEach(function(
 function chooseTv(items,terms,season,episode){var exact=[],complete=[];(items||[]).forEach(function(it){if(!/\/(?:tv|anime|shows)\//i.test(it.url)||!titleHasAny(it.title,terms))return;var ep=episodeInfo(it.title);if(ep.explicitSeason&&ep.season!==season)return;if(season>1&&!ep.explicitSeason)return;if(ep.episodes.indexOf(episode)>=0){exact.push(it);return;}if(ep.complete&&season===1&&ep.episodes.indexOf(episode)>=0)complete.push(it);});var a=exact.length?exact:complete;if(a.length!==1)return null;return a[0];}
 function wpSearch(base,query){
   var u=base+"/wp-json/wp/v2/posts?search="+encodeURIComponent(query)+"&per_page=20";
-  var profiles=[
-    {name:"simple",headers:{"Accept":"application/json"}},
-    {name:"lang",headers:{"Accept":"application/json","Accept-Language":"zh-CN,zh;q=0.9,en;q=0.7"}},
-    {name:"ua",headers:{"Accept":"application/json","User-Agent":UA}},
-    {name:"browser",headers:{"Accept":"application/json","User-Agent":UA,"Accept-Language":"zh-CN,zh;q=0.9,en;q=0.7","Referer":base+"/"}}
-  ],i=0;
-  function next(){
-    if(i>=profiles.length)return Promise.reject(new Error("WP API all profiles failed"));
-    var p=profiles[i++];
-    return fetchText(u,p.headers).then(function(t){
-      var rows;
-      try{rows=JSON.parse(t);}catch(e){throw new Error("invalid JSON");}
-      if(!Array.isArray(rows))throw new Error("invalid JSON shape");
-      var out=[];
-      rows.forEach(function(x){
-        if(!x)return;
-        var link=abs(x.link||"",base),title=htmlDecode(x.title&&x.title.rendered||"");
-        var content=x.content&&x.content.rendered||"";
-        if(link&&title)out.push({url:link,title:title,content:content,postId:x.id||0});
-      });
-      diag("WPSEARCH · "+base+" · "+p.name+" · "+query+" · "+out.length+" results");
-      return out;
-    }).catch(function(e){
-      diag("WPTRY · "+base+" · "+p.name+" · "+(e&&e.message||e));
-      return next();
+  return fetchText(u,{"Accept":"application/json"}).then(function(t){
+    var rows;
+    try{rows=JSON.parse(t);}catch(e){throw new Error("invalid JSON");}
+    if(!Array.isArray(rows))throw new Error("invalid JSON shape");
+    var out=[];
+    rows.forEach(function(x){
+      if(!x)return;
+      var link=abs(x.link||"",base),title=htmlDecode(x.title&&x.title.rendered||"");
+      var content=x.content&&x.content.rendered||"";
+      if(link&&title)out.push({url:link,title:title,content:content,postId:x.id||0});
     });
-  }
-  return next();
+    diag("WPSEARCH · "+query+" · "+out.length+" results");
+    return out;
+  });
 }
 function htmlSearch(base,query){
   var u=base+"/?s="+encodeURIComponent(query);
@@ -121,8 +107,8 @@ function htmlSearch(base,query){
 }
 function searchOne(base,query){
   return wpSearch(base,query).catch(function(e){
-    diag("WPERR · "+base+" · "+query+" · "+(e&&e.message||e));
-    return htmlSearch(base,query);
+    diag("WPERR · "+query+" · "+(e&&e.message||e));
+    throw e;
   });
 }
 function discoverDetail(meta,type,season,episode){
@@ -146,9 +132,9 @@ function discoverDetail(meta,type,season,episode){
         items.forEach(function(it){if(!all.some(function(x){return x.url===it.url;}))all.push(it);});
         return nextQ();
       }).catch(function(e){
-        diag("SEARCHERR · "+base+" · "+q+" · "+(e&&e.message||e));
+        diag("SEARCHERR · "+q+" · "+(e&&e.message||e));
         log(base+" search "+q+": "+(e&&e.message||e));
-        return nextQ();
+        return Promise.reject(e);
       });
     }
     return nextQ();
@@ -177,7 +163,10 @@ function getStreams(id,mediaType,season,episode){
   return tmdbMeta(tmdb,type).then(function(meta){
     if(!meta){diag("TMDB · metadata unavailable");return statusRows();}
     diag("TMDB · "+(meta.zh||meta.en||meta.original||"?")+" · "+(meta.year||"no-year")+" · aliases "+((meta.aliases&&meta.aliases.length)||0));
-    return discoverDetail(meta,type,season,episode).then(function(hit){
+    return discoverDetail(meta,type,season,episode).catch(function(e){
+      diag("MATCHERR · "+(e&&e.message||e));
+      return null;
+    }).then(function(hit){
       if(!hit){diag("MATCH · no unambiguous NOVIPNOAD page");return statusRows();}
       diag("MATCH · "+hit.url);
       var detailPromise=clean(hit.content)?Promise.resolve(hit.content):fetchText(hit.url,headers(hit.base+"/",false));return detailPromise.then(function(html){

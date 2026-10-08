@@ -22,6 +22,18 @@ jobs:
         run: |
           npm install --no-save playwright
           npx playwright install --with-deps chromium
+      - name: Validate experimental provider and resolver
+        run: |
+          node --check flixer-provider-lab/resolver.mjs
+          node --check flixer-provider-lab/providers/flixer-local.js
+          PORT=8833 MAX_WAIT_MS=9000 node flixer-provider-lab/resolver.mjs > /tmp/flixer-resolver.log 2>&1 &
+          pid=$!
+          trap 'kill $pid || true' EXIT
+          for i in $(seq 1 25); do
+            if curl --fail --silent http://127.0.0.1:8833/health > /dev/null; then break; fi
+            sleep 1
+          done
+          node --input-type=module -e 'const r = await fetch("http://127.0.0.1:8833/resolve/movie/9502"); const d = await r.json(); if (!r.ok || !d.streams?.some(s => s.url.endsWith(".m3u8"))) { console.error(d); process.exit(1); } console.log("Resolver accepted TMDB 9502 and returned HLS:",d.streams.length,"available variants:",d.variants?.length||0);'
       - name: Inspect Flixer player JavaScript
         run: node flixer-provider-lab/analyze.mjs
       - name: Inspect Flixer movie player

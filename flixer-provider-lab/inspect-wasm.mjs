@@ -48,11 +48,17 @@ page.on('response',r=>{
  }
 });
 const promises=[];
+const reqPaths=[];
+page.on('request',r=>{if(r.url().includes('wasm')||r.url().includes('img_data'))reqPaths.push(r.url());});
+page.on('console',m=>{if(/WASM|enhance|source/i.test(m.text())) console.log('BROWSER_NOTE',m.text().slice(0,230))});
 try{
  await page.goto('https://flixer.su/watch/movie/9502',{waitUntil:'domcontentloaded',timeout:35000});
  await page.waitForTimeout(15000);
+ const forced=await page.evaluate(async()=>{try{const u='https://plsdontscrapemelove.flixer.su/assets/wasm/img_data_bg.wasm';const r=await fetch(u);const data=await r.arrayBuffer();return {status:r.status,size:data.byteLength,contentType:r.headers.get('content-type')}}catch(e){return {error:String(e)}}});
+ console.log('WASM_FORCED_FETCH',JSON.stringify(forced));
+ await page.waitForTimeout(1500);
  await Promise.allSettled(promises);
- console.log('WASM_AUDIT',JSON.stringify({wasmResources,scripts,video:await page.locator('video').count()},null,2).slice(0,12000));
+ console.log('WASM_AUDIT',JSON.stringify({wasmResources,scripts,reqPaths,video:await page.locator('video').count()},null,2).slice(0,12000));
  if(!wasmResources.length)process.exitCode=1;
 }catch(e){console.log('WASM_AUDIT_ERROR',String(e));process.exitCode=1}
 await ctx.close();await browser.close();

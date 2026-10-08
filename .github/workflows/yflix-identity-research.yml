@@ -1,45 +1,64 @@
-name: YFlix Identity Research
+name: YFlix 050 Final Smoke
 on:
   push:
     paths:
       - '.github/workflows/yflix-identity-research.yml'
   workflow_dispatch:
 jobs:
-  research:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 6
     steps:
-      - name: Fast VidRock source list
+      - name: Validate v0.5.0 provider behavior
         shell: bash
         run: |
           set -e
-          python3 - <<'PY'
-          import requests,urllib.parse,json
-          S=requests.Session();S.headers.update({"User-Agent":"Mozilla/5.0"})
-          KEY="09eb429913afb6b1cc90f23746f41fb3279aed77726c625c40672b81444c0bac"
-          bases=["https://backend-api2-bxhuur-7f7bc0-15-235-147-53.sslip.io","https://showbox.filmu.in"]
-          cases=[
-            ("Interstellar","movie","tt0816692",157336,"Interstellar",2014,None,None),
-            ("ReacherS01E01","tv","tt9288030",108978,"Reacher",2022,1,1)
-          ]
-          for label,kind,imdb,tmdb,title,year,s,e in cases:
-            print("\n###",label)
-            q=f"tmdbId={tmdb}&title={urllib.parse.quote(title)}&year={year}"
-            if s:q+=f"&season={s}&episode={e}"
-            path=f"/scrape/VidRock/{kind}/{imdb}?{q}"
-            for base in bases:
-              try:
-                r=S.get(base+path,timeout=18,headers={"x-api-key":KEY,"Accept":"application/json"})
-                print("BACKEND",base,"STATUS",r.status_code,"LEN",len(r.text))
-                if r.status_code==200:
-                  j=r.json()
-                  print("COUNT",len(j.get("sources") or []))
-                  for row in (j.get("sources") or [])[:50]:
-                    print(json.dumps({
-                      "name":row.get("name"),"quality":row.get("quality"),"type":row.get("type"),
-                      "url":row.get("url"),"workerProxyUrl":row.get("workerProxyUrl"),
-                      "headers":row.get("headers")
-                    },ensure_ascii=False))
-                else: print(r.text[:500])
-              except Exception as ex: print("ERR",base,repr(ex))
-          PY
+          curl -fsSL https://raw.githubusercontent.com/feixiangdao/test1/main/yflix-nuvio/providers/yflix-server2.js -o /tmp/s2.js
+          curl -fsSL https://raw.githubusercontent.com/feixiangdao/test1/main/yflix-nuvio/providers/yflix-server4.js -o /tmp/s4.js
+          node -c /tmp/s2.js
+          node -c /tmp/s4.js
+          node - <<'NODE'
+          function durationMinutes(text){
+            let total=0,count=0;
+            const re=/#EXTINF:([0-9.]+)/g;
+            let m;
+            while((m=re.exec(String(text||'')))){ total+=Number(m[1])||0; count++; }
+            return count?total/60:0;
+          }
+          async function probe(row){
+            const r=await fetch(row.url,{headers:row.headers||{},signal:AbortSignal.timeout(15000)});
+            const text=await r.text();
+            if(!r.ok||!text.startsWith('#EXTM3U')) throw new Error('bad HLS '+row.name+' '+r.status);
+            return durationMinutes(text);
+          }
+          async function run(){
+            const s2=require('/tmp/s2.js');
+            const s4=require('/tmp/s4.js');
+
+            const s2m=await s2.getStreams('157336','movie');
+            const s2t=await s2.getStreams('108978','tv',1,1);
+            console.log('S2_MOVIE',s2m.length,s2m.map(x=>x.name));
+            console.log('S2_TV',s2t.length,s2t.map(x=>x.name));
+            if(s2m.some(x=>x.type==='diagnostic')) throw new Error('S2 still returns DIAG cards');
+            if(s2m.length!==0) throw new Error('Interstellar S2 should hide currently dead VidBolt sources');
+            if(!s2t.some(x=>x.type==='mp4')) throw new Error('S2 TV expected live MP4 candidates');
+
+            const s4m=await s4.getStreams('157336','movie');
+            const s4t=await s4.getStreams('108978','tv',1,1);
+            console.log('S4_MOVIE',s4m.length,s4m.map(x=>x.name));
+            console.log('S4_TV',s4t.length,s4t.map(x=>x.name));
+            if(s4m.length<4) throw new Error('S4 movie expected four Videasy qualities');
+            if(s4t.length<4) throw new Error('S4 TV expected four Videasy qualities');
+            if(s4m.some(x=>!/Videasy/.test(x.name))) throw new Error('S4 movie contains non-Videasy source');
+            if(s4t.some(x=>!/Videasy/.test(x.name))) throw new Error('S4 TV contains non-Videasy source');
+
+            const m1080=s4m.find(x=>/1080p/.test(x.name))||s4m[0];
+            const t1080=s4t.find(x=>/1080p/.test(x.name))||s4t[0];
+            const md=await probe(m1080);
+            const td=await probe(t1080);
+            console.log('S4_DURATION',md,td);
+            if(!(md>160&&md<178)) throw new Error('Interstellar runtime mismatch '+md);
+            if(!(td>48&&td<60)) throw new Error('Reacher S01E01 runtime mismatch '+td);
+          }
+          run().catch(e=>{console.error(e);process.exit(1)});
+          NODE

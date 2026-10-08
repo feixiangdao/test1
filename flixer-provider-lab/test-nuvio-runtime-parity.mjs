@@ -15,7 +15,11 @@ function methodScript(method,nextMarker){
   if(last<0)throw Error("METHOD_END_MISSING_"+method);
   return kotlin.slice(first+3,last);
 }
-const polyfill=methodScript("getStaticPolyfillCode");
+const fullPolyfill=methodScript("getStaticPolyfillCode");
+const p0=fullPolyfill.indexOf("// Fetch implementation (async)"),p1=fullPolyfill.indexOf("// AbortController/AbortSignal minimal polyfill",p0);
+if(p0<0||p1<0)throw Error("NUVIO_FETCH_SLICE_MISSING");
+// Evaluate exactly Nuvio native-fetch shim; unrelated 30 KB DOM polyfills are compiled separately by the Android host.
+const polyfill=fullPolyfill.slice(p0,p1);
 const call=methodScript("getStaticCallCode");
 const qjs=await getQuickJS();
 const rt=qjs.newRuntime();rt.setMemoryLimit(128*1024*1024);rt.setMaxStackSize(6*1024*1024);
@@ -27,6 +31,7 @@ function host(name,fn) {
   ctx.setProp(ctx.global,name,f);f.dispose();
 }
 try {
+ host("atob",(v)=>ctx.newString(Buffer.from(String(v||""),"base64").toString("binary")));
  host("__get_scraper_id",()=>ctx.newString("flixer-local-alpha-030"));
  host("__get_scraper_settings",()=>ctx.newString("{}"));
  host("__get_tmdb_api_key",()=>ctx.newString(""));

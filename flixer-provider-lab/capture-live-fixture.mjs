@@ -42,6 +42,14 @@ page.on("response",r=>{
   })));
  }
  const onlySources=headers["x-only-sources"]==="1";
+ if(server==="alpha" && !globalThis.__flixerContextCaptured) {
+  globalThis.__flixerContextCaptured=true;
+  promises.push(writeFile("/tmp/flixer-browser-public-headers.json",JSON.stringify({
+    fingerprintLite:headers["x-fingerprint-lite"]||"",
+    clientFingerprint:headers["x-client-fingerprint"]||"",
+    userAgent:headers["user-agent"]||""
+  })).catch(e=>console.log("HEADER_CONTEXT_SAVE_ERROR",String(e).slice(0,90))));
+ }
  if(!/^[0-9a-f]{64}$/i.test(key||"")) {
    console.log("CIPHER_REQUEST_KEY_NOT_AVAILABLE",{status:r.status(),server,onlySources,headerNames:Object.keys(headers).filter(x=>x.startsWith("x-"))});
    return;

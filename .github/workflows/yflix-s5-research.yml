@@ -6,59 +6,39 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 3
     steps:
-      - name: Test patched CineSrc Surge with extended timeout
+      - name: Isolate CineSrc token mint
         shell: bash
         run: |
           set -e
           git clone --depth 1 https://github.com/sharoon7171/cinesrc-stream-resolver /tmp/cs
           cd /tmp/cs
           python3 -c "p='src/protection/host.js';s=open(p).read();old=\"headers.set('x-cs-r', requestToken)\\n      }\";new=\"headers.set('x-cs-r', requestToken)\\n        if (protectionHeader) headers.set('x-cs-q', protectionHeader)\\n        if (requestPacket) headers.set('x-cs-p', requestPacket)\\n      }\";assert old in s;open(p,'w').write(s.replace(old,new))"
-          sed -i 's/const FETCH_TIMEOUT_MS = 15_000/const FETCH_TIMEOUT_MS = 45_000/' src/resolve/live.js
-          sed -i 's/const PROVIDER_TIMEOUT_MS = 15_000/const PROVIDER_TIMEOUT_MS = 55_000/' src/resolve/live.js
+          python3 -c "p='src/protection/session.js';s=open(p).read();old=\"  const stageOneToken = await host.stageOne.gc()\\n  const stageTwoToken = await host.window.__ss2_challenge.gc()\";new=\"  const __t0=Date.now()\\n  const stageOneToken = await host.stageOne.gc()\\n  const __t1=Date.now()\\n  const stageTwoToken = await host.window.__ss2_challenge.gc()\\n  const __t2=Date.now()\\n  console.log('MINT_PARTS', JSON.stringify({stage1Ms:__t1-__t0,stage2Ms:__t2-__t1,stage1Len:String(stageOneToken).length,stage2Len:String(stageTwoToken).length,stage1Prefix:String(stageOneToken).slice(0,24),stage2Prefix:String(stageTwoToken).slice(0,48)}))\";assert old in s;open(p,'w').write(s.replace(old,new))"
           npm ci >/dev/null
-          cat > test-one.mjs <<'NODE'
-          import { parseStreamQuery, fetchProviderCatalog, resolveProviderStream } from './src/resolve/live.js';
-          function collectUrls(v,out){
-            if(!v)return;
-            if(typeof v==='string'){if(/^https?:\/\//i.test(v))out.push(v);return;}
-            if(Array.isArray(v)){for(const x of v)collectUrls(x,out);return;}
-            if(typeof v==='object'){for(const k of Object.keys(v))collectUrls(v[k],out);}
-          }
-          const input=parseStreamQuery({id:'157336',type:'movie'});
+          cat > test-mint.mjs <<'NODE'
+          import { createChallengeHost } from './src/protection/host.js';
+          import { mintLockedSession } from './src/protection/session.js';
+
           const started=Date.now();
-          try{
-            const cat=await fetchProviderCatalog(input);
-            console.log('CATALOG_MS',Date.now()-started);
-            console.log('CATALOG',JSON.stringify(cat.providers));
-            const p0=Date.now();
-            const r=await resolveProviderStream(input,'surge');
-            console.log('RESOLVE_MS',Date.now()-p0);
-            console.log('RESULT_JSON',JSON.stringify(r,null,2));
-            const urls=[]; collectUrls(r,urls);
-            console.log('URLS',JSON.stringify(urls));
-            for(const u of urls.filter(x=>/m3u8|playlist/i.test(x)).slice(0,3)){
-              try{
-                const pr=await fetch(u,{
-                  headers:{
-                    Referer:'https://cinesrc.st/',
-                    'User-Agent':'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/137.0.0.0 Mobile Safari/537.36'
-                  },
-                  signal:AbortSignal.timeout(15000)
-                });
-                const t=await pr.text();
-                console.log('HLS',pr.status,pr.headers.get('content-type'),u,t.slice(0,220).replace(/\n/g,'\\n'));
-              }catch(e){console.log('HLS_ERR',String(e?.message||e));}
-            }
-          }catch(e){
-            console.log('TOTAL_MS',Date.now()-started);
+          let host;
+          try {
+            host=await createChallengeHost('/embed/movie/157336');
+            console.log('HOST_MS',Date.now()-started);
+            const m0=Date.now();
+            const session=await mintLockedSession(host,false);
+            console.log('MINT_MS',Date.now()-m0);
+            const parts=String(session.token||'').split('::');
+            console.log('TOKEN_TOTAL_LEN',String(session.token||'').length);
+            console.log('TOKEN_SEGMENTS',JSON.stringify(parts.map(x=>({prefix:x.slice(0,48),len:x.length}))));
+          } catch(e) {
             console.log('ERR_TYPE',typeof e,e?.constructor?.name);
             try{console.log('ERR_JSON',JSON.stringify(e,null,2));}catch{}
-            try{console.log('ERR_KEYS',Object.getOwnPropertyNames(e));}catch{}
-            try{for(const k of Object.getOwnPropertyNames(e)){console.log('ERR_FIELD',k,JSON.stringify(e[k]));}}catch{}
             console.log('ERR_STRING',String(e?.message||e));
+          } finally {
+            try{host?.release();}catch{}
           }
           process.exit(0);
           NODE
-          node test-one.mjs
+          node test-mint.mjs

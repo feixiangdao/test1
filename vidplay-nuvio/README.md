@@ -97,3 +97,17 @@ Isolated Chromium / GitHub Actions inspection then confirmed this *current* netw
 **Remaining release gate:** A genuine, reachable (and appropriately authorized) HLS/MP4 URL with verified media response and playback in Nuvio. No embedded HTML/iframe URL should ever be falsely returned as `type: hls`, and no Chrome-only or challenge-protected source should be considered portable until independently validated.
 
 No `manifest.json` or Provider version change made based only on these diagnostics. Version remains v0.1.2.
+
+## 2026-10-08: Current VidPlay V1 data API contract and precise 403 diagnosis
+
+The actual inner `stellarconductornexus.com/embed/movie/tt5442430` page currently provides a **metadata** API at `data.vidsrc.sh/api.php?type=movie&imdb=tt5442430`. This differs from the legacy YesMovies S2 endpoint at `data.vidsrcme.ru/api.php?type=movie&tmdb=395992&stream_urls`. The new API host was observed by reading the browser-rendered `window.CFG.metaApi` field, not inferred from old code.
+
+Tests:
+- Sanitized browser config inspection: https://github.com/feixiangdao/test1/actions/runs/37780495064
+- Public metadata-only comparison (current and legacy hosts, **both HTTP 200**, response includes `title`, `imdb_id`, `file_name`, and `backdrop`, no `stream_urls`): https://github.com/feixiangdao/test1/actions/runs/37780855613
+- Actual `&stream_urls` requests on the current and legacy hosts (IMDB / TMDB variants) **all HTTP 403 JSON `{"status_code":"403","error":"invalid api token"}`**. This is a **first-party application-level authorization error**, unlike the earlier Cloudflare HTML challenges returned by `vidplay.top/ajax/*`: https://github.com/feixiangdao/test1/actions/runs/37781095675
+- The current `player.js` states `CONFIG.apiToken` is server-generated, **single-use**, and may be associated with an interactive Turnstile gate. No token reuse, Cloudflare circumvention, or decryption/access-control bypass is implemented.
+
+**Consequences:** Changing domains, Referer, or IMDb/TMDB query alone does not grant a stream. The existing `YesMovies S2` parser alone cannot turn this into a portable VidPlay V1 HLS stream unless the upstream legitimately provides the short-lived authorization required for its stream-data API. Metadata success is not media success. Do not publish any `ythd.org/embed/*` HTML iframe as `type: hls`.
+
+**Status:** user confirmed genuine browser playback for Life (2017) in Opera, but no standalone Nuvio HLS URL confirmed. Keep `vidplay-nuvio/manifest.json` version 0.1.2 unchanged pending authorized media-response and Android Nuvio playback verification.

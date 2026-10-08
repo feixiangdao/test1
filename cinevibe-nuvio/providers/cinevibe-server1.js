@@ -1,5 +1,5 @@
 // CineVibe Local for Nuvio
-// v0.2.3
+// v0.2.4
 //
 // Proven current chain (2026-10-07):
 // cinevibe.cc Server 1 -> vidsrc.wtf API 1 -> Viduki V1.
@@ -65,6 +65,124 @@ function fetchJson(url){
     });
   });
 }
+function fetchText(url,headers){
+  var opt={headers:headers||{}};
+  try{opt.skipSizeCheck=true;}catch(_){}
+  return fetch(url,opt).then(function(r){
+    return r.text().then(function(t){
+      if(!r.ok)throw new Error("HLS HTTP "+r.status);
+      return t;
+    });
+  });
+}
+function absUrl(base,rel){
+  rel=clean(rel);
+  if(!rel)return"";
+  if(/^https?:\/\//i.test(rel))return rel;
+  if(/^\/\//.test(rel)){
+    var sm=clean(base).match(/^(https?):/i);
+    return(sm?sm[1]:"https")+":"+rel;
+  }
+  try{
+    if(typeof URL!=="undefined")return new URL(rel,base).toString();
+  }catch(_){}
+  var m=clean(base).match(/^(https?:\/\/[^\/]+)(\/.*)?$/i);
+  if(!m)return rel;
+  var origin=m[1],path=(m[2]||"/").replace(/[?#].*$/,"");
+  if(rel.charAt(0)==="/")return origin+rel;
+  path=path.replace(/\/[^\/]*$/,"/");
+  var parts=(path+rel).split("/"),out=[];
+  parts.forEach(function(x){
+    if(!x||x===".")return;
+    if(x===".."){if(out.length)out.pop();return;}
+    out.push(x);
+  });
+  return origin+"/"+out.join("/");
+}
+function attrValue(line,key){
+  var re=new RegExp("(?:^|,)"+key+"=([^,]+)","i"),m=String(line||"").match(re);
+  return m?clean(m[1]).replace(/^["']|["']$/g,""):"";
+}
+function qualityFromVariant(info,url){
+  var r=attrValue(info,"RESOLUTION"),m=r.match(/\d+x(\d+)/i);
+  if(m)return parseInt(m[1],10)+"p";
+  var n=attrValue(info,"NAME")||attrValue(info,"QUALITY");
+  m=clean(n).match(/(2160|1440|1080|720|576|540|480|360|240)/i);
+  if(m)return m[1]+"p";
+  m=clean(url).match(/(?:^|[^0-9])(2160|1440|1080|720|576|540|480|360|240)(?:p|[^0-9]|$)/i);
+  if(m)return m[1]+"p";
+  return"Auto";
+}
+function qualityScore(q){
+  if(q==="4K")return2160;
+  var m=String(q||"").match(/(\d+)/);
+  return m?parseInt(m[1],10):0;
+}
+function parseMaster(text,base){
+  text=String(text||"");
+  if(text.indexOf("#EXTM3U")<0)return[];
+  var lines=text.split(/\r?\n/),out=[],pending="",i;
+  for(i=0;i<lines.length;i++){
+    var line=clean(lines[i]);
+    if(!line)continue;
+    if(/^#EXT-X-STREAM-INF:/i.test(line)){pending=line.substring(line.indexOf(":")+1);continue;}
+    if(pending&&line.charAt(0)!=="#"){
+      var u=absUrl(base,line);
+      if(u)out.push({url:u,quality:qualityFromVariant(pending,u),info:pending});
+      pending="";
+    }
+  }
+  var seen={},ded=[];
+  out.forEach(function(x){
+    var k=x.url+"|"+x.quality;
+    if(!seen[k]){seen[k]=1;ded.push(x);}
+  });
+  ded.sort(function(a,b){return qualityScore(b.quality)-qualityScore(a.quality);});
+  return ded;
+}
+function expandHls(row){
+  if(!row||row.type!=="hls"||!/\.m3u8(?:$|[?#])/i.test(clean(row.url)))return Promise.resolve([row]);
+  return fetchText(row.url,row.headers||{}).then(function(t){
+    var vars=parseMaster(t,row.url);
+    if(!vars.length)return[row];
+    return vars.map(function(v){
+      var q=v.quality||"Auto";
+      var name=row.name+(q&&q!=="Auto"?" · "+q:"");
+      return{
+        name:name,
+        title:name,
+        url:v.url,
+        quality:q,
+        type:"hls",
+        provider:row.provider,
+        headers:row.headers||{},
+        subtitles:row.subtitles||[]
+      };
+    });
+  }).catch(function(e){
+    try{console.log("[CineVibe] HLS expand "+row.name+" · "+(e&&e.message?e.message:e));}catch(_){}
+    return[row];
+  });
+}
+function expandAll(rows){
+  return Promise.all((rows||[]).map(function(r){return expandHls(r);}))
+    .then(function(groups){
+      var all=[],seen={};
+      groups.forEach(function(g){all=all.concat(g||[]);});
+      all.forEach(function(r){
+        var k=r.name+"|"+r.url;
+        if(seen[k])r.__drop=true;else seen[k]=1;
+      });
+      all=all.filter(function(r){return!r.__drop;});
+      all.sort(function(a,b){
+        var sa=clean(a.name).replace(/ · (?:2160|1440|1080|720|576|540|480|360|240)p$/,"");
+        var sb=clean(b.name).replace(/ · (?:2160|1440|1080|720|576|540|480|360|240)p$/,"");
+        if(sa!==sb)return sa<sb?-1:1;
+        return qualityScore(b.quality)-qualityScore(a.quality);
+      });
+      return all;
+    });
+}
 function getStreams(tmdbId,mediaTypeArg,season,episode){
   var type=mediaTypeArg==="tv"?"tv":"movie";
   season=parseInt(season,10)||0;
@@ -107,7 +225,10 @@ function getStreams(tmdbId,mediaTypeArg,season,episode){
       });
     });
     try{console.log("[CineVibe] portable streams="+out.length+" / raw="+rows.length+" wasm="+clean(j&&j.wasmHash));}catch(_){}
-    return out;
+    return expandAll(out).then(function(expanded){
+      try{console.log("[CineVibe] expanded rows="+expanded.length);}catch(_){}
+      return expanded;
+    });
   }).catch(function(e){
     try{console.log("[CineVibe] resolver FAIL · "+(e&&e.message?e.message:e));}catch(_){}
     return[];
@@ -116,7 +237,7 @@ function getStreams(tmdbId,mediaTypeArg,season,episode){
 function onSettings(){
   return[
     {type:"header",label:"CineVibe Local · Server 1"},
-    {type:"info",label:"当前真实链路：CineVibe → vidsrc.wtf API 1 → Viduki V1。已过滤手机实测失败或 IP/会话绑定线路；当前优先返回 Jill，并继续探测 Ethan / Wesker 等可移交直连线路。"},
+    {type:"info",label:"当前真实链路：CineVibe → vidsrc.wtf API 1 → Viduki V1。已过滤不可移交线路；Jill / Ethan / Wesker 等可用 HLS 会在手机端读取 master playlist，并尽量展开真实 1080p / 720p / 480p 清晰度。"},
     {
       type:"text",
       key:"resolverUrl",

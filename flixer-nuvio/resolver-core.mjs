@@ -16,8 +16,8 @@ async function client(){
   if(!js.ok||!w.ok)throw Error('Flixer WASM assets unavailable');
   const source=await js.text(),binary=new Uint8Array(await w.arrayBuffer());
   const module=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
-  await module.default({module_or_path:binary});
-  const key=module.get_img_key();
+  console.log('PHASE wasm init start'); await module.default({module_or_path:binary});console.log('PHASE wasm init ok');
+  console.log('PHASE key start');const key=module.get_img_key();console.log('PHASE key ok', typeof key,str(key).length);
   if(!/^[0-9a-f]{64}$/i.test(str(key)))throw Error('Flixer WASM returned invalid signing key');
   return{module,key};
  })().catch(e=>{clientPromise=null;throw e});
@@ -60,13 +60,13 @@ async function query(module,key,url,extra){
  const signed=await signature(key,url);
  const response=await get(url,{Accept:'text/plain',Origin:SITE.slice(0,-1),Referer:SITE,'User-Agent':'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/148 Mobile Safari/537.36',...signed,...extra},13000);
  if(!response.ok)throw Error('Flixer HTTP '+response.status);
- const payload=await response.text();
- const decrypted=await module.process_img_data(payload,key);
+ const payload=await response.text();console.log('PHASE encrypted response',response.status,payload.length);
+ console.log('PHASE decode start');const decrypted=await module.process_img_data(payload,key);console.log('PHASE decode ok');
  return JSON.parse(decrypted);
 }
 export async function resolveFlixer(id,type='movie',season=1,episode=1){
  const {module,key}=await client(),url=endpoint(type,id,season,episode);
- const roster=await query(module,key,url,{'bW90aGFmYWth':'1'});
+ console.log('PHASE roster start',type,id);const roster=await query(module,key,url,{'bW90aGFmYWth':'1'});console.log('PHASE roster ok');
  const available=names(roster),out=[];
  for(const server of available.slice(0,15)){
   try{

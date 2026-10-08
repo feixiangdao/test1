@@ -88,3 +88,15 @@ async function inspectSourceEngine(){
   console.log('ENGINE URLS',JSON.stringify([...new Set(parts)].slice(0,120)));
 }
 inspectSourceEngine().catch(e=>console.log('ENGINE ERROR',String(e.message)));
+
+async function exactEngine(){
+ const url='https://flixer.su/assets/js/WatchPartyOverlay-52585954.js';
+ const r=await fetch(url,{signal:AbortSignal.timeout(16000)}),s=await r.text();
+ for(const n of ['Mr','Dr','Pr','Ir','Or','Xr','Vr','Hr','Gr','Wr','Jr']){
+   const re=new RegExp('(?:const |let |var |,|;|\\s)'+n+'\\s*=','g');
+   const ms=[...s.matchAll(re)];
+   console.log('FN_COUNT',n,ms.length);
+   for(const m of ms.slice(0,2))console.log('FN_CODE',n,m.index,s.slice(Math.max(0,m.index-240),Math.min(s.length,m.index+5100)));
+ }
+}
+exactEngine().catch(e=>console.log('FN_ERROR',e.message));

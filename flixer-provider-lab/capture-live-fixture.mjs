@@ -1,13 +1,16 @@
 import { chromium } from "playwright";
 import {writeFile} from "node:fs/promises";
-const HOST="plsdontscrapemelove.flixer.su";
-let ip="";
-try {
-  const r=await fetch("https://dns.google/resolve?name="+HOST+"&type=A&cd=true",{signal:AbortSignal.timeout(9000)});
-  const j=await r.json();ip=(j.Answer||[]).find(x=>x.type===1)?.data||"";
-}catch(e){console.log("DNS_LOOKUP_ERROR",String(e).slice(0,120))}
+const hosts=["flixer.su","plsdontscrapemelove.flixer.su"];
+const maps=[];
+for(const h of hosts){
+ try{
+  const r=await fetch("https://dns.google/resolve?name="+h+"&type=A&cd=true",{signal:AbortSignal.timeout(9000)});
+  const j=await r.json();const ip=(j.Answer||[]).find(x=>x.type===1)?.data;
+  if(ip)maps.push("MAP "+h+" "+ip);
+ }catch(e){console.log("DNS_LOOKUP_ERROR",h,String(e).slice(0,120))}
+}
 const args=["--no-sandbox"];
-if(ip)args.push("--host-resolver-rules=MAP flixer.su "+ip+", MAP "+HOST+" "+ip);
+if(maps.length)args.push("--host-resolver-rules="+maps.join(", "));
 const browser=await chromium.launch({headless:true,args});
 const context=await browser.newContext({viewport:{width:1365,height:900}});
 const page=await context.newPage();

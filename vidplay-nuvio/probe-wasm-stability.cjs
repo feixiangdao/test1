@@ -43,4 +43,25 @@ async function sample(movie){
   try{const out=sandbox.s2DecryptUrls(arr[i].enc,new Uint8Array(arr[j].wasm));ok=out.length>0&&out.every(x=>x.startsWith("https://"))}catch(e){}
   console.log("CROSS_DECRYPT",JSON.stringify({cipherMovie:arr[i].movie,keyWasmMovie:arr[j].movie,sameWasm:arr[i].checksum===arr[j].checksum,success:ok}))
  }
+ if(arr.length<4)throw Error("Not enough WASM samples to trust stable key");
+ const keys=arr.map(x=>sandbox.s2RecoverKey(new Uint8Array(x.wasm),sandbox.s2Base64Bytes(x.enc)));
+ const hex=keys.map(k=>k.map(v=>v.toString(16).padStart(8,"0")));
+ if(!hex.every(z=>JSON.stringify(z)===JSON.stringify(hex[0])))throw Error("Stable WASM binary did not yield a stable ChaCha key");
+ function decodeWithKey(b64,key){
+   var enc=sandbox.s2Base64Bytes(b64),nonce=[sandbox.s2Rd32(enc,0),sandbox.s2Rd32(enc,4),sandbox.s2Rd32(enc,8)];
+   var ct=enc.slice(12),out=new Uint8Array(ct.length);
+   for(var b=0;b<Math.ceil(ct.length/64);b++){
+     var ks=sandbox.s2ChaChaBlock(key,b,nonce);
+     for(var j=0;j<64&&b*64+j<ct.length;j++)out[b*64+j]=ct[b*64+j]^ks[j];
+   }
+   return sandbox.s2Utf8(out).split(/\r?\n/).filter(x=>/^https?:\/\//.test(x));
+ }
+ const directSuccess=arr.every((x,i)=>{
+   let derived=decodeWithKey(x.enc,keys[0]);
+   let original=sandbox.s2DecryptUrls(x.enc,new Uint8Array(x.wasm));
+   return JSON.stringify(derived)===JSON.stringify(original)&&derived.length>=1;
+ });
+ if(!directSuccess)throw Error("Hardcoded-key decryption mismatched public WASM output");
+ console.log("STATIC_KEY_VERIFIED",JSON.stringify({wasmSha256Prefix:arr[0].checksum,keyWordsHex:hex[0],numberOfSamples:arr.length,allCrossDecrypted:true}));
+ 
 })().catch(e=>{console.error(e);process.exitCode=1});

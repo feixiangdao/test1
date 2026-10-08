@@ -9,45 +9,48 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Inspect FilmU and VidBolt
+      - name: Inspect only first-party app bundles
         shell: bash
         run: |
           set -e
           python3 - <<'PY'
           import requests,re,urllib.parse
+          S=requests.Session()
+          S.headers.update({"User-Agent":"Mozilla/5.0"})
           targets=[
             ("filmu","https://embed.filmu.in/movie/157336"),
             ("vidbolt","https://vidbolt.xyz/movie/157336")
           ]
-          needles=["singularity","allmovieland","/api/","tmdb","imdb","scrape/","quasar","expire","auth_key","source"]
+          needles=[
+            "singularity-movie","singularity-tv","allmovieland","/api/proxy",
+            "api.themoviedb.org","append_to_response","external_ids","imdb_id",
+            "/scrape/","quasar","callisto","movy.lol","auth_key","expire=",
+            "movie/","tv/"
+          ]
           for name,url in targets:
-            print("\n===",name,url,"===")
-            r=requests.get(url,timeout=20,headers={"User-Agent":"Mozilla/5.0"})
-            print("HTML",r.status_code,r.url,"len",len(r.text))
-            print(r.text[:800].replace("\n"," "))
+            print("\n###",name)
+            r=S.get(url,timeout=20)
+            print("PAGE",r.status_code,r.url)
             srcs=re.findall(r'<script[^>]+src=["\']([^"\']+)["\']',r.text,re.I)
-            print("SCRIPTS",srcs)
-            blobs=[("html",r.text)]
-            for i,src in enumerate(srcs):
+            first=[]
+            host=urllib.parse.urlparse(r.url).netloc
+            for src in srcs:
               u=urllib.parse.urljoin(r.url,src)
-              try:
-                rr=requests.get(u,timeout=20,headers={"User-Agent":"Mozilla/5.0","Referer":r.url})
-                print("SCRIPT",i,rr.status_code,u,"len",len(rr.text))
-                blobs.append((f"script{i}",rr.text))
-              except Exception as e:
-                print("SCRIPTERR",u,e)
-            for label,text in blobs:
+              if urllib.parse.urlparse(u).netloc==host:
+                first.append(u)
+            print("FIRST_PARTY",first)
+            for u in first:
+              rr=S.get(u,timeout=20,headers={"Referer":r.url})
+              print("BUNDLE",rr.status_code,u,"LEN",len(rr.text))
+              text=rr.text
               low=text.lower()
               for needle in needles:
-                n=needle.lower()
-                pos=0
-                hits=0
+                pos=0; count=0
                 while True:
-                  idx=low.find(n,pos)
-                  if idx<0 or hits>=20: break
-                  a=max(0,idx-220); b=min(len(text),idx+420)
-                  print("\nHIT",label,needle,idx)
-                  print(text[a:b].replace("\n"," ")[:800])
-                  hits+=1
-                  pos=idx+len(n)
+                  idx=low.find(needle.lower(),pos)
+                  if idx<0 or count>=8: break
+                  a=max(0,idx-350); b=min(len(text),idx+700)
+                  print("\n--",needle,"@",idx,"--")
+                  print(text[a:b].replace("\n"," ")[:1200])
+                  pos=idx+len(needle); count+=1
           PY

@@ -1,0 +1,19 @@
+name: VidPlay V1 end to end verification
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'vidplay-nuvio/probe-v1-end2end.cjs'
+      - '.github/workflows/probe-v1-end2end.yml'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node vidplay-nuvio/probe-v1-end2end.cjs

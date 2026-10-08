@@ -16,9 +16,17 @@ const context=await browser.newContext({viewport:{width:1365,height:900}});
 const page=await context.newPage();
 let item=null;
 const apiResults=[];
+const failures=[];
+const browserErrors=[];
+const badStatuses=[];
+function safeError(t){return String(t||"").replace(/https?:\/\/[^\s\"']+/g,'[URL]').slice(0,260);}
+page.on('pageerror',e=>{if(browserErrors.length<12)browserErrors.push(safeError(e.message));});
+page.on('console',m=>{if(['error','warning'].includes(m.type())&&browserErrors.length<18)browserErrors.push(m.type()+': '+safeError(m.text()));});
+page.on('requestfailed',req=>{if(failures.length<35)failures.push({path:(()=>{try{return new URL(req.url()).pathname}catch{return ''}})(),reason:safeError(req.failure()?.errorText)});});
 const promises=[];
 page.on("response",r=>{
  const u=r.url(),req=r.request();
+ if(r.status()>=400&&badStatuses.length<30)badStatuses.push({path:new URL(u).pathname,status:r.status()});
  if(u.includes("/api/tmdb/"))apiResults.push({path:new URL(u).pathname,status:r.status()});
  if(!u.includes("/api/tmdb/movie/9502/images")||item||r.status()!==200)return;
  const headers=req.headers(),key=headers["x-api-key"];
@@ -31,7 +39,7 @@ page.on("response",r=>{
 });
 try{await page.goto("https://flixer.su/watch/movie/9502",{waitUntil:"domcontentloaded",timeout:38000});await page.waitForTimeout(16000)}catch(e){console.log("BROWSER_PAGE_ERROR",String(e).slice(0,300))}
 await Promise.allSettled(promises);
-console.log("PAGE_DIAGNOSTICS",JSON.stringify({url:page.url(),title:await page.title().catch(()=>""),body:(await page.locator("body").innerText().catch(()=>"")).slice(0,450),apiResults:apiResults.slice(0,16)}));
+console.log("PAGE_DIAGNOSTICS",JSON.stringify({url:page.url(),title:await page.title().catch(()=>""),body:(await page.locator("body").innerText().catch(()=>"")).slice(0,450),apiResults:apiResults.slice(0,16),failures,badStatuses,browserErrors,meta:await page.evaluate(()=>({scriptCount:document.scripts.length,readyState:document.readyState,videoCount:document.querySelectorAll('video').length,hasTmdbBase:!!window.TMDB_API_BASE_URL})).catch(()=>({}))}));
 if(item?.body?.length>100){
  await writeFile("/tmp/flixer-fixture.json",JSON.stringify(item));
  console.log("LIVE_CIPHER_FIXTURE_READY");

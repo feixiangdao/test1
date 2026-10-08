@@ -14,8 +14,11 @@ function extType(u){
 }
 function safeUrl(u){
   u=clean(u);
-  if(!/^https?:\/\//i.test(u))return false;
-  if(/^https?:\/\/(?:localhost|127\.|10\.|192\.168\.|0\.0\.0\.0|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.)/i.test(u))return false;
+  if(!/^https?:\/\/[^\s"'<>]+$/i.test(u)||u.length>4096)return false;
+  var m=u.match(/^https?:\/\/([^/?#]+)/i),authority=m&&m[1];
+  if(!authority||authority.indexOf("@")>=0||authority.charAt(0)==="[")return false;
+  var host=authority.split(":")[0].toLowerCase();
+  if(!host||host.indexOf(".")<0||/^(?:localhost|0\.|127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.)/.test(host))return false;
   return true;
 }
 function abs(u,base){
@@ -25,11 +28,18 @@ function abs(u,base){
   return safeUrl(u)?u:"";
 }
 function urlsFromText(html){
+  // Only actual media fields and HTML media tags qualify. Never scan arbitrary
+  // page strings: ad code, documentation and unrelated assets may mention MP4/HLS.
   var s=clean(html).replace(/\\\//g,"/").replace(/&amp;/g,"&");
-  var out=[],re=/(?:https?:)?\/\/[^\s"'<>\\]+/gi,m;
-  while((m=re.exec(s))!==null&&out.length<80){
-    var u=abs(m[0].replace(/[),;]+$/,""),"");
+  var out=[],m;
+  var re=/(?:["']?(?:file|src|source|url|videoUrl|hls)["']?\s*[:=]\s*["']|<source\b[^>]*\bsrc\s*=\s*["'])(https?:\/\/[^"'<>\s]+)["']/gi;
+  while((m=re.exec(s))!==null&&out.length<32){
+    var u=abs(m[1].replace(/[,;]+$/,""),"");
     if(extType(u)&&out.indexOf(u)<0)out.push(u);
+  }
+  // An endpoint may respond with a bare direct media URL.
+  if(!out.length&&/^https?:\/\/\S+\.(?:m3u8|mp4|mpd)(?:[?#]\S*)?$/i.test(s)){
+    var direct=abs(s,"");if(extType(direct))out.push(direct);
   }
   return out;
 }
@@ -66,6 +76,7 @@ function streamRows(html,ref,sourceName,depth){
 }
 function tmdbImdb(id){
   var key=clean(settings().tmdbApiKey);
+  if(!key){try{key=clean(globalThis.TMDB_API_KEY);}catch(e){}}
   if(!key)return Promise.resolve("");
   var u="https://api.themoviedb.org/3/movie/"+encodeURIComponent(String(id))+"/external_ids?api_key="+encodeURIComponent(key);
   return fetchText(u,{"Accept":"application/json"}).then(function(t){
@@ -109,7 +120,7 @@ function getStreams(id,mediaType,season,episode){
 function onSettings(){
   return [
     {type:"header",label:"VidPlay Local · experimental"},
-    {type:"info",label:"Only verified direct HLS/MP4/DASH URL shapes are returned. HTTP 403 / challenge / HTML embeds without media produce zero streams. No bypass. Movie V1/V2 require TMDB API key for IMDb ID; movie V3 and TV V1/V2/V3 use TMDB ID."},
+    {type:"info",label:"Only explicitly identified direct HLS/MP4/DASH URL fields are returned (availability not guaranteed). HTTP 403 / challenge / HTML embeds without media produce zero streams. No bypass. Movie V1/V2 require TMDB API key for IMDb ID; movie V3 and TV V1/V2/V3 use TMDB ID."},
     {type:"text",key:"tmdbApiKey",label:"TMDB API key (optional; required for movie V1/V2)",defaultValue:"",isPassword:true}
   ];
 }

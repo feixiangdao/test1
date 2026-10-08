@@ -41,6 +41,15 @@ jobs:
           echo MODERN_WASM2JS_OUTPUT_SIZE
           wc -c /tmp/flixer-wasm-translation.mjs
           node --check /tmp/flixer-wasm-translation.mjs
+          echo WASM2JS_HEAD_BEGIN
+          head -c 1300 /tmp/flixer-wasm-translation.mjs
+          echo WASM2JS_HEAD_END
+          echo WASM2JS_TAIL_BEGIN
+          tail -c 1400 /tmp/flixer-wasm-translation.mjs
+          echo WASM2JS_TAIL_END
+          node --input-type=module -e 'const x=await import("file:///tmp/flixer-wasm-translation.mjs");console.log("WASM2JS_MODULE_EXPORTS",JSON.stringify(Object.keys(x).slice(0,35)))'
+          node --input-type=module -e 'import fs from "node:fs";let s=fs.readFileSync("/tmp/flixer-wasm-translation.mjs","utf8");console.log("JS_COMPAT_PROFILE",JSON.stringify({bytes:s.length,hasNativeWasm:s.includes("WebAssembly."),hasBrowserDOM:/\\b(?:window|document|navigator)\\b/.test(s),hasNodeRequire:/\\brequire\\(/.test(s),usesBigInt:/\\bBigInt\\b/.test(s)}))'
+
       - name: Validate experimental provider and resolver
         if: false
         run: |

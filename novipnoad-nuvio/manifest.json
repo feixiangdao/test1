@@ -13,7 +13,7 @@
         "movie",
         "tv"
       ],
-      "filename": "providers/novipnoad.js",
+      "filename": "providers/novipnoad-v018.js",
       "enabled": true,
       "formats": [
         "m3u8",

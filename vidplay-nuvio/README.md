@@ -111,3 +111,14 @@ Tests:
 **Consequences:** Changing domains, Referer, or IMDb/TMDB query alone does not grant a stream. The existing `YesMovies S2` parser alone cannot turn this into a portable VidPlay V1 HLS stream unless the upstream legitimately provides the short-lived authorization required for its stream-data API. Metadata success is not media success. Do not publish any `ythd.org/embed/*` HTML iframe as `type: hls`.
 
 **Status:** user confirmed genuine browser playback for Life (2017) in Opera, but no standalone Nuvio HLS URL confirmed. Keep `vidplay-nuvio/manifest.json` version 0.1.2 unchanged pending authorized media-response and Android Nuvio playback verification.
+
+## 2026-10-08: V2 / V3 status (movie and TV)
+
+Automated Chromium clicked the V2 and V3 selectors independently for both `Life (2017)` and `Abbott Elementary S01E01`. Both detail pages returned HTTP 200, but each movie or television playback AJAX endpoint returned Cloudflare HTTP 403 HTML, hence there was no third-party iframe and no media in the GitHub runner. Neither V2 nor V3 can currently be identified with a specific external player host from these cloud-only tests.
+
+- Movie V2: `/ajax/mov_vplay2.php?embed=tt5442430` HTTP 403
+- Movie V3: `/ajax/mov_vplay3.php?embed=395992` HTTP 403
+- TV V2: `/ajax/tv_vplay2.php?embed=125935&season=1&episode=1` HTTP 403
+- TV V3: `/ajax/tv_vplay3.php?embed=125935&season=1&episode=1` HTTP 403
+
+[Automated V2/V3 real click log](https://github.com/feixiangdao/test1/actions/runs/37782995403). This does not prove that V2/V3 are unplayable for a browser user; V1 was previously observed playing in user's residential Opera while GitHub Actions could not get the equivalent VidPlay AJAX response. The Opera connector permits reading tabs and screenshots but not scripted clicks or directly reading DOM iframe src attributes. Next useful data is each successful V2 and V3 iframe URL obtained from the actual browser session, ideally just domain and embed path, with query tokens redacted. Keep experimental v0.1.2, do not invent media streams.

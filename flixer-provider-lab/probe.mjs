@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 const targets = [
   ['Kung Fu Panda', 'https://flixer.su/watch/movie/9502'],
   ['Constantine', 'https://flixer.su/watch/movie/561'],
+  ['Game of Thrones S1E1', 'https://flixer.su/watch/tv/1399/1/1'],
 ];
 const safe = u => { try { const x = new URL(u); return x.origin + x.pathname; } catch { return ''; } };
 const isInteresting = u => ['.m3u8','.mp4','.mpd','/api/','/source','/server','/embed','/watch','/stream','/play','/video','/proxy','/playlist'].some(s => u.toLowerCase().includes(s));

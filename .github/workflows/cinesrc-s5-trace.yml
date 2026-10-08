@@ -8,35 +8,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      - name: Extract Febbox fallback implementation
+      - name: Inspect official challenge worker protocol
         shell: bash
         run: |
           set -e
-          UA='Mozilla/5.0'
-          curl -fsSL --max-time 30 -A "$UA" 'https://cinesrc.st/embed/movie/157336' -o /tmp/page.html
-          grep -oE '<script[^>]+src="[^"]+"' /tmp/page.html | sed -E 's/.*src="([^"]+)"/\1/' | sort -u > /tmp/scripts.txt
-          n=0
-          while read -r p; do
-            [ -z "$p" ] && continue
-            n=$((n+1))
-            curl -fsSL --max-time 30 -A "$UA" -e 'https://cinesrc.st/embed/movie/157336' "https://cinesrc.st$p" -o "/tmp/js$n.js" || true
-          done < /tmp/scripts.txt
+          curl -fsSL --max-time 30 'https://cinesrc.st/300726c-prod.js' -o /tmp/c.js
+          curl -fsSL --max-time 30 'https://cinesrc.st/pow-worker-v3.js' -o /tmp/w.js
           python3 - <<'PY'
-          import glob,re,os
-          keys=['fetchFebboxHLS','fetchFebboxMP4','febboxToken','febbox-hls','febbox-mp4','v2()']
-          for fn in glob.glob('/tmp/js*.js'):
+          import re
+          for fn in ['/tmp/c.js','/tmp/w.js']:
               txt=open(fn,encoding='utf-8',errors='replace').read()
-              if not any(k in txt for k in keys): continue
               print('FILE',fn,'LEN',len(txt))
-              seen=[]
-              for kw in keys:
-                  pos=0
+              for kw in ['new Worker','Worker(','postMessage','onmessage','pow-worker-v3','WebAssembly','solve','nonce']:
+                  pos=0;c=0
                   while True:
                       i=txt.find(kw,pos)
-                      if i<0: break
-                      if all(abs(i-x)>2500 for x in seen):
-                          seen.append(i)
-                          print('\n---',kw,'@',i,'---')
-                          print(txt[max(0,i-3500):min(len(txt),i+5000)])
-                      pos=i+len(kw)
+                      if i<0 or c>=12: break
+                      print('\n---',kw,'@',i,'---')
+                      print(txt[max(0,i-1200):min(len(txt),i+2200)])
+                      pos=i+len(kw);c+=1
           PY

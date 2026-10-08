@@ -1,0 +1,20 @@
+name: VidPlay live smoke
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'vidplay-nuvio/live-smoke.cjs'
+      - '.github/workflows/vidplay-live-smoke.yml'
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run live VidPlay movie and episode requests
+        run: node vidplay-nuvio/live-smoke.cjs

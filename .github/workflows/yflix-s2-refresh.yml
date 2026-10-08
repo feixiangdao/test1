@@ -1,0 +1,41 @@
+name: YFlix S2 Refresh
+on:
+  push:
+    paths:
+      - '.github/workflows/yflix-s2-refresh.yml'
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect current VidBolt app
+        shell: bash
+        run: |
+          set -e
+          mkdir -p /tmp/vb
+          curl -fsSL 'https://vidbolt.xyz/movie/157336' -A 'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36' -o /tmp/vb/page.html
+          echo '=== PAGE LEN ==='
+          wc -c /tmp/vb/page.html
+          echo '=== SCRIPT SRCS ==='
+          grep -oE '<script[^>]+src="[^"]+"' /tmp/vb/page.html | sed -E 's/.*src="([^"]+)"/\1/' || true
+          python3 - <<'PY'
+          import re, urllib.parse, requests, os
+          html=open('/tmp/vb/page.html',encoding='utf-8',errors='ignore').read()
+          srcs=re.findall(r'<script[^>]+src=["\']([^"\']+)',html,re.I)
+          print('SRCS',srcs)
+          for i,s in enumerate(srcs):
+              u=urllib.parse.urljoin('https://vidbolt.xyz/movie/157336',s)
+              try:
+                  r=requests.get(u,headers={'User-Agent':'Mozilla/5.0','Referer':'https://vidbolt.xyz/movie/157336'},timeout=25)
+                  print('FETCH',i,r.status_code,len(r.content),u)
+                  if r.ok:
+                      open(f'/tmp/vb/js{i}.js','wb').write(r.content)
+              except Exception as e:
+                  print('ERR',u,e)
+          PY
+          echo '=== DYNAMIC CHUNKS ==='
+          grep -RohE 'assets/[A-Za-z0-9._-]+\.js' /tmp/vb/*.js | sort -u | head -300 || true
+          echo '=== SCRAPER WORDS ==='
+          grep -RoiE '[A-Z][A-Za-z0-9]{2,20}' /tmp/vb/*.js | grep -Ei 'Callisto|Quasar|Vidlink|Videasy|Vaplayer|MovieBox|Allmovieland|Ninetta|Naija|Nova|Saffron|FastVa|Darkmatter|Fourk|Playapi|Netnaija|Prime|Citadel|Stream|Orion|Pulsar|Stellar|Sigma|Gama' | sort -u | head -300 || true
+          echo '=== ENDPOINT CONTEXT ==='
+          grep -RinE '/scrape/|scraper\.|sources|providers|loaders|Callisto|Quasar|Vidlink|MovieBox|Vaplayer|Allmovieland|Ninetta|Naija|Nova|Saffron|FastVa' /tmp/vb/*.js | head -500 || true

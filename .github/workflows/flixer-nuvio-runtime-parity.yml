@@ -1,0 +1,33 @@
+name: Flixer Nuvio QuickJS runtime parity
+on:
+  push:
+    branches: [flixer-provider-lab-20261008]
+    paths:
+      - 'flixer-provider-lab/test-local-live.mjs'
+      - 'flixer-provider-lab/test-nuvio-runtime-parity.mjs'
+      - '.github/workflows/flixer-nuvio-runtime-parity.yml'
+  workflow_dispatch:
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install QuickJS
+        run: npm install --no-save quickjs-emscripten
+      - name: Get exact currently deployed Local provider and Nuvio runtime
+        run: |
+          curl --fail --silent --show-error --location --retry 2 --max-time 15 'https://raw.githubusercontent.com/feixiangdao/test1/flixer-local-only-20261008/flixer-local/providers/flixer-local-live-alpha.js' -o /tmp/flixer-local-candidate.js
+          curl --fail --silent --show-error --location --retry 2 --max-time 15 'https://raw.githubusercontent.com/NuvioMedia/NuvioTV/main/app/src/full/java/com/nuvio/tv/core/plugin/PluginRuntime.kt' -o /tmp/PluginRuntime.kt
+          wc -c /tmp/flixer-local-candidate.js
+      - name: Fetch real same-version Flixer HLS without browser and retain ephemeral cipher
+        run: |
+          node flixer-provider-lab/test-local-live.mjs
+          test -s /tmp/flixer-fixture.json
+      - name: Execute real Nuvio QuickJS native fetch and call wrapper with fixture
+        run: node flixer-provider-lab/test-nuvio-runtime-parity.mjs

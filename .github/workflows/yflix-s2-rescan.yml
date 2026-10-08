@@ -8,24 +8,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Inspect bundle and active backends
+      - name: Inspect current VidBolt embedded player module
         shell: bash
         run: |
           set -e
           UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'
-          echo '=== INDEX BUNDLE ==='
-          curl -fsSL --max-time 25 -A "$UA" -e 'https://vidbolt.xyz/movie/157336' 'https://vidbolt.xyz/assets/index-CWZT0e_1.js' | head -c 20000
+          curl -fsSL --max-time 25 -A "$UA" -e 'https://vidbolt.xyz/movie/157336' 'https://vidbolt.xyz/assets/EmbeddedOnlyEmbedPage-CxGTx3In.js' -o /tmp/embed.js
+          echo 'SIZE' $(wc -c < /tmp/embed.js)
+          echo '=== FULL EMBED MODULE ==='
+          head -c 60000 /tmp/embed.js
           echo
-          echo '=== BACKEND PROBES ==='
-          probe(){
-            label="$1"; url="$2";
-            echo "--- $label ---"
-            code=$(curl -sS -L --max-time 25 -A "$UA" -e 'https://vidbolt.xyz/' -H 'Accept: application/json' -o /tmp/out.json -w '%{http_code}' "$url" || true)
-            echo "HTTP $code SIZE $(wc -c < /tmp/out.json 2>/dev/null || echo 0)"
-            head -c 12000 /tmp/out.json || true
-            echo
-          }
-          probe 'Saffron movie' 'https://scraper.vidbolt.xyz/scrape/Saffron/movie/tt0816692?tmdbId=157336&imdbId=tt0816692&title=Interstellar&year=2014'
-          probe 'Saffron TV' 'https://scraper.vidbolt.xyz/scrape/Saffron/tv/tt9288030?tmdbId=108978&imdbId=tt9288030&title=Reacher&year=2022&season=1&episode=1'
-          probe 'Callisto movie' 'https://scraper.vidbolt.xyz/scrape/Callisto/movie/tt0816692?title=Interstellar&tmdbId=157336&year=2014'
-          probe 'Callisto TV' 'https://scraper.vidbolt.xyz/scrape/Callisto/tv/tt9288030?title=Reacher&tmdbId=108978&year=2022&season=1&episode=1'
+          echo '=== JS ASSET REFERENCES ==='
+          grep -oE '[A-Za-z0-9._-]+\.js' /tmp/embed.js | sort -u | head -300 || true
+          echo '=== PROVIDER KEYWORDS ==='
+          grep -oEi 'Callisto|Quasar|Saffron|Orion|FastVa|Ninetta|Naija|Nova|Vidlink|Vaplayer|MovieBoxV2|Allmovieland|Darkmatter|Fourkhdhub|PlayAPI|provider[A-Za-z0-9_-]*' /tmp/embed.js | sort -u || true

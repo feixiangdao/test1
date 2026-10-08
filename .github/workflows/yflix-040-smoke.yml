@@ -1,0 +1,64 @@
+name: YFlix 040 Smoke
+on:
+  push:
+    paths:
+      - '.github/workflows/yflix-040-smoke.yml'
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Test S2/S4 provider and HLS chain
+        shell: bash
+        run: |
+          set -e
+          curl -fsSL https://raw.githubusercontent.com/feixiangdao/test1/main/yflix-nuvio/providers/yflix-server2.js -o /tmp/s2.js
+          curl -fsSL https://raw.githubusercontent.com/feixiangdao/test1/main/yflix-nuvio/providers/yflix-server4.js -o /tmp/s4.js
+          node -c /tmp/s2.js
+          node -c /tmp/s4.js
+          node - <<'NODE'
+          function abs(base, ref){ try{return new URL(ref,base).toString()}catch(e){return ref} }
+          async function probeHls(row){
+            const h=row.headers||{};
+            const r=await fetch(row.url,{headers:h,signal:AbortSignal.timeout(15000)});
+            const text=await r.text();
+            console.log('MASTER',row.name,r.status,r.headers.get('content-type'),text.slice(0,120).replace(/\n/g,'\\n'));
+            if(!r.ok||!text.includes('#EXTM3U')) throw new Error('bad master '+r.status);
+            const lines=text.replace(/\r/g,'').split('\n');
+            let next='';
+            for(const line0 of lines){
+              const line=line0.trim();
+              if(line && !line.startsWith('#')) { next=abs(row.url,line); break; }
+            }
+            if(!next) return;
+            const r2=await fetch(next,{headers:h,signal:AbortSignal.timeout(15000)});
+            const ct=r2.headers.get('content-type')||'';
+            let body='';
+            if(/mpegurl|text/i.test(ct)||next.includes('.m3u8')) body=await r2.text();
+            else body='binary';
+            console.log('NEXT',r2.status,ct,next,body.slice(0,120).replace(/\n/g,'\\n'));
+          }
+          async function run(){
+            const s2=require('/tmp/s2.js');
+            const s4=require('/tmp/s4.js');
+            const m2=await s2.getStreams('157336','movie');
+            console.log('S2_MOVIE',m2.length,m2.map(x=>x.name));
+            const t2=await s2.getStreams('108978','tv',1,1);
+            console.log('S2_TV',t2.length,t2.map(x=>x.name).slice(0,12));
+            if(!m2.length||String(m2[0].type)==='diagnostic') throw new Error('S2 movie no stream');
+            if(!t2.length||String(t2[0].type)==='diagnostic') throw new Error('S2 tv no stream');
+            await probeHls(m2[0]);
+            await probeHls(t2[0]);
+
+            const m4=await s4.getStreams('157336','movie');
+            console.log('S4_MOVIE',m4.length,m4.map(x=>x.name));
+            const t4=await s4.getStreams('108978','tv',1,1);
+            console.log('S4_TV',t4.length,t4.map(x=>x.name));
+            if(!m4.length||String(m4[0].type)==='diagnostic') throw new Error('S4 movie no stream');
+            if(!t4.length||String(t4[0].type)==='diagnostic') throw new Error('S4 tv no stream');
+            await probeHls(m4[0]);
+            await probeHls(t4[0]);
+          }
+          run().catch(e=>{console.error(e);process.exit(1)});
+          NODE

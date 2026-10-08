@@ -1,13 +1,13 @@
 {
   "name": "VidPlay V1 Local",
-  "version": "0.1.5",
-  "description": "Real V1 HLS resolver verified live: first-party keyless IMDb lookup, YTHD signed player token, VidSrc stream URL decryption and sequential CDN authorization; Android playback pending confirmation.",
+  "version": "0.1.6",
+  "description": "VidPlay V1-only real HLS resolver; improved Android QuickJS binary compatibility and stage-specific playback diagnostics; official Nuvio phone playback awaiting verification.",
   "scrapers": [
     {
       "id": "vidplay-direct-lab",
       "name": "VidPlay · V1",
-      "description": "VidPlay V1 only: signed player API to verified direct HLS quality variants; sequential token requests; 15s timeout and nonplayable diagnostic fallback. No V2 or V3.",
-      "version": "0.1.5",
+      "description": "VidPlay V1 only. Real server-issued HLS and quality variants; avoids Uint8Array.slice, checks WASM arrayBuffer, staged errors, 15s budget. No V2/V3.",
+      "version": "0.1.6",
       "author": "VidPlay Lab",
       "supportedTypes": [
         "movie",

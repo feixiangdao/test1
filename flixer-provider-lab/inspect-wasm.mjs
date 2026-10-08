@@ -56,6 +56,13 @@ try{
  await page.waitForTimeout(15000);
  const forced=await page.evaluate(async()=>{try{const u='https://plsdontscrapemelove.flixer.su/assets/wasm/img_data_bg.wasm';const r=await fetch(u);const data=await r.arrayBuffer();return {status:r.status,size:data.byteLength,contentType:r.headers.get('content-type')}}catch(e){return {error:String(e)}}});
  console.log('WASM_FORCED_FETCH',JSON.stringify(forced));
+ const glue=await page.evaluate(async()=>{
+   try { const r=await fetch('https://plsdontscrapemelove.flixer.su/assets/wasm/img_data.js');return r.ok ? await r.text() : null; }
+   catch(e) {return null;}
+ });
+ if(glue){ await writeFile('/tmp/flixer-img-data.js',glue);console.log('WASM_GLUE_FETCH',glue.length);}
+ else console.log('WASM_GLUE_FETCH_FAILED');
+
  await page.waitForTimeout(1500);
  await Promise.allSettled(promises);
  console.log('WASM_AUDIT',JSON.stringify({wasmResources,scripts,reqPaths,video:await page.locator('video').count()},null,2).slice(0,12000));

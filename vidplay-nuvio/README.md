@@ -1,3 +1,18 @@
+# CURRENT: VidPlay V1 v0.1.8 — works without either binary fetch API (2026-10-08)
+
+**Phone evidence:** v0.1.7 returned \`播放器阶段[WASM 解密媒体地址]: WASM: native bridge has no binary bodyBase64\`; the earlier v0.1.6 returned \`fetch.arrayBuffer unavailable\`. Thus the installed official Nuvio runtime does not expose either method to this local provider. No APK change or new server is allowed.
+
+**Fix:** The V1 Provider first attempts legitimate WASM binary reading as previously. When \`arrayBuffer()\` is missing and \`__native_fetch\` does not expose \`bodyBase64\`, it uses a small, validated public-WASM-derived **ChaCha key candidate** embedded in the Provider to decode the stream URLs returned by the *normal upstream server-signed media API*. It **does not** bypass or manufacture a one-time API token, reuse a browser cookie, change the manifest URL, or add V2/V3. Only actual URL candidates that subsequently pass the existing HLS manifest checks are returned. If upstream rotates the decoding key, wrong-key plaintext is discarded and the plugin returns the clearly marked nonplayable Status diagnostic rather than fabricated media.
+
+**Evidence:**
+- [Four WASM samples and cross-decryption](https://github.com/feixiangdao/test1/actions/runs/37795748928): both movies have identical current WASM and produce the same recovered key across four separately signed encrypted responses. WASM binary was observed to change between earlier runs, so cached key lifetime is **not guaranteed**.
+- [Real Nuvio no-binary phone simulation](https://github.com/feixiangdao/test1/actions/runs/37796285766): deliberately disables \`fetch.arrayBuffer\` and makes \`__native_fetch\` return empty \`bodyBase64\` for actual remote WASM data. V1 returns **3 HLS rows for Kung Fu Panda (2008): 272p, 544p, 816p**, and **3 for Life (2017): 266p, 534p, 800p**. Both execute the new fallback, obtain current signed API data, and verify the HLS master response. Native Android playback still requires user confirmation.
+- [Mocked regression tests](https://github.com/feixiangdao/test1/actions/runs/37796313389): pass valid-metadata/signed-media checks; invalid offline parameters produce a diagnostic, not fake streams.
+
+**Stable install URL:** \`https://raw.githubusercontent.com/feixiangdao/test1/main/vidplay-nuvio/manifest.json\` remains unchanged; \`scraper.id = vidplay-direct-lab\`, manifest version **0.1.8**. Refresh the existing Nuvio plugin; do **not** add a different URL. Test *Kung Fu Panda* first, then attempt >30 seconds continuous playback. If only Status appears, capture the new diagnostic; the external decoding key may have rotated or another device-specific networking limit may remain.
+
+---
+
 # CURRENT: VidPlay V1 v0.1.7 — Legacy Nuvio WASM binary compatibility (2026-10-08)
 
 **Device screenshot after v0.1.6:** V1 status was \`播放器阶段[WASM 解密媒体地址]: WASM: Nuvio fetch.arrayBuffer unavailable\`. This confirms the browser-linked public player and authorized media API were reached on the user's phone; the runtime lacked a binary response method.

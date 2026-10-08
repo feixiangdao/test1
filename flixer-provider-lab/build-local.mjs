@@ -87,7 +87,21 @@ try{
      console.log("LOCAL_DECRYPT_FIXTURE_RESULT",JSON.stringify({decodedJson:true,hasSources:values.length>0,sourceCount:values.length,expectedSources:expected?.sources?.length||null,exactMatch:matched,mediaUrlCount:urlValues.length}));
      if(expected && !matched)process.exitCode=1;
      if(!expected && !urlValues.length)console.log("LOCAL_DECRYPT_NO_MEDIA_URL_YET");
-    }catch(e){ console.log("LOCAL_DECRYPT_FIXTURE_ERROR",String(e).slice(0,180));process.exitCode=1;}
+    }catch(e){ console.log("LOCAL_DECRYPT_FIXTURE_ERROR",String(e).slice(0,180));
+      try{
+       await writeFile("/tmp/flixer-native-glue.mjs",glue);
+       const native=await import("file:///tmp/flixer-native-glue.mjs");
+       const binary=await readFile("/tmp/flixer-img-data.wasm");
+       native.initSync({module:binary});
+       const raw=await native.process_img_data(fixture.body,fixture.suppliedKey);
+       let parsed={};try{parsed=JSON.parse(raw)}catch(_){}
+       console.log("NATIVE_WASM_CROSSCHECK",JSON.stringify({success:true,sourceCount:parsed?.sources?.length||0}));
+       process.exitCode=1;
+      }catch(nativeErr){
+       console.log("NATIVE_WASM_CROSSCHECK_ERROR",String(nativeErr).slice(0,220));
+       if(String(nativeErr)===String(e)){console.log("FIXTURE_MISMATCH_SUSPECTED",String(e));}
+       process.exitCode=1;
+      }}
    }
   }catch(e){console.log("LOCAL_DECRYPT_FIXTURE_MISSING",e?.code||String(e).slice(0,80));}
 

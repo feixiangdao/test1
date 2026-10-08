@@ -6,15 +6,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
-      - name: Fast probe VidBolt backends
+      - name: Probe VidBolt same-origin proxy backends
         shell: bash
         run: |
           node - <<'NODE'
-          const BASE='https://showbox.filmu.in';
-          const KEY='09eb429913afb6b1cc90f23746f41fb3279aed77726c625c40672b81444c0bac';
-          const UA='Mozilla/5.0';
+          const BASE='https://vidbolt.xyz';
+          const UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36';
           const providers=['VidRock','Flaxmovies','VidFastFirst','VidFastPro','Vidflix','ShowBox','Peachify','VidRift','FSonic','CineStream'];
           const cases=[
             {label:'MOVIE',kind:'movie',id:'tt0816692',tmdb:'157336',title:'Interstellar',year:'2014'},
@@ -24,13 +23,17 @@ jobs:
             const q=new URLSearchParams({tmdbId:c.tmdb,title:c.title,year:c.year});
             if(c.season)q.set('season',c.season);
             if(c.episode)q.set('episode',c.episode);
-            const u=BASE+'/scrape/'+provider+'/'+c.kind+'/'+c.id+'?'+q.toString();
+            const path='/scrape/'+provider+'/'+c.kind+'/'+c.id+'?'+q.toString();
+            const u=BASE+'/api/proxy?path='+encodeURIComponent(path);
             try{
-              const r=await fetch(u,{headers:{'x-api-key':KEY,'accept':'application/json','user-agent':UA},signal:AbortSignal.timeout(8000)});
+              const r=await fetch(u,{
+                headers:{'accept':'application/json','user-agent':UA,'referer':BASE+'/'+c.kind+'/'+c.tmdb},
+                signal:AbortSignal.timeout(15000)
+              });
               const tx=await r.text();
               let j={}; try{j=JSON.parse(tx)}catch{}
               const rows=Array.isArray(j.sources)?j.sources:[];
-              return {label:c.label,provider,status:r.status,count:rows.length,rows:rows.slice(0,8).map(x=>({
+              return {label:c.label,provider,status:r.status,count:rows.length,body:rows.length?undefined:tx.slice(0,240),rows:rows.slice(0,10).map(x=>({
                 name:x?.name,quality:x?.quality,type:x?.type,url:x?.url,workerProxyUrl:x?.workerProxyUrl,headers:x?.headers
               }))};
             }catch(e){return{label:c.label,provider,error:String(e?.message||e)}}
@@ -39,7 +42,7 @@ jobs:
             const jobs=[];
             for(const c of cases)for(const p of providers)jobs.push(one(p,c));
             const all=await Promise.all(jobs);
-            for(const x of all)console.log('RESULT',JSON.stringify(x).slice(0,12000));
+            for(const x of all)console.log('RESULT',JSON.stringify(x).slice(0,14000));
           }
           run().catch(e=>{console.error(e);process.exit(1)});
           NODE

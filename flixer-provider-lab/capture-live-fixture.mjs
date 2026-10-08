@@ -61,7 +61,7 @@ page.on("response",r=>{
    console.log("LIVE_CIPHER_CAPTURED",{status:r.status(),bytes:t.length,server,onlySources,hasKey:true});
  }).catch(e=>console.log("CIPHER_BODY_ERROR",String(e).slice(0,140))));
 });
-try{await page.goto("https://flixer.su/watch/movie/9502",{waitUntil:"domcontentloaded",timeout:38000});await page.waitForTimeout(20000)}catch(e){console.log("BROWSER_PAGE_ERROR",String(e).slice(0,300))}
+try{await page.goto("https://flixer.su/watch/movie/9502",{waitUntil:"domcontentloaded",timeout:38000});for(let i=0;i<64&&!cipherResults.some(x=>x.onlySources&&x.server==="alpha"&&x.body.length>100);i++)await page.waitForTimeout(250);await page.waitForTimeout(400)}catch(e){console.log("BROWSER_PAGE_ERROR",String(e).slice(0,300))}
 await Promise.allSettled(promises);
 console.log("PAGE_DIAGNOSTICS",JSON.stringify({url:page.url(),title:await page.title().catch(()=>""),body:(await page.locator("body").innerText().catch(()=>"")).slice(0,450),apiResults:apiResults.slice(0,16),failures,badStatuses,browserErrors,meta:await page.evaluate(()=>({scriptCount:document.scripts.length,readyState:document.readyState,videoCount:document.querySelectorAll('video').length,hasTmdbBase:!!window.TMDB_API_BASE_URL})).catch(()=>({}))}));
 const mediaCipher=cipherResults.find(x=>x.onlySources && x.server==="alpha" && x.body.length>100);

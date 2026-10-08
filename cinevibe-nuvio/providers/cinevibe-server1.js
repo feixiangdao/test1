@@ -1,5 +1,5 @@
 // CineVibe Local for Nuvio
-// v0.2.1
+// v0.2.2
 //
 // Proven current chain (2026-10-07):
 // cinevibe.cc Server 1 -> vidsrc.wtf API 1 -> Viduki V1.
@@ -25,11 +25,15 @@ function mediaType(url,fallback){
   if(/\.mp4$/.test(p))return"mp4";
   return fallback==="dash"?"dash":fallback==="mp4"?"mp4":"hls";
 }
-function transferable(url){
-  url=clean(url);
-  // Leon currently returns a signed jerso URL containing the resolver egress IP.
-  // That token is not portable to the phone running Nuvio, so drop it.
+function transferable(url,server){
+  url=clean(url);server=clean(server).toLowerCase();
+  // Confirmed non-portable from real Nuvio testing:
+  // Leon: resolver-egress-IP-bound jerso token.
+  // Claire: embed-session scoped /e/.../master.m3u8.
+  // Rebecca: reamefly signed session works at resolver but not on phone.
+  if(server==="leon"||server==="claire"||server==="rebecca")return false;
   if(/jerso441ceg\.com/i.test(url))return false;
+  if(/reamefly\.cyou/i.test(url))return false;
   if(/:[0-9]{9,12}:(?:\d{1,3}\.){3}\d{1,3}:/i.test(url))return false;
   return true;
 }
@@ -78,7 +82,7 @@ function getStreams(tmdbId,mediaTypeArg,season,episode){
     rows.forEach(function(x){
       x=x||{};
       var url=clean(x.url);
-      if(!/^https?:\/\//i.test(url)||!transferable(url)||seen[url])return;
+      if(!/^https?:\/\//i.test(url)||!transferable(url,x.server)||seen[url])return;
       seen[url]=1;
       var server=clean(x.server)||"Server 1";
       var lang=clean(x.language);
@@ -110,7 +114,7 @@ function getStreams(tmdbId,mediaTypeArg,season,episode){
 function onSettings(){
   return[
     {type:"header",label:"CineVibe Local · Server 1"},
-    {type:"info",label:"当前真实链路：CineVibe → vidsrc.wtf API 1 → Viduki V1。自动过滤与解析服务器 IP 绑定的临时线路；视频流量仍由 Nuvio 直连 CDN。"},
+    {type:"info",label:"当前真实链路：CineVibe → vidsrc.wtf API 1 → Viduki V1。已根据手机实测过滤 Leon / Claire / Rebecca 等不可移交线路，目前优先保留 Jill / Ada 等直连线路。"},
     {
       type:"text",
       key:"resolverUrl",

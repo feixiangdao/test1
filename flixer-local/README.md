@@ -75,3 +75,16 @@ This is not an end-to-end decryption success, so this Local manifest stays disab
 - This is only a parser-level syntax test; it does **not** establish execution inside Nuvio Hermes, source decrypt success, or video playback. The generated preview is a research output, not a published working Provider.
 
 The final target remains a one-file, locally executing Flixer Nuvio provider. No Playwright, Vercel, remote resolver, or background host may be required at playback time.
+
+## 2026-10-08: real Hermes VM verification
+
+- The Flixer WASM-to-JS research core compiled successfully with `hermes-compiler@250829098.0.19` to about **482,563 bytes of Hermes bytecode**, and ran in the legacy `hermes-engine-cli@0.12.0` test VM.
+- A direct **Hermes execution** of the standalone `get_img_key()` returned a 64-character string (PASS). This is stronger evidence than the earlier Hermes parser-only check.
+- In the same Hermes runtime, `process_img_data` was invoked with deliberately invalid synthetic input and returned an object to the caller. No actual Flixer ciphertext was successfully decoded in the test.
+- A separate browser-to-local interop experiment could not capture a legitimate browser-origin ciphertext/key pair in that CI session; the test correctly FAILED instead of claiming sources were available.
+- Test run links:
+  - Runtime: https://github.com/feixiangdao/test1/actions/runs/37775121594
+  - Decoder entry-point: https://github.com/feixiangdao/test1/actions/runs/37775372301
+  - Interop no-sample: https://github.com/feixiangdao/test1/actions/runs/37774297982
+
+All generated upstream-derived bundles remain ephemeral in the testing runner, **not committed or published**. The final Local Provider still requires an independently verified way to obtain and decode authorized media responses and Nuvio in-app execution. This manifest stays disabled.

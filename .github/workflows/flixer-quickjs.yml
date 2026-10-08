@@ -1,0 +1,24 @@
+name: Flixer QuickJS Android compatibility
+on:
+  push:
+    branches: [flixer-local-only-20261008]
+    paths:
+      - 'flixer-local/check-quickjs.mjs'
+      - 'flixer-local/providers/flixer-local-live-alpha.js'
+      - '.github/workflows/flixer-quickjs.yml'
+  workflow_dispatch:
+jobs:
+  quickjs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install QuickJS runtime
+        run: npm install --no-save quickjs-emscripten
+      - name: Run Nuvio-equivalent provider JavaScript inside QuickJS
+        run: node flixer-local/check-quickjs.mjs

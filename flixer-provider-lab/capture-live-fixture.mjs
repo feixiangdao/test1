@@ -15,9 +15,11 @@ const browser=await chromium.launch({headless:true,args});
 const context=await browser.newContext({viewport:{width:1365,height:900}});
 const page=await context.newPage();
 let item=null;
+const apiResults=[];
 const promises=[];
 page.on("response",r=>{
  const u=r.url(),req=r.request();
+ if(u.includes("/api/tmdb/"))apiResults.push({path:new URL(u).pathname,status:r.status()});
  if(!u.includes("/api/tmdb/movie/9502/images")||item||r.status()!==200)return;
  const headers=req.headers(),key=headers["x-api-key"];
  if(!/^[0-9a-f]{64}$/i.test(key||"")) {
@@ -29,6 +31,7 @@ page.on("response",r=>{
 });
 try{await page.goto("https://flixer.su/watch/movie/9502",{waitUntil:"domcontentloaded",timeout:38000});await page.waitForTimeout(16000)}catch(e){console.log("BROWSER_PAGE_ERROR",String(e).slice(0,300))}
 await Promise.allSettled(promises);
+console.log("PAGE_DIAGNOSTICS",JSON.stringify({url:page.url(),title:await page.title().catch(()=>""),body:(await page.locator("body").innerText().catch(()=>"")).slice(0,450),apiResults:apiResults.slice(0,16)}));
 if(item?.body?.length>100){
  await writeFile("/tmp/flixer-fixture.json",JSON.stringify(item));
  console.log("LIVE_CIPHER_FIXTURE_READY");

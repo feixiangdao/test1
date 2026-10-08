@@ -1,79 +1,37 @@
-name: YFlix S2 Fresh Research
+name: YFlix S2 v052 Smoke
 on:
   push:
     paths:
       - '.github/workflows/yflix-s2-fresh.yml'
 jobs:
-  direct:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      - name: Probe Quasar direct upstreams
+      - name: Validate stable S2 subset
         shell: bash
         run: |
+          set -e
+          curl -fsSL https://raw.githubusercontent.com/feixiangdao/test1/main/yflix-nuvio/providers/yflix-server2-v052.js -o /tmp/s2.js
+          node -c /tmp/s2.js
           node - <<'NODE'
-          const API='https://scraper.vidbolt.xyz/scrape/Quasar/movie/tt0816692?tmdbId=157336';
-          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/137 Safari/537.36';
-          function b64urlDecode(s){
-            s=s.replace(/-/g,'+').replace(/_/g,'/');
-            while(s.length%4)s+='=';
-            return Buffer.from(s,'base64').toString('utf8');
+          const p=require('/tmp/s2.js');
+          async function probe(x){
+            const h=Object.assign({},x.headers||{}, {Range:'bytes=0-0'});
+            const r=await fetch(x.url,{headers:h,signal:AbortSignal.timeout(12000)});
+            console.log('PROBE',x.name,r.status,r.headers.get('content-type')||'',r.headers.get('content-range')||'');
+            if(r.status!==206) throw new Error('not range-playable '+x.name+' '+r.status);
           }
-          function decodeProxy(u){
-            try{
-              const x=new URL(u);
-              const parts=x.pathname.split('/').filter(Boolean);
-              const i=parts.findIndex(v=>v==='segment'||v==='m3u8');
-              if(i<0||!parts[i+1]) return null;
-              const upstream=b64urlDecode(parts[i+1]);
-              let headers={};
-              const hs=x.searchParams.get('headers');
-              if(hs){try{headers=JSON.parse(hs)}catch{}}
-              const q=x.searchParams.get('q');
-              let final=upstream;
-              if(q){
-                // segment proxy q can contain query-string material or u=<url>&headers=...
-                const p=new URLSearchParams(q);
-                if(p.get('u')) final=p.get('u');
-                else final=upstream+(upstream.includes('?')?'&':'?')+q;
-              }
-              return {final,headers};
-            }catch{return null}
+          async function run(){
+            const m=await p.getStreams('157336','movie');
+            console.log('MOVIE',m.length,m.map(x=>x.name));
+            if(m.length!==0) throw new Error('movie must stay hidden');
+            const t=await p.getStreams('108978','tv',1,1);
+            console.log('TV',t.length,t.map(x=>x.name));
+            if(t.length<1) throw new Error('TV has no stable stream');
+            if(t.some(x=>!/Vidlink/.test(x.name))) throw new Error('unexpected TV family');
+            if(t.some(x=>!/480p|360p/.test(x.name))) throw new Error('unexpected TV quality');
+            for(const x of t) await probe(x);
           }
-          async function probeFile(url,headers){
-            try{
-              const h=Object.assign({},headers||{}, {Range:'bytes=0-1048575'});
-              const r=await fetch(url,{headers:h,signal:AbortSignal.timeout(15000)});
-              const ab=await r.arrayBuffer();
-              return {status:r.status,len:ab.byteLength,ct:r.headers.get('content-type')||'',cr:r.headers.get('content-range')||'',head:Buffer.from(ab).subarray(0,16).toString('hex')};
-            }catch(e){return {error:String(e?.message||e)}}
-          }
-          async function probeHls(url,headers){
-            try{
-              const r=await fetch(url,{headers:headers||{},signal:AbortSignal.timeout(15000)});
-              const tx=await r.text();
-              return {status:r.status,ok:r.ok&&tx.startsWith('#EXTM3U'),ct:r.headers.get('content-type')||'',head:tx.slice(0,120)};
-            }catch(e){return {error:String(e?.message||e)}}
-          }
-          async function main(){
-            const r=await fetch(API,{headers:{Accept:'application/json','User-Agent':UA,Referer:'https://vidbolt.xyz/'},signal:AbortSignal.timeout(20000)});
-            const j=await r.json();
-            const rows=j.sources||[];
-            for(const x of rows){
-              const n=String(x.name||'');
-              if(!/streamflix|interstellar \(2014\)|vaplayer/i.test(n)) continue;
-              const d=decodeProxy(String(x.url||''));
-              if(!d) continue;
-              const hh=Object.assign({},d.headers||{},x.headers||{});
-              console.log('\nROW',n);
-              console.log('UPSTREAM',d.final);
-              console.log('HEADERS',JSON.stringify(hh));
-              const isHls=String(x.type||'').toLowerCase()==='m3u8'||String(d.final).includes('.m3u8');
-              console.log('DIRECT_PROBE',JSON.stringify(isHls?await probeHls(d.final,hh):await probeFile(d.final,hh)));
-            }
-            // Explicit StreamFlix direct URL seen in current Quasar response
-            const sf='https://cf.streamflixserver.site/movies/2014/itenstelr.mkv';
-            console.log('\nEXPLICIT_STREAMFLIX',sf,JSON.stringify(await probeFile(sf,{'User-Agent':UA})));
-          }
-          main().catch(e=>{console.error(e);process.exit(1)});
+          run().catch(e=>{console.error(e);process.exit(1)});
           NODE

@@ -18,7 +18,7 @@ async function publicDnsA(hostname) {
     });
     if (!r.ok) return null;
     const data=await r.json();
-    const a=(data.Answer || []).find(x=>x.type===1 && /^\\d{1,3}(\\.\\d{1,3}){3}$/.test(x.data));
+    const a=(data.Answer || []).find(x=>x.type===1 && /^\d{1,3}(\.\d{1,3}){3}$/.test(x.data));
     return a ? a.data : null;
   } catch (e) { console.warn("[DNS] DoH unavailable for",hostname,String(e).slice(0,120));return null; }
 }

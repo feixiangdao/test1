@@ -1,0 +1,28 @@
+{
+  "name": "Flixer Local Only (development)",
+  "version": "0.2.0",
+  "description": "Strict on-device Nuvio JavaScript experiment. Direct-link fallback only; WASM decoding not implemented. Disabled by default.",
+  "scrapers": [
+    {
+      "id": "flixer-local-direct-020",
+      "name": "Flixer Local · Direct (experimental)",
+      "description": "Pure local; returns no results when Flixer only offers encrypted WASM sources. Not a finished player provider.",
+      "version": "0.2.0",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/flixer-local-only-20261008/flixer-local/providers/flixer-local.js",
+      "enabled": false,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "hasSettings": true
+    }
+  ]
+}

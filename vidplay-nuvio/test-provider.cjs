@@ -109,6 +109,22 @@ function common(u,opts){
   assert(!called.some(x=>x.url.includes("127.0.0.1")));
   console.log("PASS: private IP media rejected");
 
+
+  // Crucial no-key route: the public metadata endpoint maps TMDB 395992
+  // directly to the IMDb ID used by the real VidPlay V1 YTHD embed.
+  globalThis.SCRAPER_SETTINGS={};
+  delete globalThis.TMDB_API_KEY;
+  mock((u,o)=>{
+    if(u==="https://data.vidsrc.sh/api.php?type=movie&tmdb=395992")
+      return{status:200,body:{status_code:"200",data:{title:"Life 2017",imdb_id:"tt5442430"}}};
+    return common(u,o);
+  });
+  const keyless=await getStreams(395992,"movie");
+  assert.equal(keyless.length,3);
+  assert(called.some(x=>x.url==="https://data.vidsrc.sh/api.php?type=movie&tmdb=395992"));
+  assert(!called.some(x=>x.url.includes("api.themoviedb.org")));
+  console.log("PASS: keyless TMDB-to-IMDb mapping for VidPlay V1");
+
   assert.deepEqual(await getStreams("wrong","movie"),[]);
   assert.deepEqual(await getStreams(125935,"tv",1,0),[]);
   console.log("PASS: invalid identifiers rejected");

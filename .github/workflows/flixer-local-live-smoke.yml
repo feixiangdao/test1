@@ -1,0 +1,24 @@
+name: Flixer Local live regression (minified)
+on:
+  push:
+    branches: [flixer-local-only-20261008]
+    paths:
+      - '.github/workflows/flixer-local-live-smoke.yml'
+  workflow_dispatch:
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify current script and fetch direct Alpha HLS with no browser
+        run: |
+          set -euo pipefail
+          cp flixer-local/providers/flixer-local-live-alpha.js /tmp/flixer-local-candidate.js
+          curl --fail --silent --show-error --location --retry 2 --max-time 15 https://raw.githubusercontent.com/feixiangdao/test1/flixer-provider-lab-20261008/flixer-provider-lab/test-local-live.mjs -o /tmp/flixer-check-live.mjs
+          node /tmp/flixer-check-live.mjs

@@ -43,3 +43,15 @@ Do not install this disabled manifest expecting playable Flixer streams. The pub
 - An automated Chromium initialization attempt failed with `E20` during key generation; other real-browser sessions had successfully resolved HLS. This suggests environment-sensitive logic but does not isolate the precise E20 cause.
 - Binaryen `wasm2js` **version 108** was tested without flags and with `--all-features`. Both failed validation of some `i64.trunc_sat_f64_u` instructions; therefore a direct WASM-to-pure-JavaScript translation is **not demonstrated**. This does not establish that a newer Binaryen or a manual port is impossible.
 - Until a decoder works inside Nuvio itself, the manifest must remain disabled and no claimed video playback success should be inferred from the direct-link unit tests.
+
+## Update: standalone JS conversion and wasm-bindgen linkage
+
+Research in branch `flixer-provider-lab-20261008` has since advanced beyond the Binaryen 108 limitation:
+
+- **Binaryen 132** with selective feature flags and the nontrapping-fptoint/bulk-memory lowering passes successfully translated the 132,377-byte WASM into ~1,270,309 bytes of standalone JS.
+- The translated code exposed low-level `get_img_key` and `process_img_data` and passed Node syntax checking.
+- Combining it with the site's public wasm-bindgen JS glue yielded a **~1,290,267-byte module** that imports successfully **without a native WASM file**.
+- Invoking `get_img_key` outside a real browser still failed with **E18** under a minimal DOM/screen/localStorage compatibility shim. A real headless browser has also intermittently returned **E20**.
+- The lab now traces calls to the wasm-bindgen imports to determine which browser-context input remains required.
+
+This is not an end-to-end decryption success, so this Local manifest stays disabled. No hosted resolver is incorporated.

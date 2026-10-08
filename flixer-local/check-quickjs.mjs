@@ -5,7 +5,8 @@ const filename=process.env.FLIXER_SCRIPT_PATH || "flixer-local/providers/flixer-
 const code=await readFile(filename,"utf8");
 console.log("QJS_INPUT",{bytes:Buffer.byteLength(code),lines:code.split("\n").length});
 const qjs=await getQuickJS();
-for(const preset of ["bare","nuvio"]){
+const globals={bare:"",window:"globalThis.window=globalThis;",self:"globalThis.self=globalThis;",global:"globalThis.global=globalThis;",window_self:"globalThis.window=globalThis;globalThis.self=globalThis;",nuvio:"globalThis.window=globalThis;globalThis.self=globalThis;globalThis.global=globalThis;"};
+for(const preset of Object.keys(globals)){
 for(const memMiB of [32,64,128]){
  const runtime=qjs.newRuntime();
  runtime.setMemoryLimit(memMiB*1024*1024);
@@ -13,7 +14,7 @@ for(const memMiB of [32,64,128]){
  const ctx=runtime.newContext();
  const start=Date.now();
  try {
-  const prelude=preset==="nuvio"?"globalThis.window=globalThis;globalThis.self=globalThis;globalThis.global=globalThis;\n":"";
+  const prelude=globals[preset]+"\n";
   const wrapper="var module={exports:{}}; var exports=module.exports; (function(){\n"+prelude+code+"\nmodule.exports.__testKey=function(){return typeof get_img_key==='function'?get_img_key():'MISSING_KEY_FUNCTION';};\n})();"+
     "JSON.stringify({hasStreams:typeof module.exports.getStreams==='function',hasSettings:typeof module.exports.onSettings==='function',appInfo:typeof navigator==='object',globalJSDecoder:typeof globalThis.WebAssembly});";
   const res=ctx.evalCode(wrapper,"flixer-local-provider.js",{type:"global"});

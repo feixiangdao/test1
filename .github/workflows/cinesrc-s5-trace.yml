@@ -6,40 +6,12 @@ on:
 jobs:
   trace:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 3
     steps:
-      - name: Capture Worker messages despite crypto timeout
+      - name: Dump CineSrc PoW worker protocol
         shell: bash
         run: |
           set -e
-          curl -fsSL --max-time 30 'https://cinesrc.st/300726c-prod.js' -o /tmp/c.js
-          node - <<'NODE'
-          process.on('uncaughtException',e=>console.log('UNCAUGHT',e&&e.name,String(e&&e.message||e).slice(0,500)));
-          process.on('unhandledRejection',e=>console.log('UNHANDLED',e&&e.name,String(e&&e.message||e).slice(0,500)));
-          const fs=require('fs'),vm=require('vm');
-          const ORIGIN='https://cinesrc.st',PAGE=ORIGIN+'/embed/movie/157336',UA='Mozilla/5.0';
-          const listeners={};let api=null;const workerLog=[];
-          function addEventListener(n,f){(listeners[n]||(listeners[n]=[])).push(f)}
-          function removeEventListener(){}
-          function dispatchEvent(e){for(const f of (listeners[e.type]||[]).slice())try{f(e)}catch{};return true}
-          class CE{constructor(type,opt){this.type=type;this.detail=opt&&opt.detail}}
-          class FakeWorker{constructor(url){this.url=String(url);workerLog.push({event:'new',url:this.url});}postMessage(msg){workerLog.push({event:'post',url:this.url,msg});}terminate(){workerLog.push({event:'terminate',url:this.url});}addEventListener(type,fn){this['on'+type]=fn;}removeEventListener(){}}
-          const g={console:{log(){},error(){}},setTimeout,clearTimeout,setInterval,clearInterval,TextEncoder,TextDecoder,URL,URLSearchParams,atob:s=>Buffer.from(s,'base64').toString('binary'),btoa:s=>Buffer.from(s,'binary').toString('base64'),crypto:require('crypto').webcrypto,WebAssembly,Worker:FakeWorker,CustomEvent:CE,Event:CE,addEventListener,removeEventListener,dispatchEvent,fetch,location:{origin:ORIGIN,href:PAGE,pathname:'/embed/movie/157336',search:''},navigator:{userAgent:UA,language:'en-US',languages:['en-US','en']},performance:{now:()=>Date.now()}};
-          g.window=g;g.self=g;g.globalThis=g;g.document={createElement:()=>({style:{},setAttribute(){},appendChild(){},remove(){}}),head:{appendChild(){}},body:{appendChild(){}},documentElement:{},querySelector:()=>null,querySelectorAll:()=>[],addEventListener,removeEventListener};
-          addEventListener('_cs',e=>{if(e&&e.detail&&g[e.detail])api=g[e.detail]});
-          const ctx=vm.createContext(g);vm.runInContext(fs.readFileSync('/tmp/c.js','utf8'),ctx,{timeout:10000});
-          function b64url(s){return Buffer.from(s).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
-          const jar={};function addCookies(r){for(const x of (typeof r.headers.getSetCookie==='function'?r.headers.getSetCookie():[])){const p=x.split(';')[0],i=p.indexOf('=');if(i>0)jar[p.slice(0,i)]=p.slice(i+1)}}function cookies(){return Object.entries(jar).map(([k,v])=>k+'='+v).join('; ')}
-          async function main(){
-            console.log('API_KEYS',api&&Object.keys(api));
-            const q=b64url(JSON.stringify(['movie','157336',null,null]));
-            const boot=await fetch(ORIGIN+'/api/c/bootstrap',{method:'POST',headers:{'User-Agent':UA,'x-cs-q':q}});addCookies(boot);const bj=await boot.json();
-            const native=fetch;
-            async function wrapped(input,opt){let url=typeof input==='string'?input:String(input&&input.url||input);if(url.startsWith('/'))url=ORIGIN+url;const u=new URL(url,ORIGIN);opt=Object.assign({},opt||{});const h=new Headers(opt.headers||{});h.set('User-Agent',UA);if(cookies())h.set('Cookie',cookies());if(u.pathname==='/api/c/issue'||u.pathname==='/api/c/stage2/issue'){h.set('x-cs-r',bj.r);h.set('x-cs-q',q);if(u.pathname==='/api/c/issue')h.set('x-cs-p',bj.p)}opt.headers=h;const r=await native(url,opt);addCookies(r);console.log('FETCH',u.pathname,r.status);return r}
-            g.fetch=wrapped;ctx.fetch=wrapped;
-            Promise.resolve().then(()=>api.gc()).then(v=>console.log('GC_OK',String(v).slice(0,200))).catch(e=>console.log('GC_REJECT',e&&e.name,String(e&&e.message||e).slice(0,400)));
-            for(const ms of [500,1500,3000,5500,7000])setTimeout(()=>console.log('WORKER_AT_'+ms+'='+JSON.stringify(workerLog)),ms);
-            await new Promise(r=>setTimeout(r,7500));
-          }
-          main().catch(e=>console.log('MAIN_ERR',e&&e.name,String(e&&e.message||e).slice(0,500)));
-          NODE
+          curl -fsSL --max-time 30 'https://cinesrc.st/pow-worker-v3.js' -o /tmp/w.js
+          echo SIZE=$(wc -c < /tmp/w.js)
+          cat /tmp/w.js

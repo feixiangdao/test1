@@ -45,16 +45,48 @@ function mock(responder){seen=[];globalThis.fetch=async (url,opt)=>{seen.push(St
 
  globalThis.TMDB_API_KEY='dummy-test-key';
  mock(u=>{
-   if(u.includes('api.themoviedb.org'))return{status:200,body:'{"imdb_id":"tt5442430"}'};
+   if(u.includes('api.themoviedb.org'))return{status:200,body:'{"title":"Life","release_date":"2017-03-23","external_ids":{"imdb_id":"tt5442430"}}'};
    if(u.includes('mov_vplay.php'))return{status:200,body:'{"file":"https://media.example/v1/video.mp4"}'};
    if(u.includes('mov_vplay2.php'))return{status:200,body:'<html>...</html>'};
    return{status:403,body:'blocked'};
  });
  const keyRoutes=await getStreams(395992,'movie');
  assert.equal(keyRoutes.length,1);
- assert(seen.some(u=>u.includes('api.themoviedb.org/3/movie/395992/external_ids?api_key=dummy-test-key')));
+ assert(seen.some(u=>u.includes('api.themoviedb.org/3/movie/395992?api_key=dummy-test-key')));
  assert(seen.some(u=>u.endsWith('mov_vplay.php?embed=tt5442430')));
  assert.equal(keyRoutes[0].name,'VidPlay · V1');
  delete globalThis.TMDB_API_KEY;
  console.log('PASS movie IMDb lookup via shared TMDB key');
+ // Live site's confirmed GET form: /index.php?menu=search&query=<title>.
+ // Identical titles in different years must never select the wrong movie page.
+ globalThis.TMDB_API_KEY='dummy-test-key';
+ const lifePage='https://vidplay.top/movie/51381-watch-life-2017-online';
+ const searchHtml='<figure><a href="/movie/54003-watch-life-1999-online"></a><div class="title">Life</div><div class="year">1999</div></figure>'+
+ '<figure><a href="/movie/51381-watch-life-2017-online"></a><div class="title">Life</div><div class="year">2017</div></figure>';
+ mock((u,o)=>{
+   if(u.includes('api.themoviedb.org'))return{status:200,body:'{"title":"Life","release_date":"2017-03-23","external_ids":{"imdb_id":"tt5442430"}}'};
+   if(u.includes('/index.php?menu=search&query=Life'))return{status:200,body:searchHtml};
+   if(u.includes('/ajax/mov_vplay.php')){assert.equal(o.headers.Referer,lifePage);return{status:200,body:'{"file":"https://media.example/life/v1.m3u8"}'};}
+   if(u.includes('/ajax/mov_vplay2.php')){assert.equal(o.headers.Referer,lifePage);return{status:403,body:'...'};}
+   if(u.includes('/ajax/mov_vplay3.php')){assert.equal(o.headers.Referer,lifePage);return{status:403,body:'...'};}
+   throw Error('unexpected request '+u);
+ });
+ const matchedMovie=await getStreams(395992,'movie');
+ assert.equal(matchedMovie.length,1);
+ assert.equal(matchedMovie[0].url,'https://media.example/life/v1.m3u8');
+ console.log('PASS exact title+year movie discovery; correct detail-page AJAX Referer');
+ 
+ const tvPage='https://vidplay.top/watchseries/abbott-elementary-online-free/season/1/episode/1';
+ mock((u,o)=>{
+   if(u.includes('api.themoviedb.org'))return{status:200,body:'{"name":"Abbott Elementary","first_air_date":"2021-12-07"}'};
+   if(u.includes('/index.php?menu=search'))return{status:200,body:'<figure><a href="/watchseries/abbott-elementary-online-free"></a><div class="title">Abbott Elementary</div><div class="year">2021</div></figure>'};
+   if(u.includes('/ajax/tv_vplay.php')){assert.equal(o.headers.Referer,tvPage);return{status:200,body:'{"file":"https://media.example/abbott/s1e1.m3u8"}'};}
+   if(u.includes('/ajax/tv_vplay')){assert.equal(o.headers.Referer,tvPage);return{status:403,body:'...'};}
+   throw Error('unexpected '+u);
+ });
+ const matchedTv=await getStreams(125935,'tv',1,1);
+ assert.equal(matchedTv.length,1);
+ console.log('PASS TV exact series match and correct season/episode AJAX Referer');
+ delete globalThis.TMDB_API_KEY;
+
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1});

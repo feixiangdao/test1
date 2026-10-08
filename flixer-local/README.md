@@ -104,3 +104,13 @@ All generated upstream-derived bundles remain ephemeral in the testing runner, *
 A second live Alpha capture (200 response, same 232-character ciphertext length) returned WASM-compatible decoder error `E57` in the standalone JS runtime, despite one earlier successful Alpha extraction. CI: https://github.com/feixiangdao/test1/actions/runs/37776565567 . This means **live-source decoding is not yet deterministic**. Nine naïve standard AES-256-GCM key/layout hypotheses did not decode the response, so a small hand-written raw-AES substitute is not validated.
 
 The research is comparing decryption of the *same* captured ciphertext inside the site's own browser environment versus the translated JS environment. Do not activate the Local manifest unless that consistency question and on-device signed HTTP requests are resolved.
+
+## Same-version ciphertext investigation — October 8, 2026
+
+- A public, previously published Hexa movie-550 ciphertext/key fixture was decoded with the current Flixer code in both translated pure-JS and native WASM implementations. **Both returned E57**, strongly suggesting fixture/version incompatibility or unsupported input rather than a unique wasm2js translation bug. This is not sufficient to assert which difference caused E57.
+- A new ephemeral CI flow attempted to capture the current Flixer movie-9502 encrypted `/images` response together with its same-request key, with no keys or ciphertext checked into Git.
+- Initial capture failed due to incorrect DNS mapping causing a certificate error; after correcting hostname mappings, the page loaded and `/api/tmdb/movie/9502` returned HTTP 200.
+- The headless browser subsequently remained at **“Loading video...”** and **never called the encrypted `/api/tmdb/movie/9502/images` endpoint** during the sample window, so a current-version fixture was unavailable and decrypt parity could not be tested.
+- Evidence: [native/JS E57 comparison](https://github.com/feixiangdao/test1/actions/runs/37777166554), [same-version capture diagnostic](https://github.com/feixiangdao/test1/actions/runs/37777644426).
+
+**No end-to-end Nuvio playback** and **no complete Local decryptor** have been proven. The disabled experimental manifest must stay disabled until a same-version media source can be decoded locally and tested in Nuvio.

@@ -38,7 +38,24 @@ globalThis.fetch=async (url,options)=>{
       const first=lines.find(x=>x&&!x.startsWith("#")&&x.trim())||"";
       let child=null;
       if(first){try{child=new URL(first.trim(),row.url)}catch(e){}}
-      variantChecks.push({quality:row.quality,host:u.hostname,status:r.status,validHLS:t.startsWith("#EXTM3U"),isChildPlaylist:/#EXT-X-TARGETDURATION|#EXT-X-MAP|#EXTINF/.test(t),segmentHost:child?.host||null,segmentPathSuffix:child?child.pathname.split("/").pop()?.slice(-15):null,playlistLineCount:lines.length});
+      let segmentProbe=null;
+      if(child&&t.startsWith("#EXTM3U")&&row===playable[0]){
+        try{
+          const z=await original(child.href,{
+            signal:AbortSignal.timeout(9000),
+            headers:{"User-Agent":"Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/139.0.0.0","Referer":row.headers?.Referer||"https://stellarconductornexus.com/","Range":"bytes=0-2047"}
+          });
+          let chunk=[];
+          if(z.body?.getReader){
+            const reader=z.body.getReader();
+            const d=await reader.read();
+            chunk=d.value?Array.from(d.value.slice(0,16)):[];
+            try{await reader.cancel()}catch(e){}
+          }
+          segmentProbe={status:z.status,mime:z.headers.get("content-type"),bytes:z.headers.get("content-length"),magicHex:chunk.map(b=>b.toString(16).padStart(2,"0")).join(""),hasMP4Ftyp:String.fromCharCode(...chunk.slice(4,8))==="ftyp",hasTSSync:chunk[0]===0x47};
+        }catch(e){segmentProbe={error:e.name+":"+e.message.slice(0,75)}}
+      }
+      variantChecks.push({quality:row.quality,host:u.hostname,status:r.status,validHLS:t.startsWith("#EXTM3U"),isChildPlaylist:/#EXT-X-TARGETDURATION|#EXT-X-MAP|#EXTINF/.test(t),encrypted:/#EXT-X-KEY:/.test(t),hasInitMap:/#EXT-X-MAP:/.test(t),segmentHost:child?.host||null,segmentPathSuffix:child?child.pathname.split("/").pop()?.slice(-15):null,playlistLineCount:lines.length,segmentProbe});
     }catch(e){variantChecks.push({quality:row.quality,error:e.name+":"+e.message.slice(0,75)})}
   }
  console.log("V1_END_TO_END",JSON.stringify({

@@ -28,7 +28,7 @@ The working mock tests demonstrate parser behavior only; they are not live end-t
 
 ## Files
 
-- `manifest.json`: Nuvio install manifest, version 0.1.0
+- `manifest.json`: Nuvio install manifest, version 0.1.1
 - `providers/vidplay.js`: experimental parser/provider
 - `test-provider.cjs`: mock-backed deterministic tests
 - `probe-browser.cjs`, `probe-tv.cjs`, `probe-episode.cjs`, `inspect-ajax.cjs`, `inspect-scripts.cjs`: browser research tools
@@ -43,3 +43,11 @@ Do **not** describe the provider as working until at least one legally accessibl
 - Request header and Cloudflare detail: https://github.com/feixiangdao/test1/actions/runs/37761311539
 - Episode route and TV AJAX structure: https://github.com/feixiangdao/test1/actions/runs/37762337434
 - Mock provider tests: https://github.com/feixiangdao/test1/actions/runs/37762621857
+
+## 2026-10-08 follow-up
+
+- v0.1.1 restricts media extraction to explicitly labeled video fields or video source tags, rejecting arbitrary URL strings in unrelated HTML/JS, and excludes private/internal IP literals.
+- Shared `globalThis.TMDB_API_KEY` is accepted for optional movie IMDb resolution where exposed by the Nuvio runtime.
+- Mock-backed regression tests passed, including unrelated ad URL filtering and shared TMDB API key lookup: https://github.com/feixiangdao/test1/actions/runs/37767657449
+- A **real live smoke test** of the newly hardened provider on GitHub Actions returned **HTTP 403** for movie V3 and TV V1/V2/V3, yielding zero streams as designed. The tests did not establish playback: https://github.com/feixiangdao/test1/actions/runs/37767776290
+- Actual playback remains unverified; do not label this as working or suggest using a fake media placeholder.

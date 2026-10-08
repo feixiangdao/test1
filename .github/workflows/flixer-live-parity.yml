@@ -5,6 +5,10 @@ on:
     paths:
       - 'flixer-provider-lab/capture-live-fixture.mjs'
       - 'flixer-provider-lab/build-local.mjs'
+      - 'flixer-provider-lab/local-protocol.js'
+      - 'flixer-provider-lab/local-environment.js'
+      - 'flixer-provider-lab/pack-local.mjs'
+      - 'flixer-provider-lab/test-local-bundle.mjs'
       - '.github/workflows/flixer-live-parity.yml'
   workflow_dispatch:
 jobs:
@@ -20,7 +24,7 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: |
-          npm install --no-save binaryen@132.0.0 playwright
+          npm install --no-save binaryen@132.0.0 playwright hermes-parser
           npx playwright install --with-deps chromium
       - name: Capture current Flixer encrypted fixture with headed Chromium
         env:
@@ -39,3 +43,9 @@ jobs:
           node node_modules/binaryen/bin/wasm-opt /tmp/flixer-img-data.wasm --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --llvm-nontrapping-fptoint-lowering --llvm-memory-copy-fill-lowering -o /tmp/flixer-lowered.wasm
           node node_modules/binaryen/bin/wasm2js /tmp/flixer-lowered.wasm --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext -o /tmp/flixer-wasm-translation.mjs
           node flixer-provider-lab/build-local.mjs
+      - name: Pack and validate single-file Local Provider against current Alpha media
+        run: |
+          node flixer-provider-lab/pack-local.mjs
+          node --check /tmp/flixer-local-candidate.js
+          node -e 'const {parse}=require("hermes-parser");const fs=require("fs");const s=fs.readFileSync("/tmp/flixer-local-candidate.js","utf8");parse(s,{sourceType:"script"});console.log("LOCAL_BUNDLE_HERMES_PARSE_PASS",s.length)'
+          node flixer-provider-lab/test-local-bundle.mjs

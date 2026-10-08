@@ -1,0 +1,52 @@
+name: Flixer Local size and QuickJS compatibility
+on:
+  push:
+    branches: [flixer-local-only-20261008]
+    paths:
+      - '.github/workflows/flixer-minify.yml'
+      - 'flixer-local/check-quickjs.mjs'
+  workflow_dispatch:
+jobs:
+  minify-and-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install JS tools
+        run: npm install --no-save terser quickjs-emscripten
+      - name: Minify local provider without renaming global APIs
+        run: |
+          node --input-type=module - <<'NODE'
+          import {readFile,writeFile} from "node:fs/promises";
+          import {minify} from "terser";
+          const input=await readFile("flixer-local/providers/flixer-local-live-alpha.js","utf8");
+          const r=await minify(input,{ecma:2018,module:false,toplevel:false,compress:{passes:2},mangle:{toplevel:false},format:{comments:false}});
+          if(!r.code)throw Error("MINIFIER_NO_OUTPUT");
+          await writeFile("/tmp/flixer-minified.js",r.code+"\n");
+          console.log("FLIXER_MINIFIED_BYTES",{before:Buffer.byteLength(input),after:Buffer.byteLength(r.code)});
+          if(Buffer.byteLength(r.code)>=Buffer.byteLength(input))throw Error("SIZE_NOT_REDUCED");
+          NODE
+          node --check /tmp/flixer-minified.js
+      - name: QuickJS compatibility of minified provider
+        env:
+          FLIXER_SCRIPT_PATH: /tmp/flixer-minified.js
+        run: |
+          node flixer-local/check-quickjs.mjs | tee /tmp/quickjs-check.log
+          if grep -q 'QUICKJS_EVALUATION_ERROR' /tmp/quickjs-check.log; then exit 1; fi
+          if grep -q 'QUICKJS_HOST_EXCEPTION' /tmp/quickjs-check.log; then exit 1; fi
+          grep -q 'QUICKJS_KEY_RESULT.*length.*64' /tmp/quickjs-check.log
+      - name: Publish minimized file on existing path
+        if: success()
+        run: |
+          set -euo pipefail
+          cp /tmp/flixer-minified.js flixer-local/providers/flixer-local-live-alpha.js
+          git add flixer-local/providers/flixer-local-live-alpha.js
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Reduce Flixer Local file size after QuickJS compatibility check"
+            git push origin HEAD:flixer-local-only-20261008
+          fi

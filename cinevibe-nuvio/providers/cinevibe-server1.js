@@ -1,5 +1,5 @@
 // CineVibe Local for Nuvio
-// v0.2.7
+// v0.2.8
 //
 // Stable client path:
 // Nuvio -> CineVibe quality resolver -> CineVibe/Viduki resolver -> direct CDN.
@@ -23,6 +23,22 @@ function mediaType(url,fallback){
   if(/\.mpd$/.test(p))return"dash";
   if(/\.mp4$/.test(p))return"mp4";
   return fallback==="dash"?"dash":fallback==="mp4"?"mp4":"hls";
+}
+function standardQuality(q){
+  q=clean(q);
+  var m=q.match(/(\d{3,4})p/i);
+  if(!m)return q||"Auto";
+  var n=parseInt(m[1],10)||0;
+  // Viduki often encodes cropped widescreen frames without black bars.
+  // Example: 1920x816 is conventionally a 1080p-class encode, not "816p".
+  if(n>=1800)return"2160p";
+  if(n>=1200)return"1440p";
+  if(n>=800)return"1080p";
+  if(n>=530)return"720p";
+  if(n>=350)return"480p";
+  if(n>=260)return"360p";
+  if(n>=180)return"240p";
+  return n?String(n)+"p":"Auto";
 }
 function transferable(url,server){
   url=clean(url);server=clean(server).toLowerCase();
@@ -86,7 +102,9 @@ function getStreams(tmdbId,mediaTypeArg,season,episode){
       var lang=clean(x.language);
       var name="CineVibe · "+server;
       if(lang&&lang!=="ENGLISH")name+=" · "+lang;
-      var q=clean(x.quality)||"Auto";
+      var rawQ=clean(x.quality)||"Auto";
+      var q=standardQuality(rawQ);
+      try{if(rawQ!==q)console.log("[CineVibe] quality "+rawQ+" -> "+q+" · "+server);}catch(_){}
 
       var h={};
       if(x.headers&&typeof x.headers==="object"){
@@ -115,7 +133,7 @@ function getStreams(tmdbId,mediaTypeArg,season,episode){
 function onSettings(){
   return[
     {type:"header",label:"CineVibe Local · Server 1"},
-    {type:"info",label:"当前真实链路：CineVibe → vidsrc.wtf API 1 → Viduki V1。清晰度由服务端读取实际码流后返回；Nuvio 本地不再解析 m3u8/TS，因此不会因清晰度探测导致线路消失。"},
+    {type:"info",label:"当前真实链路：CineVibe → vidsrc.wtf API 1 → Viduki V1。服务端读取实际码流；对宽银幕裁黑边编码会把 816p / 600p / 320p 等有效高度归类为常用的 1080p / 720p / 360p 档位。"},
     {
       type:"text",
       key:"resolverUrl",

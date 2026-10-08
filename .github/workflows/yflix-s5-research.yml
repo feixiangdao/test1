@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Test patched CineSrc Surge only
+      - name: Diagnose patched CineSrc Surge
         shell: bash
         run: |
           set -e
@@ -23,22 +23,12 @@ jobs:
           console.log('CATALOG',JSON.stringify(cat.providers));
           try {
             const r=await resolveProviderStream(input,'surge');
-            console.log('RESULT',JSON.stringify(r));
-            const urls=[];
-            const walk=(v)=>{
-              if(!v)return;
-              if(typeof v==='string'){if(/^https?:\/\//i.test(v))urls.push(v);return;}
-              if(Array.isArray(v)){v.forEach(walk);return;}
-              if(typeof v==='object')Object.values(v).forEach(walk);
-            };
-            walk(r);
-            console.log('URLS',JSON.stringify(urls));
-            for(const u of urls.filter(x=>/m3u8|playlist/i.test(x)).slice(0,3)){
-              const p=await fetch(u,{headers:{Referer:'https://cinesrc.st/','User-Agent':'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/137.0.0.0 Mobile Safari/537.36'},signal:AbortSignal.timeout(15000)});
-              const t=await p.text();
-              console.log('HLS',p.status,p.headers.get('content-type'),u,t.slice(0,180).replace(/\n/g,'\\n'));
-            }
+            console.log('RESULT',JSON.stringify(r,null,2));
           } catch(e) {
-            console.log('ERR',String(e?.stack||e));
+            console.log('ERR_TYPE',typeof e,e?.constructor?.name);
+            try{console.log('ERR_JSON',JSON.stringify(e,null,2));}catch(x){console.log('ERR_JSON_FAIL',String(x));}
+            try{console.log('ERR_KEYS',Object.getOwnPropertyNames(e));}catch{}
+            try{for(const k of Object.getOwnPropertyNames(e)){console.log('ERR_FIELD',k,JSON.stringify(e[k]));}}catch{}
+            console.log('ERR_STRING',String(e));
           }
           NODE

@@ -8,130 +8,95 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
-      - name: Capture CineSrc in real Chrome via CDP
+      - name: Capture CineSrc valid challenge in fresh Chrome tab
         shell: bash
         run: |
           set -e
-          CHROME=$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)
-          echo "CHROME=$CHROME"
-          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --autoplay-policy=no-user-gesture-required --remote-debugging-port=9222 about:blank >/tmp/chrome.log 2>&1 &
+          CHROME=$(command -v google-chrome)
+          UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --ignore-certificate-errors --autoplay-policy=no-user-gesture-required --user-agent="$UA" --remote-debugging-port=9222 about:blank >/tmp/chrome.log 2>&1 &
           CPID=$!
           trap 'kill $CPID 2>/dev/null || true' EXIT
-          for i in $(seq 1 40); do
-            curl -fsS http://127.0.0.1:9222/json/version >/tmp/version.json && break
+          for i in $(seq 1 80); do
+            curl -fsS http://127.0.0.1:9222/json/version >/dev/null && break
             sleep .25
           done
-          cat /tmp/version.json
           node - <<'NODE'
-          const fs=require('fs');
           const http=require('http');
           const TARGET='https://cinesrc.st/embed/movie/157336';
-          async function get(path){
+          function api(path,method='GET'){
             return new Promise((resolve,reject)=>{
-              http.get('http://127.0.0.1:9222'+path,r=>{let s='';r.on('data',d=>s+=d);r.on('end',()=>resolve(JSON.parse(s)))}).on('error',reject)
-            })
+              const req=http.request({host:'127.0.0.1',port:9222,path,method},r=>{let s='';r.on('data',d=>s+=d);r.on('end',()=>{try{resolve(JSON.parse(s))}catch(e){reject(new Error(s))}})});
+              req.on('error',reject);req.end();
+            });
           }
           async function main(){
-            const pages=await get('/json');
-            const wsurl=pages[0].webSocketDebuggerUrl;
-            const ws=new WebSocket(wsurl);
+            const page=await api('/json/new?about%3Ablank','PUT');
+            console.log('NEW_TARGET',JSON.stringify({id:page.id,url:page.url,type:page.type}));
+            const ws=new WebSocket(page.webSocketDebuggerUrl);
             await new Promise((res,rej)=>{ws.onopen=res;ws.onerror=rej});
-            let seq=0,pending=new Map(),relevant=new Map();
+            let seq=0,pending=new Map(),rel=new Map();
             function send(method,params={}){
-              const id=++seq;
-              return new Promise((resolve,reject)=>{
-                pending.set(id,{resolve,reject});
-                ws.send(JSON.stringify({id,method,params}));
-              })
+              const id=++seq;return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}))});
             }
             ws.onmessage=async ev=>{
               let m;try{m=JSON.parse(ev.data)}catch{return}
-              if(m.id&&pending.has(m.id)){
-                const p=pending.get(m.id);pending.delete(m.id);
-                if(m.error)p.reject(new Error(JSON.stringify(m.error)));else p.resolve(m.result);
-                return;
-              }
+              if(m.id&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.error?p.reject(new Error(JSON.stringify(m.error))):p.resolve(m.result);return}
               if(m.method==='Network.requestWillBeSent'){
-                const p=m.params,req=p.request,hs=req.headers||{},na=hs['Next-Action']||hs['next-action'];
-                const isRel=na||/cinesrc\.st\/api\/c\//.test(req.url)||/\/api\/playlist\//.test(req.url)||/\.m3u8|\.mp4|\.mpd/i.test(req.url);
-                if(isRel){
-                  relevant.set(p.requestId,{url:req.url,nextAction:na||'',postData:req.postData||'',type:p.type});
-                  console.log('REQ',JSON.stringify({id:p.requestId,url:req.url,nextAction:na||'',type:p.type,postData:(req.postData||'').slice(0,8000)}));
+                const p=m.params,req=p.request,h=req.headers||{},na=h['Next-Action']||h['next-action']||'';
+                if(na||/\/api\/c\//.test(req.url)||/api\/playlist|\.m3u8|\.mp4|\.mpd/i.test(req.url)){
+                  rel.set(p.requestId,{url:req.url,na});
+                  console.log('REQ',JSON.stringify({url:req.url,na,type:p.type,postData:(req.postData||'').slice(0,10000)}));
                 }
-              } else if(m.method==='Network.responseReceived'){
-                const p=m.params,old=relevant.get(p.requestId);
-                if(old){
-                  old.status=p.response.status;old.mime=p.response.mimeType;
-                  console.log('RESP',JSON.stringify({id:p.requestId,url:old.url,status:p.response.status,mime:p.response.mimeType}));
-                }
-              } else if(m.method==='Network.loadingFinished'){
-                const old=relevant.get(m.params.requestId);
-                if(old && (old.nextAction||/\/api\/c\//.test(old.url))){
-                  try{
-                    const b=await send('Network.getResponseBody',{requestId:m.params.requestId});
-                    console.log('BODY',JSON.stringify({id:m.params.requestId,url:old.url,nextAction:old.nextAction,body:(b.body||'').slice(0,12000)}));
-                  }catch(e){console.log('BODY_ERR',old.url,e.message)}
+              }else if(m.method==='Network.responseReceived'){
+                const x=rel.get(m.params.requestId);
+                if(x)console.log('RESP',JSON.stringify({url:x.url,na:x.na,status:m.params.response.status,mime:m.params.response.mimeType}));
+              }else if(m.method==='Network.loadingFinished'){
+                const x=rel.get(m.params.requestId);
+                if(x&&(x.na||/\/api\/c\//.test(x.url))){
+                  try{const b=await send('Network.getResponseBody',{requestId:m.params.requestId});console.log('BODY',JSON.stringify({url:x.url,na:x.na,body:(b.body||'').slice(0,15000)}))}catch{}
                 }
               }
             };
-            await send('Page.enable');await send('Runtime.enable');await send('Network.enable',{maxTotalBufferSize:100000000,maxResourceBufferSize:5000000});
+            await send('Page.enable');await send('Runtime.enable');await send('Network.enable',{maxTotalBufferSize:100000000,maxResourceBufferSize:10000000});
             const inject=`
             (()=>{
               const cap=window.__cap={gc1:[],gc2:[],dr:[],fetches:[],errors:[]};
-              window.addEventListener('error',e=>cap.errors.push('error:'+String(e.message)),true);
-              window.addEventListener('unhandledrejection',e=>cap.errors.push('rej:'+String(e.reason&&e.reason.message||e.reason)),true);
-              window.addEventListener('_cs',ev=>{
-                setTimeout(()=>{
-                  try{
-                    const k=ev.detail,a=window[k];
-                    if(a&&!a.__wrapped){
-                      a.__wrapped=true;
-                      if(typeof a.gc==='function'){
-                        const f=a.gc.bind(a);a.gc=async(...args)=>{const v=await f(...args);cap.gc1.push(String(v));return v}
-                      }
-                      if(typeof a.dr==='function'){
-                        const f=a.dr.bind(a);a.dr=async(...args)=>{const v=await f(...args);cap.dr.push({in:String(args[0]).slice(0,300),out:v});return v}
-                      }
-                    }
-                  }catch(e){cap.errors.push('cswrap:'+e.message)}
-                },0)
-              },true);
-              const timer=setInterval(()=>{
-                try{
-                  const a=window.__ss2_challenge;
-                  if(a&&typeof a.gc==='function'&&!a.__wrapped){
-                    a.__wrapped=true;const f=a.gc.bind(a);a.gc=async(...args)=>{const v=await f(...args);cap.gc2.push(String(v));return v}
-                  }
-                }catch(e){}
-              },20);
-              const of=window.fetch.bind(window);
+              addEventListener('_cs',ev=>setTimeout(()=>{
+                try{const a=window[ev.detail];if(a&&!a.__w){a.__w=1;
+                  if(typeof a.gc==='function'){const f=a.gc.bind(a);a.gc=async(...z)=>{const v=await f(...z);cap.gc1.push(String(v));return v}}
+                  if(typeof a.dr==='function'){const f=a.dr.bind(a);a.dr=async(...z)=>{const v=await f(...z);cap.dr.push({input:String(z[0]).slice(0,500),output:v});return v}}
+                }}catch(e){cap.errors.push('wrap1:'+e.message)}
+              },0),true);
+              setInterval(()=>{try{const a=window.__ss2_challenge;if(a&&typeof a.gc==='function'&&!a.__w){a.__w=1;const f=a.gc.bind(a);a.gc=async(...z)=>{const v=await f(...z);cap.gc2.push(String(v));return v}}}catch{}},10);
+              const old=window.fetch.bind(window);
               window.fetch=async function(input,init){
                 let url='';try{url=typeof input==='string'?input:input.url}catch{}
-                let na='';try{const h=new Headers((init&&init.headers)||(input&&input.headers));na=h.get('Next-Action')||''}catch{}
+                let na='';try{na=new Headers((init&&init.headers)||(input&&input.headers)).get('Next-Action')||''}catch{}
                 let body='';try{body=init&&typeof init.body==='string'?init.body:''}catch{}
-                const rec={url,nextAction:na,body:body.slice(0,12000),ts:Date.now()};cap.fetches.push(rec);
-                const r=await of(input,init);
-                if(na||/\/api\/c\//.test(url)){
-                  try{rec.status=r.status;rec.response=(await r.clone().text()).slice(0,12000)}catch(e){rec.err=e.message}
-                }
+                const x={url,na,body:body.slice(0,12000)};cap.fetches.push(x);
+                const r=await old(input,init);
+                if(na||/\/api\/c\//.test(url)){try{x.status=r.status;x.response=(await r.clone().text()).slice(0,12000)}catch(e){}}
                 return r
               };
-            })();
-            `;
+              addEventListener('error',e=>cap.errors.push('err:'+e.message),true);
+              addEventListener('unhandledrejection',e=>cap.errors.push('rej:'+String(e.reason&&e.reason.message||e.reason)),true);
+            })();`;
             await send('Page.addScriptToEvaluateOnNewDocument',{source:inject});
-            await send('Page.navigate',{url:TARGET});
-            await new Promise(r=>setTimeout(r,35000));
-            const state=await send('Runtime.evaluate',{
-              expression:`JSON.stringify({
-                cap:window.__cap,
-                video:[...document.querySelectorAll('video')].map(v=>({src:v.src,currentSrc:v.currentSrc,readyState:v.readyState,duration:v.duration})),
-                perf:performance.getEntriesByType('resource').map(x=>x.name).filter(x=>/m3u8|mp4|mpd|api\\/playlist|bright67|cinesrc.*api\\/c\\//i.test(x)),
-                bodyText:document.body&&document.body.innerText&&document.body.innerText.slice(0,3000)
-              })`,
-              returnByValue:true
-            });
-            console.log('STATE',state.result.value);
+            const nav=await send('Page.navigate',{url:TARGET});
+            console.log('NAV',JSON.stringify(nav));
+            await new Promise(r=>setTimeout(r,30000));
+            const r=await send('Runtime.evaluate',{expression:`JSON.stringify({
+              href:location.href,title:document.title,html:document.documentElement&&document.documentElement.outerHTML.slice(0,500),
+              cap:window.__cap||null,
+              video:[...document.querySelectorAll('video')].map(v=>({src:v.src,currentSrc:v.currentSrc,readyState:v.readyState,duration:v.duration})),
+              perf:performance.getEntriesByType('resource').map(x=>x.name).filter(x=>/m3u8|mp4|mpd|api\\/playlist|bright67|api\\/c\\//i.test(x)),
+              body:(document.body&&document.body.innerText||'').slice(0,2000)
+            })`,returnByValue:true});
+            console.log('FINAL',r.result.value);
             ws.close();
           }
-          main().catch(e=>{console.error(e);process.exit(1)});
+          main().catch(e=>{console.error('FATAL',e.stack||e);process.exit(1)});
           NODE
+          echo '=== CHROME TAIL ==='
+          tail -80 /tmp/chrome.log || true

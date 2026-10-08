@@ -6,9 +6,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 3
     steps:
-      - name: Directly trace CineSrc getStream Server Action
+      - name: Test first-session CineSrc token
         shell: bash
         run: |
           set -e
@@ -16,7 +16,7 @@ jobs:
           cd /tmp/cs
           python3 -c "p='src/protection/host.js';s=open(p).read();old=\"headers.set('x-cs-r', requestToken)\\n      }\";new=\"headers.set('x-cs-r', requestToken)\\n        if (protectionHeader) headers.set('x-cs-q', protectionHeader)\\n        if (requestPacket) headers.set('x-cs-p', requestPacket)\\n      }\";assert old in s;open(p,'w').write(s.replace(old,new))"
           npm ci >/dev/null
-          cat > direct-action.mjs <<'NODE'
+          cat > first-session.mjs <<'NODE'
           import { parseStreamQuery } from './src/resolve/live.js';
           import { createChallengeHost } from './src/protection/host.js';
           import { mintLockedSession } from './src/protection/session.js';
@@ -25,48 +25,33 @@ jobs:
 
           const input=parseStreamQuery({id:'157336',type:'movie'});
           const actions=await discoverServerActions(input.embedPath);
-          console.log('ACTIONS',JSON.stringify(actions));
           const host=await createChallengeHost(input.embedPath);
-          console.log('HOST_READY');
-
-          for(const pid of ['nebula','wave','surge','storm','pulse']){
+          try{
+            const t0=Date.now();
+            const session=await mintLockedSession(host,false);
+            console.log('MINT_MS',Date.now()-t0,'TOKEN_LEN',session.token.length);
+            console.log('TOKEN_PREFIX',session.token.slice(0,40));
+            console.log('TOKEN_HAS_C2',session.token.includes('::c2::'),'TOKEN_HAS_C3',session.token.includes('::c3::'));
+            const args=[String(input.id),'movie','$undefined','$undefined',session.token,'surge'];
+            const p0=Date.now();
+            const response=await session.fetch(SITE_ORIGIN+input.embedPath,{
+              method:'POST',
+              headers:buildActionHeaders(actions.fetchStream,input.route),
+              body:JSON.stringify(args)
+            });
+            const raw=await response.text();
+            console.log('POST_MS',Date.now()-p0,'STATUS',response.status,'LEN',raw.length,'RAW',raw.slice(0,1200).replace(/\n/g,'\\n'));
             try{
-              const m0=Date.now();
-              const session=await mintLockedSession(host,true);
-              console.log('MINTED',pid,'ms',Date.now()-m0,'tokenLen',session.token.length);
-              const args=[String(input.id),'movie','$undefined','$undefined',session.token,pid];
-              const controller=new AbortController();
-              const timer=setTimeout(()=>controller.abort(),12000);
-              const p0=Date.now();
-              try{
-                console.log('POST_START',pid);
-                const response=await session.fetch(SITE_ORIGIN+input.embedPath,{
-                  method:'POST',
-                  headers:buildActionHeaders(actions.fetchStream,input.route),
-                  body:JSON.stringify(args),
-                  signal:controller.signal
-                });
-                console.log('POST_HEADERS',pid,'ms',Date.now()-p0,'status',response.status);
-                const raw=await response.text();
-                console.log('POST_BODY',pid,'len',raw.length,'head',raw.slice(0,600).replace(/\n/g,'\\n'));
-                const d0=Date.now();
-                try{
-                  const decoded=await Promise.race([
-                    session.decode(raw),
-                    new Promise((_,reject)=>setTimeout(()=>reject(new Error('decode_timeout')),5000))
-                  ]);
-                  console.log('DECODED',pid,'ms',Date.now()-d0,JSON.stringify(decoded).slice(0,2500));
-                }catch(e){
-                  console.log('DECODE_ERR',pid,String(e?.message||e));
-                }
-              }finally{
-                clearTimeout(timer);
-              }
+              const decoded=await session.decode(raw);
+              console.log('DECODED',JSON.stringify(decoded).slice(0,4000));
             }catch(e){
-              console.log('PROVIDER_ERR',pid,String(e?.name||''),String(e?.message||e));
+              console.log('DECODE_ERR',String(e?.message||e));
             }
+          }catch(e){
+            console.log('ERR',String(e?.message||e));
+          }finally{
+            try{host.release();}catch{}
           }
-          try{host.release();}catch{}
           process.exit(0);
           NODE
-          node direct-action.mjs
+          node first-session.mjs

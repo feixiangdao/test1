@@ -65,3 +65,5 @@ async function sample(movie){
  console.log("STATIC_KEY_VERIFIED",JSON.stringify({wasmSha256Prefix:arr[0].checksum,keyWordsHex:hex[0],numberOfSamples:arr.length,allCrossDecrypted:true}));
  
 })().catch(e=>{console.error(e);process.exitCode=1});
+
+// Repeat comparison to detect WASM generation/key rotation between runs.

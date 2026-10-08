@@ -15,9 +15,10 @@ const hosts=["flixer.su","plsdontscrapemelove.flixer.su"];
 const ips=await Promise.all(hosts.map(dns));
 const maps=hosts.map((h,i)=>ips[i]?"MAP "+h+" "+ips[i]:"").filter(Boolean);
 const args=["--no-sandbox",...(maps.length?["--host-resolver-rules="+maps.join(", ")]:[])];
-const browser=await chromium.launch({headless:true,args});
+const browser=await chromium.launch({headless:process.env.FLIXER_HEADED!=="1",args});
 const ctx=await browser.newContext({viewport:{width:1300,height:800}});
 const page=await ctx.newPage();
+page.on("console",m=>{if(/WASM|source|error/i.test(m.text()))console.log("BROWSER_RUNTIME_NOTE",m.text().slice(0,170))});
 const cases=[];
 const pending=[];
 const seen=new Set();
@@ -33,7 +34,7 @@ page.on("response",resp=>{
     status:resp.status(),source:(h["x-server"]||"").slice(0,24),
     suppliedKey:h["x-api-key"]||"",
     body,onlySources:h["x-only-sources"]||"",
-    urlPath:new URL(u).pathname
+    urlPath:new URL(u).pathname,headerNames:Object.keys(h).filter(k=>k.startsWith("x-"))
   };
   cases.push(candidate);
  })().catch(e=>console.log("BROWSER_CAPTURE_WARN",String(e).slice(0,120))));
@@ -46,7 +47,7 @@ try {
  console.log("BROWSER_SOURCE_FIXTURE_SUMMARY",JSON.stringify({
    requests:cases.length,validKeyResponses:matches.length,
    statuses:cases.map(c=>c.status),sources:cases.map(c=>c.source),
-   ciphertextLengths:cases.map(c=>c.body.length)
+   ciphertextLengths:cases.map(c=>c.body.length),headerNames:[...new Set(cases.flatMap(c=>c.headerNames))]
  }));
  if(matches.length){
   await writeFile("/tmp/flixer-fixture.json",JSON.stringify(matches[0]));

@@ -1,0 +1,20 @@
+name: VidPlay V1 no-binary Nuvio phone simulation
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'vidplay-nuvio/providers/vidplay.js'
+      - 'vidplay-nuvio/probe-no-binary-phone.cjs'
+      - '.github/workflows/vidplay-no-binary.yml'
+permissions:
+  contents: read
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node vidplay-nuvio/probe-no-binary-phone.cjs

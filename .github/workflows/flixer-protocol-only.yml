@@ -1,0 +1,26 @@
+name: Flixer pure Local protocol
+on:
+  push:
+    branches: [flixer-provider-lab-20261008]
+    paths:
+      - 'flixer-provider-lab/local-protocol.js'
+      - 'flixer-provider-lab/local-environment.js'
+      - 'flixer-provider-lab/local-protocol-tests.cjs'
+      - '.github/workflows/flixer-protocol-only.yml'
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pure JavaScript Local protocol unit tests
+        run: |
+          node --check flixer-provider-lab/local-protocol.js
+          node --check flixer-provider-lab/local-environment.js
+          node flixer-provider-lab/local-protocol-tests.cjs

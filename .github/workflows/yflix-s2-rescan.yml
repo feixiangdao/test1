@@ -1,0 +1,42 @@
+name: YFlix S2 Rescan
+on:
+  push:
+    paths:
+      - '.github/workflows/yflix-s2-rescan.yml'
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Scan VidBolt bundles
+        shell: bash
+        run: |
+          set -e
+          mkdir -p /tmp/vb
+          UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'
+          curl -L --max-time 25 -A "$UA" -e 'https://www.yflix.in/' -D /tmp/vb/headers.txt 'https://vidbolt.xyz/movie/157336' -o /tmp/vb/page.html || true
+          echo '=== PAGE HEADERS ==='
+          cat /tmp/vb/headers.txt || true
+          echo '=== PAGE SIZE ==='
+          wc -c /tmp/vb/page.html || true
+          echo '=== PAGE PREVIEW ==='
+          head -c 12000 /tmp/vb/page.html || true
+          echo
+          echo '=== ASSETS ==='
+          grep -oE '/assets/[A-Za-z0-9._-]+\.js' /tmp/vb/page.html | sort -u | tee /tmp/vb/assets.txt || true
+          n=0
+          while read -r p; do
+            [ -z "$p" ] && continue
+            n=$((n+1))
+            u="https://vidbolt.xyz$p"
+            f="/tmp/vb/a$n.js"
+            echo "FETCH $u"
+            curl -L --max-time 25 -A "$UA" -e 'https://vidbolt.xyz/movie/157336' "$u" -o "$f" || true
+            echo "SIZE $(wc -c < "$f" 2>/dev/null || echo 0)"
+          done < /tmp/vb/assets.txt
+          echo '=== DYNAMIC ASSETS / PROVIDER NAMES ==='
+          grep -RhoE '/assets/[A-Za-z0-9._-]+\.js' /tmp/vb/*.js | sort -u | head -300 || true
+          echo '=== PROVIDER SIGNALS ==='
+          grep -RhoiE 'Callisto|FastVa|Ninetta|Quasar|Saffron|Naija|Nova|Vidlink|Vaplayer|MovieBoxV2|Allmovieland|PlayAPI|Darkmatter|Fourkhdhub|scraper\.vidbolt\.xyz|/scrape/[A-Za-z0-9_-]+' /tmp/vb/*.js | sort -u || true
+          echo '=== URL SIGNALS ==='
+          grep -RhoE 'https://[A-Za-z0-9._/-]+' /tmp/vb/*.js | grep -Ei 'vidbolt|scraper|api|stream|movie|play|source|worker' | sort -u | head -300 || true

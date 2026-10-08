@@ -27,23 +27,34 @@ await writeFile(file,assembled);
 console.log("LOCAL_BUNDLE_CREATED",JSON.stringify({bytes:assembled.length,glueBytes:glue.length,wasm2jsBytes:translated.length,hasBareWbgImport:/import\s+\*\s+as\s+wbg/.test(assembled)}));
 const env = globalThis;
 const store={};
-env.window=env;
-env.self=env;
-Object.defineProperty(env,"screen",{configurable:true,value:{width:1365,height:900,colorDepth:24}});
-if(!env.navigator)Object.defineProperty(env,"navigator",{configurable:true,value:{}});
-for(const [k,v] of Object.entries({userAgent:"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36",platform:"Win32",language:"en-US"})){
-  try{Object.defineProperty(env.navigator,k,{configurable:true,value:v})}catch{}
+class WindowShim {}
+class CanvasRenderingContext2DShim {
+  constructor(){this.font="12px sans-serif";this.textBaseline="top"}
+  fillText(){}
 }
+class HTMLCanvasElementShim {
+  constructor(){this.width=250;this.height=200;this.tagName="CANVAS";}
+  getContext(){return new CanvasRenderingContext2DShim();}
+  toDataURL(){return "data:image/png;base64,"+"AAAA".repeat(50);}
+  setAttribute(){}
+  getAttribute(){return null;}
+}
+env.Window=WindowShim;
+env.HTMLCanvasElement=HTMLCanvasElementShim;
+env.CanvasRenderingContext2D=CanvasRenderingContext2DShim;
+const win=new WindowShim();
+env.window=win;
+env.self=win;
+env.screen={width:1365,height:900,colorDepth:24};
+const nav={userAgent:"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36",platform:"Win32",language:"en-US"};
+Object.defineProperty(env,"navigator",{configurable:true,value:nav});
 env.localStorage={getItem:k=>store[k]||null,setItem:(k,v)=>{store[k]=String(v)},removeItem:k=>{delete store[k]}};
 env.document={
   getElementsByTagName:tag=>tag==="script"?[{src:"https://flixer.su/assets/js/index-52585954.js"}]:[],
-  createElement:tag=>({
-    tagName:tag.toUpperCase(),width:250,height:200,
-    getContext:()=>({font:"12px sans-serif",textBaseline:"top",fillText:()=>{}}),
-    toDataURL:()=>"data:image/png;base64,"+"AAAA".repeat(50),
-    setAttribute:()=>{},getAttribute:()=>null
-  })
+  createElement:tag=>tag==="canvas" ? new HTMLCanvasElementShim() : ({tagName:tag.toUpperCase()})
 };
+Object.assign(win,{window:win,self:win,screen:env.screen,navigator:nav,localStorage:env.localStorage,document:env.document,performance:env.performance});
+
 try{
  const local=await import("file:///tmp/flixer-standalone.mjs");
  console.log("LOCAL_BUNDLE_IMPORT_PASS",JSON.stringify({exports:Object.keys(local).slice(0,12),wasmExports:local._local_asm_exports.slice(0,15)}));

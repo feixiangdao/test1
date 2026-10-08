@@ -13,6 +13,8 @@ for (const [name,url] of targets) {
   const page = await ctx.newPage();
   const requests = new Map();
   const responseInfo = [];
+  const playlistDetails = [];
+  const playlistReads = [];
   page.on('request', req => {
     const u = req.url();
     if (isInteresting(u) && requests.size < 180) requests.set(req.method() + ' ' + safe(u), {method:req.method(),url:safe(u),kind:req.resourceType()});
@@ -20,12 +22,27 @@ for (const [name,url] of targets) {
   page.on('response', response => {
     const u = response.url();
     if (isInteresting(u) && responseInfo.length < 200) responseInfo.push({status:response.status(),url:safe(u),type:response.headers()['content-type']||''});
+    if (u.toLowerCase().split('?')[0].endsWith('.m3u8') && playlistReads.length < 8) {
+      playlistReads.push(response.text().then(body => {
+        const lines = body.split(/\r?\n/);
+        const inf = lines.filter(x => x.startsWith('#EXT-X-STREAM-INF:')).slice(0,20);
+        const audio = lines.filter(x => x.startsWith('#EXT-X-MEDIA:')).slice(0,20);
+        const media = lines.filter(x => x.startsWith('#EXTINF:')).length;
+        playlistDetails.push({
+          url: safe(u),status:response.status(),isMaster:inf.length>0,
+          streamVariants:inf.map(x=>({resolution:x.match(/RESOLUTION=([^,]+)/)?.[1]||null,bandwidth:x.match(/BANDWIDTH=(\d+)/)?.[1]||null})),
+          mediaTracks:audio.map(x=>({type:x.match(/TYPE=([^,]+)/)?.[1]||null,language:x.match(/LANGUAGE="([^"]+)"/)?.[1]||null})),
+          segmentCount:media,head:lines.slice(0,4).filter(x=>x.startsWith('#'))
+        });
+      }).catch(e=>playlistDetails.push({url:safe(u),readError:String(e).slice(0,100)})));
+    }
   });
   let error=null;
   try {
     await page.goto(url,{waitUntil:'domcontentloaded',timeout:40000});
     await page.waitForTimeout(18000);
   } catch (e) { error=String(e).slice(0,350); }
+  await Promise.allSettled(playlistReads);
   const p = await page.evaluate(() => ({
     title: document.title,
     url: location.href,
@@ -40,7 +57,7 @@ for (const [name,url] of targets) {
   if(p?.sources) p.sources=p.sources.map(safe);
   if(p?.iframes) p.iframes=p.iframes.map(safe);
   console.log('FLIXER_RESULT_START');
-  console.log(JSON.stringify({name,url,error,info:p,requests:[...requests.values()],responses:responseInfo},null,2).slice(0,26000));
+  console.log(JSON.stringify({name,url,error,info:p,requests:[...requests.values()],responses:responseInfo,playlistDetails},null,2).slice(0,26000));
   console.log('FLIXER_RESULT_END');
   await ctx.close();
 }

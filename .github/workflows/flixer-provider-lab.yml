@@ -27,15 +27,19 @@ jobs:
           node flixer-provider-lab/inspect-wasm.mjs
           ls -lh /tmp/flixer-img-data.wasm /tmp/flixer-tmdb-image-enhancer.js || true
           if command -v wasm2js >/dev/null; then wasm2js --version; fi
-      - name: Evaluate WebAssembly-to-JavaScript translation
+      - name: Evaluate modern Binaryen Wasm-to-JS translation
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq binaryen > /tmp/binaryen-install.log
-          echo 'WASM2JS_VERSION:'
-          wasm2js --version || true
-          timeout 70s wasm2js /tmp/flixer-img-data.wasm --all-features -o /tmp/flixer-wasm-translation.mjs
-          echo 'WASM2JS_OUTPUT_SIZE:'
-          wc -c /tmp/flixer-img-data.wasm /tmp/flixer-wasm-translation.mjs
+          npm install --no-save binaryen@132.0.0
+          echo MODERN_BIN_DIR
+          ls -la node_modules/binaryen/bin/ | head -18
+          node node_modules/binaryen/bin/wasm2js --version || true
+          node node_modules/binaryen/bin/wasm-opt --version || true
+          node node_modules/binaryen/bin/wasm-opt /tmp/flixer-img-data.wasm --all-features --llvm-nontrapping-fptoint-lowering --llvm-memory-copy-fill-lowering -o /tmp/flixer-lowered.wasm
+          echo LOWERED_WASM
+          wc -c /tmp/flixer-img-data.wasm /tmp/flixer-lowered.wasm
+          node node_modules/binaryen/bin/wasm2js /tmp/flixer-lowered.wasm --all-features -o /tmp/flixer-wasm-translation.mjs
+          echo MODERN_WASM2JS_OUTPUT_SIZE
+          wc -c /tmp/flixer-wasm-translation.mjs
           node --check /tmp/flixer-wasm-translation.mjs
       - name: Validate experimental provider and resolver
         if: false

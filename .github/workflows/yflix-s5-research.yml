@@ -14,56 +14,18 @@ jobs:
           set -e
           git clone --depth 1 https://github.com/sharoon7171/cinesrc-stream-resolver /tmp/cs
           cd /tmp/cs
-
-          python3 - <<'PY'
-          p='src/protection/host.js'
-          s=open(p,encoding='utf-8').read()
-          old="headers.set('x-cs-r', requestToken)\n      }"
-          new="headers.set('x-cs-r', requestToken)\n        if (protectionHeader) headers.set('x-cs-q', protectionHeader)\n        if (requestPacket) headers.set('x-cs-p', requestPacket)\n      }"
-          assert old in s
-          open(p,'w',encoding='utf-8').write(s.replace(old,new))
-
-          p='src/resolve/live.js'
-          s=open(p,encoding='utf-8').read()
-          s=s.replace('const FETCH_TIMEOUT_MS = 15_000','const FETCH_TIMEOUT_MS = 45_000')
-          s=s.replace('const PROVIDER_TIMEOUT_MS = 15_000','const PROVIDER_TIMEOUT_MS = 55_000')
-          open(p,'w',encoding='utf-8').write(s)
-
-          p='src/protection/session.js'
-          s=open(p,encoding='utf-8').read()
-          old="""  const stageOneToken = await host.stageOne.gc()
-  const stageTwoToken = await host.window.__ss2_challenge.gc()
-  return `${stageOneToken}::c2::${stageTwoToken}::c3::${host.bootstrap.getRequestToken()}`"""
-          new="""  const t0 = Date.now()
-  const stageOneToken = await host.stageOne.gc()
-  const t1 = Date.now()
-  const stageTwoToken = await host.window.__ss2_challenge.gc()
-  const t2 = Date.now()
-  console.log('TOKEN_DIAG', JSON.stringify({
-    stage1Ms:t1-t0,
-    stage2Ms:t2-t1,
-    stage1Len:String(stageOneToken||'').length,
-    stage2Len:String(stageTwoToken||'').length,
-    stage1Prefix:String(stageOneToken||'').slice(0,24),
-    stage2Prefix:String(stageTwoToken||'').slice(0,40),
-    requestTokenLen:String(host.bootstrap.getRequestToken()||'').length
-  }))
-  return `${stageOneToken}::c2::${stageTwoToken}::c3::${host.bootstrap.getRequestToken()}`"""
-          assert old in s
-          open(p,'w',encoding='utf-8').write(s.replace(old,new))
-          PY
-
+          python3 -c "p='src/protection/host.js';s=open(p).read();old=\"headers.set('x-cs-r', requestToken)\\n      }\";new=\"headers.set('x-cs-r', requestToken)\\n        if (protectionHeader) headers.set('x-cs-q', protectionHeader)\\n        if (requestPacket) headers.set('x-cs-p', requestPacket)\\n      }\";assert old in s;open(p,'w').write(s.replace(old,new))"
+          sed -i 's/const FETCH_TIMEOUT_MS = 15_000/const FETCH_TIMEOUT_MS = 45_000/' src/resolve/live.js
+          sed -i 's/const PROVIDER_TIMEOUT_MS = 15_000/const PROVIDER_TIMEOUT_MS = 55_000/' src/resolve/live.js
           npm ci >/dev/null
-          cat > /tmp/cs/test-one.mjs <<'NODE'
+          cat > test-one.mjs <<'NODE'
           import { parseStreamQuery, fetchProviderCatalog, resolveProviderStream } from './src/resolve/live.js';
-
           function collectUrls(v,out){
             if(!v)return;
             if(typeof v==='string'){if(/^https?:\/\//i.test(v))out.push(v);return;}
             if(Array.isArray(v)){for(const x of v)collectUrls(x,out);return;}
             if(typeof v==='object'){for(const k of Object.keys(v))collectUrls(v[k],out);}
           }
-
           const input=parseStreamQuery({id:'157336',type:'movie'});
           const started=Date.now();
           try{
@@ -74,7 +36,7 @@ jobs:
             const r=await resolveProviderStream(input,'surge');
             console.log('RESOLVE_MS',Date.now()-p0);
             console.log('RESULT_JSON',JSON.stringify(r,null,2));
-            const urls=[];collectUrls(r,urls);
+            const urls=[]; collectUrls(r,urls);
             console.log('URLS',JSON.stringify(urls));
             for(const u of urls.filter(x=>/m3u8|playlist/i.test(x)).slice(0,3)){
               try{
@@ -99,4 +61,4 @@ jobs:
           }
           process.exit(0);
           NODE
-          node /tmp/cs/test-one.mjs
+          node test-one.mjs

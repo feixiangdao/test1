@@ -49,7 +49,6 @@ jobs:
           echo WASM2JS_TAIL_END
           node flixer-provider-lab/build-local.mjs
           node --check /tmp/flixer-standalone.mjs
-          node --input-type=module -e 'import fs from "node:fs";let s=fs.readFileSync("/tmp/flixer-wasm-translation.mjs","utf8");console.log("JS_COMPAT_PROFILE",JSON.stringify({bytes:s.length,hasNativeWasm:s.includes("WebAssembly."),hasBrowserDOM:/\\b(?:window|document|navigator)\\b/.test(s),hasNodeRequire:/\\brequire\\(/.test(s),usesBigInt:/\\bBigInt\\b/.test(s)}))'
 
       - name: Validate experimental provider and resolver
         if: false

@@ -1,0 +1,22 @@
+name: Flixer local-only regression
+on:
+  push:
+    branches: [flixer-local-only-20261008]
+    paths:
+      - 'flixer-local/**'
+      - '.github/workflows/flixer-local-only.yml'
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Nuvio local provider
+        run: |
+          node --check flixer-local/providers/flixer-local.js
+          node flixer-local/local-tests.cjs

@@ -1,5 +1,5 @@
 // YFlix Local for Nuvio
-// v0.3.1 - YFlix Server 4 / FilmU
+// v0.3.2 - YFlix Server 4 / FilmU
 //
 // Current YFlix S4 iframe:
 //   https://embed.filmu.in/movie/{tmdb}

@@ -34,6 +34,7 @@ function parseCfg(html,label){let m=html.match(new RegExp("window\\\\."+label+"\
       if(!two.r.ok){traces.push(x);continue}
       let cfg=parseCfg(two.t,"CFG");
       x.landing.cfgKeys=cfg?Object.keys(cfg):[];
+      x.landing.markerFlags={hasCFG:two.t.includes("window.CFG"),hasPlayerURL:two.t.includes("playerUrl"),hasTurnstile:/turnstile/i.test(two.t),hasChallenge:/Just a moment|challenge-platform|cf-chl/i.test(two.t),hasIframe:/<iframe/i.test(two.t),hasAPI:/data.vidsrc.sh/i.test(two.t)};
       if(!cfg||!cfg.playerUrl){traces.push(x);continue}
       let inner=new URL(cfg.playerUrl,PLAYER);
       if(inner.origin!==PLAYER||!inner.pathname.startsWith("/embed/")){x.error="unexpected inner player";traces.push(x);continue}

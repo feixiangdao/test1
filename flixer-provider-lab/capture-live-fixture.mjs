@@ -34,6 +34,13 @@ page.on("response",r=>{
  if(!u.includes("/api/tmdb/movie/9502/images")||r.status()!==200)return;
  const headers=req.headers(),key=headers["x-api-key"];
  const server=(headers["x-server"]||"").toLowerCase();
+ if(!globalThis.__flixerPrintedHeaderSchema && server==="alpha"){
+  globalThis.__flixerPrintedHeaderSchema=true;
+  console.log("ALPHA_REQUEST_HEADER_SCHEMA",Object.keys(headers).sort().filter(n=>!["cookie","authorization"].includes(n)).map(n=>({
+    name:n,bytes:String(headers[n]).length,
+    value: ["accept","origin","referer","x-server","x-only-sources"].includes(n)?String(headers[n]).slice(0,110):undefined
+  })));
+ }
  const onlySources=headers["x-only-sources"]==="1";
  if(!/^[0-9a-f]{64}$/i.test(key||"")) {
    console.log("CIPHER_REQUEST_KEY_NOT_AVAILABLE",{status:r.status(),server,onlySources,headerNames:Object.keys(headers).filter(x=>x.startsWith("x-"))});

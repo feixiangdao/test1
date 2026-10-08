@@ -1,13 +1,13 @@
 {
-  "name": "VidPlay V1 Local Lab",
-  "version": "0.1.4",
-  "description": "V1-only Nuvio provider. Keeps the provider visible with explicitly non-playable diagnostic rows when upstream streams are restricted; 7s timeout, keyless IMDb lookup.",
+  "name": "VidPlay V1 Local",
+  "version": "0.1.5",
+  "description": "Real V1 HLS resolver verified live: first-party keyless IMDb lookup, YTHD signed player token, VidSrc stream URL decryption and sequential CDN authorization; Android playback pending confirmation.",
   "scrapers": [
     {
       "id": "vidplay-direct-lab",
-      "name": "VidPlay · V1 (Lab)",
-      "description": "V1-only YTHD resolver; verified HLS when accessible, otherwise visible non-playable Status diagnostic (403/verification/timeout). Requires no TMDB key in normal cases.",
-      "version": "0.1.4",
+      "name": "VidPlay · V1",
+      "description": "VidPlay V1 only: signed player API to verified direct HLS quality variants; sequential token requests; 15s timeout and nonplayable diagnostic fallback. No V2 or V3.",
+      "version": "0.1.5",
       "author": "VidPlay Lab",
       "supportedTypes": [
         "movie",

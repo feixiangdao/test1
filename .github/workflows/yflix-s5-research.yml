@@ -6,59 +6,39 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      - name: Run patched current CineSrc resolver
+      - name: Test patched CineSrc Surge only
         shell: bash
         run: |
           set -e
           git clone --depth 1 https://github.com/sharoon7171/cinesrc-stream-resolver /tmp/cs
           cd /tmp/cs
           python3 -c "p='src/protection/host.js';s=open(p).read();old=\"headers.set('x-cs-r', requestToken)\n      }\";new=\"headers.set('x-cs-r', requestToken)\n        if (protectionHeader) headers.set('x-cs-q', protectionHeader)\n        if (requestPacket) headers.set('x-cs-p', requestPacket)\n      }\";assert old in s;open(p,'w').write(s.replace(old,new))"
-          npm ci
+          npm ci >/dev/null
           node --input-type=module <<'NODE'
           import { parseStreamQuery, fetchProviderCatalog, resolveProviderStream } from './src/resolve/live.js';
-
-          async function probeFinal(label, result) {
-            const urls = [];
-            function walk(v) {
-              if (!v) return;
-              if (typeof v === 'string') {
-                if (/^https?:\/\//i.test(v)) urls.push(v);
-                return;
-              }
-              if (Array.isArray(v)) { for (const x of v) walk(x); return; }
-              if (typeof v === 'object') { for (const k of Object.keys(v)) walk(v[k]); }
+          const input=parseStreamQuery({id:'157336',type:'movie'});
+          const cat=await fetchProviderCatalog(input);
+          console.log('CATALOG',JSON.stringify(cat.providers));
+          try {
+            const r=await resolveProviderStream(input,'surge');
+            console.log('RESULT',JSON.stringify(r));
+            const urls=[];
+            const walk=(v)=>{
+              if(!v)return;
+              if(typeof v==='string'){if(/^https?:\/\//i.test(v))urls.push(v);return;}
+              if(Array.isArray(v)){v.forEach(walk);return;}
+              if(typeof v==='object')Object.values(v).forEach(walk);
+            };
+            walk(r);
+            console.log('URLS',JSON.stringify(urls));
+            for(const u of urls.filter(x=>/m3u8|playlist/i.test(x)).slice(0,3)){
+              const p=await fetch(u,{headers:{Referer:'https://cinesrc.st/','User-Agent':'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/137.0.0.0 Mobile Safari/537.36'},signal:AbortSignal.timeout(15000)});
+              const t=await p.text();
+              console.log('HLS',p.status,p.headers.get('content-type'),u,t.slice(0,180).replace(/\n/g,'\\n'));
             }
-            walk(result);
-            console.log('URLS', label, JSON.stringify(urls));
-            for (const u of urls.filter(x=>/m3u8|playlist/i.test(x)).slice(0,4)) {
-              try {
-                const r = await fetch(u,{headers:{Referer:'https://cinesrc.st/','User-Agent':'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/137.0.0.0 Mobile Safari/537.36'},signal:AbortSignal.timeout(15000)});
-                const t = await r.text();
-                console.log('HLS',label,r.status,r.headers.get('content-type'),u,t.slice(0,160).replace(/\n/g,'\\n'));
-              } catch(e) { console.log('HLS_ERR',label,u,String(e?.message||e)); }
-            }
+          } catch(e) {
+            console.log('ERR',String(e?.stack||e));
           }
-
-          async function test(label, query) {
-            const input = parseStreamQuery(query);
-            console.log('INPUT', label, JSON.stringify(input));
-            const cat = await fetchProviderCatalog(input);
-            console.log('CATALOG', label, JSON.stringify(cat.providers));
-            for (const id of ['surge','nebula','wave','thunder','storm']) {
-              const started = Date.now();
-              try {
-                const r = await resolveProviderStream(input, id);
-                console.log('RESULT', label, id, Date.now()-started, JSON.stringify(r));
-                await probeFinal(label+' '+id,r);
-                break;
-              } catch (e) {
-                console.log('RESULT_ERR', label, id, Date.now()-started, String(e?.stack || e));
-              }
-            }
-          }
-
-          await test('MOVIE', {id:'157336', type:'movie'});
-          await test('TV', {id:'108978', type:'tv', season:'1', episode:'1'});
           NODE

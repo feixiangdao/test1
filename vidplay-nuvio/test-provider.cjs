@@ -58,13 +58,30 @@ function common(u,opts){
   assert(called.some(x=>x.url===player));
   console.log("PASS: V1 signed player API -> independently verified HLS 360p/720p/1080p");
 
+  // The real V1 player advertises Turnstile, yet its fresh signed API token
+  // was accepted by the stream API. Do not prematurely drop authorized media.
+  mock((u,o)=>{
+    if(u===player)return{status:200,body:'<script>window.CONFIG = {"mediaType":"movie","imdb":"tt5442430","api":"'+apiBase+'","apiToken":"'+token+'","turnstile":true};</script>'};
+    if(u===api)return{status:200,body:{status_code:"200",data:{stream_urls:[hlsURL,"https://media.example/second/master.m3u8","https://media.example/third/master.m3u8"]}}};
+    return common(u,o);
+  });
+  const signedDespiteFlag=await getStreams(395992,"movie");
+  assert.equal(signedDespiteFlag.length,3);
+  assert.deepEqual(signedDespiteFlag.map(r=>r.quality),["360p","720p","1080p"]);
+  assert(called.some(x=>x.url===api));
+  assert(!called.some(x=>x.url.includes("second/master.m3u8")||x.url.includes("third/master.m3u8")));
+  assert.equal(called.filter(x=>x.url==="https://media.example/generate.php").length,1);
+  console.log("PASS: fresh signed token works with Turnstile flag; only first CDN token is requested");
+
+
+
   mock((u,o)=>{
     if(u===player)return{status:200,body:'<script>window.CONFIG = {"mediaType":"movie","imdb":"tt5442430","api":"'+apiBase+'","turnstile":true};</script>'};
     return common(u,o);
   });
   assertDiagnostics(await getStreams(395992,"movie"),"V1 player blocked");
   assert(!called.some(x=>x.url.startsWith(apiBase)));
-  console.log("PASS: browser verification shows one explicitly nonplayable diagnostic; no fake media");
+  console.log("PASS: Turnstile flag without signed token returns explicit nonplayable diagnostic");
 
   mock((u,o)=>{
     if(u===player)return{status:200,body:'<script>window.CONFIG = {"mediaType":"movie","imdb":"tt5442430","api":"'+apiBase+'","turnstile":false};</script>'};

@@ -1,3 +1,17 @@
+# CURRENT: VidPlay V1 v0.1.7 — Legacy Nuvio WASM binary compatibility (2026-10-08)
+
+**Device screenshot after v0.1.6:** V1 status was \`播放器阶段[WASM 解密媒体地址]: WASM: Nuvio fetch.arrayBuffer unavailable\`. This confirms the browser-linked public player and authorized media API were reached on the user's phone; the runtime lacked a binary response method.
+
+**Fix in the Provider only (no APK modification, no proxy):** On a WASM binary response where \`response.arrayBuffer\` is absent, call Nuvio's existing asynchronous native \`__native_fetch(url,"GET",headersJson,"none","",true)\` bridge. The official NuvioMobile [FetchBridge.kt](https://github.com/NuvioMedia/NuvioMobile/blob/main/composeApp/src/fullCommonMain/kotlin/com/nuvio/app/features/plugins/runtime/network/FetchBridge.kt) sends a JSON response with \`bodyBase64\` containing the original raw response bytes. Decode using our existing pure-JavaScript Base64 routine; validate WebAssembly magic bytes before passing the result to the existing ChaCha stream URL decoder. The fallback is enabled only for the expected \`data.vidsrc.sh\` or \`data.vidsrcme.ru\` WASM hosts; ordinary \`fetch.arrayBuffer()\` remains preferred when available. Inline WASM base64 (if upstream supplies it) is also accepted. Do not use \`response.text()\` for WASM; UTF-8 conversion corrupts bytes. If neither binary method exists in the actual installed Nuvio version, leave a specific nonplayable Status diagnostic.
+
+**Live regression with deliberately missing \`response.arrayBuffer()\`:** https://github.com/feixiangdao/test1/actions/runs/37794512921 — native \`bodyBase64\` fallback successfully retrieved and decoded a genuine ~7.5KB WASM; *Life (2017)* → **266p, 534p, 800p** HLS; *Kung Fu Panda (2008)* → **272p, 544p, 816p** HLS. Both passed genuine remote authorization, WASM decryption and HLS playlist validation. Separate unit regression: https://github.com/feixiangdao/test1/actions/runs/37794398048.
+
+**Install URL:** unchanged \`https://raw.githubusercontent.com/feixiangdao/test1/main/vidplay-nuvio/manifest.json\`. V1 only, scraper ID \`vidplay-direct-lab\`, now **v0.1.7**. No V2/V3.
+
+**Android playback not yet verified.** The installed Nuvio build must itself expose the same native bridge. After refreshing v0.1.7, retest the film in the screenshot *Kung Fu Panda* and inspect whether three actual playable quality rows appear, or whether the Status message now names a missing bridge/CDN/network issue. Native player decoding/long-running CDN access remain to be checked on-device.
+
+---
+
 # CURRENT UPDATE: VidPlay V1 v0.1.6 Android "not a function" compatibility (2026-10-08)
 
 **User-reported Android issue:** After v0.1.5, V1 pill persisted but emitted `播放器：not a function` instead of playable stream rows on *Kung Fu Panda (2008)*. This is an Android JavaScript runtime error inside V1's YTHD chain, NOT evidence that the film lacks a source.

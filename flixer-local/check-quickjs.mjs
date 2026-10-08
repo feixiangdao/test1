@@ -1,7 +1,7 @@
 import { getQuickJS } from "quickjs-emscripten";
 import { readFile } from "node:fs/promises";
 
-const filename="flixer-local/providers/flixer-local-live-alpha.js";
+const filename=process.env.FLIXER_SCRIPT_PATH || "flixer-local/providers/flixer-local-live-alpha.js";
 const code=await readFile(filename,"utf8");
 console.log("QJS_INPUT",{bytes:Buffer.byteLength(code),lines:code.split("\n").length});
 const qjs=await getQuickJS();

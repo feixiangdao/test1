@@ -1,0 +1,21 @@
+{
+  "name": "NOVIPNOAD Local Alpha",
+  "version": "0.1.0",
+  "description": "Independent NOVIPNOAD provider using first-party title/episode discovery and direct player resolution. Fails closed on ambiguous matches.",
+  "scrapers": [
+    {
+      "id": "novipnoad-local",
+      "name": "NOVIPNOAD Local",
+      "description": "NOVIPNOAD .ca/.uk/.net search + strict movie/TV matching + direct player quality extraction.",
+      "version": "0.1.0",
+      "author": "NOVIPNOAD Local Lab",
+      "supportedTypes": ["movie", "tv"],
+      "filename": "providers/novipnoad.js",
+      "enabled": true,
+      "formats": ["m3u8", "mp4", "mpd"],
+      "contentLanguage": ["zh", "en", "multi"],
+      "limited": true,
+      "hasSettings": true
+    }
+  ]
+}

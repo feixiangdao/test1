@@ -6,12 +6,43 @@ on:
 jobs:
   trace:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
-      - name: Dump CineSrc PoW worker protocol
+      - name: Capture real PoW worker response shape
         shell: bash
         run: |
           set -e
-          curl -fsSL --max-time 30 'https://cinesrc.st/pow-worker-v3.js' -o /tmp/w.js
-          echo SIZE=$(wc -c < /tmp/w.js)
-          cat /tmp/w.js
+          CHROME=$(command -v google-chrome)
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --ignore-certificate-errors --remote-debugging-port=9222 about:blank >/tmp/chrome.log 2>&1 &
+          CPID=$!
+          trap 'kill $CPID 2>/dev/null || true' EXIT
+          for i in $(seq 1 80); do
+            curl -fsS http://127.0.0.1:9222/json/version >/dev/null && break
+            sleep .25
+          done
+          node - <<'NODE'
+          const http=require('http');
+          const WORK='Q1NQMwMNAQEQEQMEMl1FJmMwN16YENJC10mWKKPHkW0';
+          function api(path,method='GET'){return new Promise((resolve,reject)=>{const req=http.request({host:'127.0.0.1',port:9222,path,method},r=>{let s='';r.on('data',d=>s+=d);r.on('end',()=>{try{resolve(JSON.parse(s))}catch(e){reject(new Error(s))}})});req.on('error',reject);req.end()})}
+          async function main(){
+            const page=await api('/json/new?about%3Ablank','PUT');
+            const ws=new WebSocket(page.webSocketDebuggerUrl);await new Promise((res,rej)=>{ws.onopen=res;ws.onerror=rej});
+            let seq=0,pending=new Map();
+            function send(method,params={}){const id=++seq;return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}))})}
+            ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data)}catch{return}if(m.id&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.error?p.reject(new Error(JSON.stringify(m.error))):p.resolve(m.result)}};
+            await send('Page.enable');await send('Runtime.enable');
+            await send('Page.navigate',{url:'https://cinesrc.st/'});
+            await new Promise(r=>setTimeout(r,4000));
+            const expr=`new Promise((resolve)=>{
+              const w=new Worker('/pow-worker-v3.js');
+              const timer=setTimeout(()=>{try{w.terminate()}catch{};resolve({timeout:true})},20000);
+              w.onmessage=e=>{clearTimeout(timer);const d=e.data;try{w.terminate()}catch{};resolve({data:d,keys:d&&Object.keys(d)})};
+              w.onerror=e=>{clearTimeout(timer);try{w.terminate()}catch{};resolve({error:String(e.message||e)})};
+              w.postMessage({id:123,work:'${WORK}'});
+            })`;
+            const r=await send('Runtime.evaluate',{expression:expr,awaitPromise:true,returnByValue:true});
+            console.log('WORKER_RESULT='+JSON.stringify(r.result.value));
+            ws.close();
+          }
+          main().catch(e=>{console.error(e.stack||e);process.exit(1)});
+          NODE

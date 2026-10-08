@@ -1,0 +1,50 @@
+name: YFlix S2 Fresh Research
+on:
+  push:
+    paths:
+      - '.github/workflows/yflix-s2-fresh.yml'
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect current VidBolt bundles
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import re, requests, urllib.parse, json
+          UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'
+          s=requests.Session(); s.headers.update({'User-Agent':UA})
+          page=s.get('https://vidbolt.xyz/movie/157336',timeout=20)
+          print('PAGE',page.status_code,page.url,'LEN',len(page.text))
+          print(page.text[:5000])
+          srcs=re.findall(r'<script[^>]+src=["\']([^"\']+)',page.text,re.I)
+          print('SCRIPTS',srcs)
+          seen=set()
+          queue=[urllib.parse.urljoin(page.url,x) for x in srcs]
+          n=0
+          while queue and n<60:
+            u=queue.pop(0)
+            if u in seen: continue
+            seen.add(u); n+=1
+            try:r=s.get(u,timeout=20)
+            except Exception as e:
+              print('ERR',u,e); continue
+            print('\nFILE',n,r.status_code,u,'LEN',len(r.text))
+            if not r.ok: continue
+            txt=r.text
+            for m in re.finditer(r'["\'](\.?/?assets/[^"\']+\.js)["\']',txt):
+              queue.append(urllib.parse.urljoin(u,m.group(1)))
+            vals=set()
+            for m in re.finditer(r'["\']([^"\']{2,350})["\']',txt):
+              z=m.group(1)
+              zl=z.lower()
+              if any(k in zl for k in ['scrape/','provider','server','source','stream','moviebox','vidlink','callisto','quasar','ninetta','saffron','naija','nova','fastva','primevid','allmovieland','videasy','vaplayer','darkmatter']):
+                vals.add(z)
+            for v in sorted(vals):
+              print('STR',v[:500])
+            urls=sorted(set(re.findall(r'https?://[^"\'\x60\s<>]+',txt)))
+            for x in urls:
+              if any(k in x.lower() for k in ['scraper','api.','workers.dev','movy','vid','stream','movie','embed','filmu','devcorp']):
+                print('URL',x[:700])
+          PY

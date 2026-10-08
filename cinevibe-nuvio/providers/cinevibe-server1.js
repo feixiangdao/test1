@@ -1,5 +1,5 @@
 // CineVibe Local for Nuvio
-// v0.2.4
+// v0.2.5
 //
 // Proven current chain (2026-10-07):
 // cinevibe.cc Server 1 -> vidsrc.wtf API 1 -> Viduki V1.
@@ -114,7 +114,7 @@ function qualityFromVariant(info,url){
   return"Auto";
 }
 function qualityScore(q){
-  if(q==="4K")return2160;
+  if(q==="4K")return 2160;
   var m=String(q||"").match(/(\d+)/);
   return m?parseInt(m[1],10):0;
 }

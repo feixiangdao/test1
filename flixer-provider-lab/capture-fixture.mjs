@@ -25,11 +25,13 @@ const seen=new Set();
 page.on("response",resp=>{
  const u=resp.url();
  if(!/\/api\/tmdb\/(?:movie|tv)\//.test(u)||!/\/images(?:\?|$)/.test(u))return;
- const req=resp.request(), key=req.method()+" "+new URL(u).pathname+" "+resp.status();
- if(seen.has(key))return;
- seen.add(key);
+ const req=resp.request();
  pending.push((async()=>{
-  const h=await req.allHeaders(),body=await resp.text();
+  const h=await req.allHeaders();
+  const key=req.method()+" "+new URL(u).pathname+" "+resp.status()+" "+(h["x-server"]||"")+" "+(h["x-only-sources"]||"");
+  if(seen.has(key))return;
+  seen.add(key);
+  const body=await resp.text();
   const candidate={
     status:resp.status(),source:(h["x-server"]||"").slice(0,24),
     suppliedKey:h["x-api-key"]||"",
@@ -50,7 +52,9 @@ try {
    ciphertextLengths:cases.map(c=>c.body.length),headerNames:[...new Set(cases.flatMap(c=>c.headerNames))]
  }));
  if(matches.length){
-  await writeFile("/tmp/flixer-fixture.json",JSON.stringify(matches[0]));
+  const picked=matches.find(c=>c.onlySources==="1" && c.source==="alpha") || matches.find(c=>c.onlySources==="1") || matches[0];
+  await writeFile("/tmp/flixer-fixture.json",JSON.stringify(picked));
+  console.log("BROWSER_SELECTED_SOURCE_KIND",JSON.stringify({server:picked.source||null,isMediaRequest:picked.onlySources==="1",ciphertextBytes:picked.body.length}));
   console.log("BROWSER_SOURCE_FIXTURE_READY");
  } else {
   console.log("BROWSER_SOURCE_FIXTURE_NOT_AVAILABLE");

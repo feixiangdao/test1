@@ -7,26 +7,62 @@ on:
 jobs:
   research:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 8
     steps:
-      - name: Inspect and probe VidBolt Nebula Echo
+      - name: Probe VidRock backends for Nebula Echo
         shell: bash
         run: |
           set -e
           python3 - <<'PY'
           import requests,re,json,urllib.parse
           S=requests.Session();S.headers.update({"User-Agent":"Mozilla/5.0"})
-          for name,url in [
-            ("Nebula","https://vidbolt.xyz/assets/vidr-_MrUkJWh.js"),
-            ("Echo","https://vidbolt.xyz/assets/localapiscraper-B_Gz3ANy.js")
-          ]:
-            r=S.get(url,timeout=30,headers={"Referer":"https://vidbolt.xyz/movie/157336"})
-            print("\nMODULE",name,r.status_code,len(r.text))
-            print(r.text[:12000])
-
-          # Extract all server ids/names once, compactly.
-          t=S.get("https://vidbolt.xyz/assets/EmbeddedOnlyEmbedPage-CxGTx3In.js",timeout=30).text
-          print("\nSERVERS")
-          for m in re.finditer(r'\{id:"([^"]+)",name:"([^"]+)",desc:"([^"]*)",cc:"([^"]*)",tag:"([^"]*)",status:"([^"]+)"',t):
-            print(m.groups())
+          KEY="09eb429913afb6b1cc90f23746f41fb3279aed77726c625c40672b81444c0bac"
+          bases=[
+            "https://backend-api2-bxhuur-7f7bc0-15-235-147-53.sslip.io",
+            "https://showbox.filmu.in"
+          ]
+          cases=[
+            ("Interstellar","movie","tt0816692",157336,"Interstellar",2014,None,None),
+            ("ReacherS01E01","tv","tt9288030",108978,"Reacher",2022,1,1)
+          ]
+          def dur(url,h=None):
+            try:
+              r=S.get(url,timeout=22,headers=h or {})
+              if r.status_code!=200:return {"status":r.status_code,"head":r.text[:80]}
+              t=r.text
+              if "#EXTM3U" not in t:return {"status":200,"not_hls":True,"ct":r.headers.get("content-type")}
+              vals=[float(x) for x in re.findall(r'#EXTINF:([0-9.]+)',t)]
+              if vals:return {"status":200,"minutes":round(sum(vals)/60,2),"segments":len(vals)}
+              for line in t.replace("\r","").split("\n"):
+                line=line.strip()
+                if line and not line.startswith("#"):
+                  return {"status":200,"master":True,"child":dur(urllib.parse.urljoin(url,line),h)}
+              return {"status":200,"empty":True}
+            except Exception as e:return {"error":repr(e)}
+          for label,kind,imdb,tmdb,title,year,s,e in cases:
+            print("\n###",label)
+            q=f"tmdbId={tmdb}&title={urllib.parse.quote(title)}&year={year}"
+            if s:q+=f"&season={s}&episode={e}"
+            path=f"/scrape/VidRock/{kind}/{imdb}?{q}"
+            for base in bases:
+              url=base+path
+              try:
+                r=S.get(url,timeout=40,headers={"x-api-key":KEY,"Accept":"application/json"})
+                print("\nBACKEND",base,r.status_code,"LEN",len(r.text))
+                print(r.text[:12000])
+                if r.status_code==200:
+                  for row in (r.json().get("sources") or [])[:30]:
+                    u=row.get("workerProxyUrl") or row.get("url") or ""
+                    if not u:continue
+                    print("ROW",row.get("name"),row.get("quality"),row.get("type"),u[:260])
+                    if ".m3u8" in u or str(row.get("type","")).lower()=="m3u8":
+                      print("PROBE",json.dumps(dur(u,row.get("headers") or {}),ensure_ascii=False))
+                    else:
+                      try:
+                        rr=S.get(u,timeout=15,headers={**(row.get("headers") or {}),"Range":"bytes=0-65535"},stream=True)
+                        print("FILE",rr.status_code,rr.headers.get("content-type"),rr.headers.get("content-range"),rr.headers.get("content-length"))
+                        rr.close()
+                      except Exception as ex:print("FILEERR",repr(ex))
+              except Exception as ex:
+                print("\nBACKENDERR",base,repr(ex))
           PY

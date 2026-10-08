@@ -4,6 +4,8 @@ on:
     branches: [flixer-local-only-20261008]
     paths:
       - '.github/workflows/flixer-local-live-smoke.yml'
+      - 'flixer-local/providers/flixer-local-live-alpha.js'
+      - 'flixer-local/manifest.json'
   workflow_dispatch:
 jobs:
   live:

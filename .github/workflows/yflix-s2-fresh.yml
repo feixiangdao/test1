@@ -4,63 +4,68 @@ on:
     paths:
       - '.github/workflows/yflix-s2-fresh.yml'
 jobs:
-  inspect:
+  scan:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Extract real VidBolt dynamic chunks
+      - name: Scan VidBolt backend matrix
         shell: bash
         run: |
-          python3 - <<'PY'
-          import re, requests, urllib.parse, json
-          UA='Mozilla/5.0'
-          base='https://vidbolt.xyz/assets/'
-          main=requests.get(base+'index-CWZT0e_1.js',headers={'User-Agent':UA},timeout=20).text
-          print('MAIN_LEN',len(main))
-          # print relevant import map / dynamic chunk names
-          names=sorted(set(re.findall(r'["\']([^"\']+\.js)["\']',main)))
-          for n in names:
-              if any(k in n.lower() for k in ['embed','provider','scraper','movie','player','server','stream','dark','callisto','quasar','vidlink','vaplayer','ninetta','saffron','nova','naija','fast']):
-                  print('CHUNKNAME',n)
-          print('ALL_CHUNKS')
-          for n in names: print(n)
-
-          # Resolve relative to /assets/ but strip accidental assets/ prefix
-          todo=[]
-          for n in names:
-              z=n
-              if z.startswith('./'): z=z[2:]
-              if z.startswith('assets/'): z=z[len('assets/'):]
-              if z.endswith('.js'):
-                  todo.append(urllib.parse.urljoin(base,z))
-          # Always include known embedded chunk from current main.
-          for m in re.finditer(r'EmbeddedOnlyEmbedPage-[A-Za-z0-9_-]+\.js',main):
-              todo.append(base+m.group(0))
-          seen=set()
-          for u in todo:
-              if u in seen: continue
-              seen.add(u)
-              try:r=requests.get(u,headers={'User-Agent':UA,'Referer':'https://vidbolt.xyz/movie/157336'},timeout=20)
-              except Exception as e:
-                  print('FETCHERR',u,e);continue
-              if not r.ok or len(r.text)<100:
-                  continue
-              txt=r.text
-              score=sum(1 for k in ['scrape/','getMovie','getTv','sources','provider','Quasar','Callisto','Vidlink','Vaplayer','MovieBox'] if k.lower() in txt.lower())
-              if score<2: continue
-              print('\n=== FILE',u,'LEN',len(txt),'SCORE',score,'===')
-              vals=set()
-              for m in re.finditer(r'["\']([^"\']{2,500})["\']',txt):
-                  s=m.group(1)
-                  if any(k in s.lower() for k in ['scrape/','provider','quasar','callisto','vidlink','vaplayer','moviebox','ninetta','saffron','naija','nova','fastva','darkmatter','allmovieland','playapi']):
-                      vals.add(s)
-              for s in sorted(vals):
-                  print('STR',s[:700])
-              for term in ['scrape/','Quasar','Callisto','Vidlink','Vaplayer','MovieBox','providers','scrapers']:
-                  low=txt.lower();t=term.lower();pos=0;c=0
-                  while c<8:
-                      i=low.find(t,pos)
-                      if i<0: break
-                      print('CTX['+term+']',re.sub(r'\s+',' ',txt[max(0,i-600):i+1600])[:2200])
-                      pos=i+len(t);c+=1
-          PY
+          node - <<'NODE'
+          const UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36';
+          const BASE='https://scraper.vidbolt.xyz/scrape';
+          const providers=[
+            'Callisto','FastVa','Ninetta','Quasar','Saffron','Naija','Nova',
+            'Darkmatter','DarkMatter','MovieBoxV2','Vaplayer','FourKHDHub',
+            'PlayAPI','Allmovieland','NetNaija','Vidlink','PrimeVids','Videasy'
+          ];
+          function qs(obj){return Object.entries(obj).filter(([,v])=>v!==undefined&&v!==null&&v!=='').map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&')}
+          async function one(p,type){
+            const imdb=type==='movie'?'tt0816692':'tt9288030';
+            const tmdb=type==='movie'?'157336':'108978';
+            const title=type==='movie'?'Interstellar':'Reacher';
+            const year=type==='movie'?'2014':'2022';
+            const q={tmdbId:tmdb,imdbId:imdb,title,year};
+            if(type==='tv'){q.season=1;q.episode=1}
+            const u=BASE+'/'+encodeURIComponent(p)+'/'+type+'/'+encodeURIComponent(imdb)+'?'+qs(q);
+            try{
+              const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':UA,Referer:'https://vidbolt.xyz/'},signal:AbortSignal.timeout(12000)});
+              const tx=await r.text();
+              let j=null; try{j=JSON.parse(tx)}catch{}
+              const rows=j&&Array.isArray(j.sources)?j.sources:(j&&Array.isArray(j.streams)?j.streams:[]);
+              return {p,type,status:r.status,count:rows.length,rows:rows.slice(0,8),head:tx.slice(0,180)};
+            }catch(e){return {p,type,error:String(e?.message||e),count:0,rows:[]}}
+          }
+          async function probe(row){
+            const url=String(row?.url||'');
+            if(!/^https?:/.test(url)) return {skip:'no-url'};
+            const h=Object.assign({},row.headers||{});
+            const isHls=String(row.type||'').toLowerCase().includes('m3u8')||url.includes('.m3u8')||url.includes('/proxy/m3u8/');
+            try{
+              if(isHls){
+                const r=await fetch(url,{headers:h,signal:AbortSignal.timeout(10000)});
+                const tx=await r.text();
+                return {kind:'hls',status:r.status,ok:r.ok&&tx.startsWith('#EXTM3U'),ct:r.headers.get('content-type')||'',head:tx.slice(0,80)};
+              }
+              h.Range='bytes=0-0';
+              const r=await fetch(url,{headers:h,signal:AbortSignal.timeout(10000)});
+              const ab=await r.arrayBuffer();
+              return {kind:'file',status:r.status,ok:r.status===206||r.status===200,len:ab.byteLength,ct:r.headers.get('content-type')||'',cr:r.headers.get('content-range')||''};
+            }catch(e){return {error:String(e?.message||e)}}
+          }
+          async function main(){
+            const jobs=[];
+            for(const p of providers){jobs.push(one(p,'movie'));jobs.push(one(p,'tv'))}
+            const rs=await Promise.all(jobs);
+            for(const x of rs){
+              console.log('\nRESULT',x.p,x.type,'STATUS',x.status,'COUNT',x.count,'ERR',x.error||'');
+              if(!x.count){console.log('HEAD',x.head||'');continue}
+              for(let i=0;i<Math.min(x.rows.length,4);i++){
+                const row=x.rows[i];
+                console.log('ROW',i,JSON.stringify({name:row.name,quality:row.quality,type:row.type,language:row.language,url:row.url,headers:row.headers}).slice(0,2500));
+                console.log('PROBE',i,JSON.stringify(await probe(row)));
+              }
+            }
+          }
+          main().catch(e=>{console.error(e);process.exit(1)});
+          NODE

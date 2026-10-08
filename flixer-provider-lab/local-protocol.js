@@ -89,7 +89,7 @@ function fetchCipher(key,path,server,offset){
  var msg=key+":"+timestamp+":"+n+":"+path;
  var headers={"X-Api-Key":key,"X-Request-Timestamp":String(timestamp),"X-Request-Nonce":n,
  "X-Request-Signature":hmac(key,msg),"X-Client-Fingerprint":fingerprint(),
- "X-Fingerprint-Lite":"e9136c41504646444","Accept":"text/plain","Referer":SITE+"/","User-Agent":UA};
+ "X-Fingerprint-Lite":"b4f8a1fc72e905d63e","Accept":"text/plain","Referer":SITE+"/","User-Agent":UA};
  if(server){headers["X-Only-Sources"]="1";headers["X-Server"]=server;}
  return fetch(API+path,{headers:headers}).then(function(r){
    if(!r.ok)throw Error("API HTTP "+r.status);

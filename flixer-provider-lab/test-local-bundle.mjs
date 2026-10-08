@@ -8,7 +8,7 @@ const requests=[];
 const sandbox={
   console,Date,Math,Promise,Uint8Array,Uint16Array,Uint32Array,Int32Array,Float32Array,Float64Array,
   ArrayBuffer,DataView,Object,Array,String,Number,Boolean,RegExp,JSON,Error,TypeError,
-  module:{exports:{}},setTimeout,clearTimeout,
+  WebAssembly:undefined,module:{exports:{}},setTimeout,clearTimeout,
   fetch:async (url,opt)=>{
     requests.push({url,headers:opt?.headers||{}});
     if(url.includes("/api/time"))return {ok:true,status:200,json:async()=>({timestamp:Math.floor(Date.now()/1000)})};

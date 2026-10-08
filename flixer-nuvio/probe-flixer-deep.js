@@ -54,3 +54,20 @@ async function detailed(){
   }
 }
 detailed().catch(e=>console.log('DEEP ERROR',String(e.message)));
+
+async function sourceFunctions(){
+ const names=['index-52585954.js','VideoPlayer-52585954.js','useQueries-52585954.js','useContentSections-52585954.js'];
+ const patterns=['nc','ac','rc','oc','lc','xr','poster_sources','serverName','fetchMovie','fetchTV','sources-with-title'];
+ for(const file of names) {
+   const res=await fetch('https://flixer.su/assets/js/'+file,{signal:AbortSignal.timeout(15000)});
+   const s=await res.text();
+   console.log('FUNCTION_ASSET',file,res.status,s.length,'HEAD',s.slice(0,650));
+   for(const p of patterns) {
+     const escaped=p.replace(/[.*+?^$()|[\]{}]/g,'\\$&');
+     const re=/^[a-z]{1,10}$/.test(p)?new RegExp('(?:^|[,{; ])'+escaped+'\\s*=','gm'):new RegExp(escaped,'g');
+     const found=[...s.matchAll(re)].slice(0,p==='poster_sources'?8:3);
+     for (const f of found) console.log('FUNCTION_CODE',file,p,f.index,s.slice(Math.max(0,f.index-600),f.index+2600));
+   }
+ }
+}
+sourceFunctions().catch(e=>console.log('FUNCTION ERROR',e.message));

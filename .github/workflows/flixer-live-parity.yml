@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 7
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -53,3 +53,18 @@ jobs:
           node flixer-provider-lab/test-local-bundle.mjs
       - name: Verify unsigned-secret-free direct Node network retrieval from local Provider
         run: node flixer-provider-lab/test-local-live.mjs
+      - name: Publish verified single-file Local provider to development branch
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin refs/heads/flixer-local-only-20261008:refs/remotes/origin/flixer-local-only-20261008
+          git switch -C flixer-local-only-20261008 origin/flixer-local-only-20261008
+          mkdir -p flixer-local/providers
+          cp /tmp/flixer-local-candidate.js flixer-local/providers/flixer-local-live-alpha.js
+          node --check flixer-local/providers/flixer-local-live-alpha.js
+          git add flixer-local/providers/flixer-local-live-alpha.js
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Publish tested standalone Flixer Local Alpha candidate"
+            git push origin HEAD:refs/heads/flixer-local-only-20261008
+          fi

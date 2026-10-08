@@ -4,6 +4,7 @@ on:
     branches: [flixer-provider-lab-20261008]
     paths:
       - 'flixer-provider-lab/build-local.mjs'
+      - 'flixer-provider-lab/normalize-public-fixture.mjs'
       - '.github/workflows/flixer-standalone-lab.yml'
   workflow_dispatch:
 jobs:
@@ -28,6 +29,10 @@ jobs:
           curl -fsSL --retry 2 --max-time 20 --resolve "$H:443:$IP" "https://$H/assets/wasm/img_data_bg.wasm" -o /tmp/flixer-img-data.wasm
           curl -fsSL --retry 2 --max-time 20 --resolve "$H:443:$IP" "https://$H/assets/wasm/img_data.js" -o /tmp/flixer-img-data.js
           wc -c /tmp/flixer-img-data.wasm /tmp/flixer-img-data.js
+      - name: Prepare published Hexa ciphertext regression fixture
+        run: |
+          curl -fsSL --retry 2 --max-time 20 "https://raw.githubusercontent.com/Nyumat/NyumatFlix/c22372a0246eaef227d5f18b57e47e75982d5bd4/apps/web/__tests__/fixtures/hexa-movie-550.json" -o /tmp/hexa-public-fixture.json
+          node flixer-provider-lab/normalize-public-fixture.mjs
       - name: Translate WASM and run browser-free JavaScript module
         run: |
           npm install --no-save binaryen@132.0.0 hermes-parser

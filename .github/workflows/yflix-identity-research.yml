@@ -7,47 +7,85 @@ on:
 jobs:
   research:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 8
     steps:
-      - name: Compact resolver extraction and FilmU direct probes
+      - name: Validate identities and inspect remaining VidBolt modules
         shell: bash
         run: |
           set -e
           python3 - <<'PY'
-          import requests,re,json,urllib.parse
+          import requests,re,json,urllib.parse,math
           S=requests.Session();S.headers.update({"User-Agent":"Mozilla/5.0"})
+          FILMU_KEY="09eb429913afb6b1cc90f23746f41fb3279aed77726c625c40672b81444c0bac"
 
-          print("=== VIDBOLT MODULES ===")
+          def absurl(base,ref):
+            return urllib.parse.urljoin(base,ref)
+
+          def duration(url,headers=None,depth=0):
+            headers=headers or {}
+            try:
+              r=S.get(url,timeout=25,headers=headers)
+              if r.status_code!=200:
+                return {"status":r.status_code,"head":r.text[:80]}
+              txt=r.text
+              if "#EXTM3U" not in txt:
+                return {"status":r.status_code,"not_hls":txt[:80]}
+              vals=[float(x) for x in re.findall(r'#EXTINF:([0-9.]+)',txt)]
+              if vals:
+                return {"status":200,"seconds":round(sum(vals),2),"minutes":round(sum(vals)/60,2),"segments":len(vals)}
+              # master: follow first variant
+              lines=txt.replace("\r","").split("\n")
+              for line in lines:
+                line=line.strip()
+                if line and not line.startswith("#"):
+                  return {"status":200,"master":True,"child":duration(absurl(url,line),headers,depth+1)}
+              return {"status":200,"empty":True}
+            except Exception as e:
+              return {"error":repr(e)}
+
+          print("=== S4 FILMU VIDEASY IDENTITY ===")
+          for label,kind,ident,query in [
+            ("Interstellar","movie","tt0816692","title=Interstellar&tmdbId=157336&imdbId=tt0816692&year=2014"),
+            ("ReacherS01E01","tv","tt9288030","title=Reacher&tmdbId=108978&imdbId=tt9288030&year=2022&season=1&episode=1")
+          ]:
+            url=f"https://box.filmu.in/scrape/Videasy/{kind}/{ident}?{query}"
+            r=S.get(url,timeout=40,headers={"x-api-key":FILMU_KEY,"Accept":"application/json","Referer":"https://embed.filmu.in/"})
+            print("\nVIDEASY",label,"API",r.status_code,"LEN",len(r.text))
+            try:j=r.json()
+            except Exception:
+              print(r.text[:1000]);continue
+            rows=j.get("sources") or []
+            print("COUNT",len(rows))
+            for row in rows:
+              u=row.get("url",""); h=row.get("headers") or {}
+              print("ROW",row.get("name"),row.get("quality"),u)
+              print("DURATION",json.dumps(duration(u,h),ensure_ascii=False))
+
+          print("\n=== S2 CURRENT EXACT FRONTEND CALLS ===")
+          urls=[
+            ("QuasarExact","https://scraper.vidbolt.xyz/scrape/Quasar/movie/tt0816692?tmdbId=157336"),
+            ("CallistoExact","https://scraper.vidbolt.xyz/scrape/Callisto/movie/tt0816692?title=Interstellar&tmdbId=157336&year=2014")
+          ]
+          for name,url in urls:
+            r=S.get(url,timeout=35,headers={"Accept":"application/json","Referer":"https://vidbolt.xyz/movie/157336"})
+            print("\nS2",name,r.status_code,"LEN",len(r.text),r.text[:7000])
+            if r.status_code==200:
+              try:
+                j=r.json()
+                for row in (j.get("sources") or [])[:15]:
+                  u=row.get("url",""); h=row.get("headers") or {}
+                  if ".m3u8" in u or row.get("type")=="m3u8":
+                    print("S2PROBE",row.get("name"),row.get("quality"),json.dumps(duration(u,h),ensure_ascii=False))
+              except Exception as e: print("JSONERR",repr(e))
+
+          print("\n=== S2 OTHER CURRENT MODULES ===")
           for name,url in [
-            ("orion","https://vidbolt.xyz/assets/darkmatter-HpTILE1p.js"),
-            ("callisto","https://vidbolt.xyz/assets/callisto-Ud7vipgB.js"),
-            ("playapi","https://vidbolt.xyz/assets/playapi-Dh80i7LV.js"),
-            ("scraperUrl","https://vidbolt.xyz/assets/scraperUrl-DC5Xrq2-.js")
+            ("FastVa","https://vidbolt.xyz/assets/vaplayer-0F78SnNd.js"),
+            ("Ninetta","https://vidbolt.xyz/assets/fourkhdhub-DhLoTLQ0.js"),
+            ("Saffron","https://vidbolt.xyz/assets/allmovieland-CsLQcLP1.js"),
+            ("Nova","https://vidbolt.xyz/assets/vidlink-_TJ5hLAe.js")
           ]:
             r=S.get(url,timeout=30,headers={"Referer":"https://vidbolt.xyz/movie/157336"})
-            print("\nMODULE",name,"STATUS",r.status_code,"LEN",len(r.text),"CTYPE",r.headers.get("content-type"))
-            t=r.text
-            # Print all string literals that look like endpoints/domains/paths.
-            vals=[]
-            for s in re.findall(r'["\']([^"\']{1,500})["\']',t):
-              sl=s.lower()
-              if ("http" in sl or "/api/" in sl or "/scrape/" in sl or "/stream" in sl or
-                  "movie" in sl or "series" in sl or "tv" in sl or "tmdb" in sl or "imdb" in sl):
-                if s not in vals: vals.append(s)
-            print("LITERALS")
-            for s in vals[:120]: print(repr(s))
-            # chunks are small; print source capped at 12000 chars.
-            print("SOURCE",t[:12000])
-
-          print("\n=== FILMU BOX DIRECT ===")
-          key="09eb429913afb6b1cc90f23746f41fb3279aed77726c625c40672b81444c0bac"
-          base="https://box.filmu.in"
-          extractors=["RiveStream","Bastion","Allmovieland","Vaplayer","Videasy","FShareTV"]
-          for ext in extractors:
-            url=f"{base}/scrape/{ext}/movie/tt0816692?title=Interstellar&tmdbId=157336&imdbId=tt0816692&year=2014"
-            try:
-              r=S.get(url,timeout=35,headers={"x-api-key":key,"Accept":"application/json","Referer":"https://embed.filmu.in/movie/157336"})
-              print("\nBOX",ext,r.status_code,"LEN",len(r.text),r.text[:4000])
-            except Exception as e:
-              print("\nBOX",ext,"ERR",repr(e))
+            print("\nMODULE",name,r.status_code,"LEN",len(r.text))
+            print(r.text[:9000])
           PY

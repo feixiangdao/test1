@@ -8,25 +8,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
-      - name: Probe FastVa Ninetta Naija Nova
+      - name: Probe VidRock via VidBolt proxy
         shell: bash
         run: |
           set -e
           UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'
           probe(){
-            label="$1"; url="$2";
+            label="$1"; path="$2";
             echo "--- $label ---"
-            code=$(curl -sS -L --max-time 25 -A "$UA" -e 'https://vidbolt.xyz/' -H 'Accept: application/json' -o /tmp/out.json -w '%{http_code}' "$url" || true)
+            code=$(curl -sS -L --max-time 35 -A "$UA" -e 'https://vidbolt.xyz/movie/157336' -H 'Accept: application/json' -G --data-urlencode "path=$path" -o /tmp/out.json -w '%{http_code}' 'https://vidbolt.xyz/api/proxy' || true)
             echo "HTTP $code SIZE $(wc -c < /tmp/out.json 2>/dev/null || echo 0)"
-            head -c 16000 /tmp/out.json || true
+            head -c 24000 /tmp/out.json || true
             echo
           }
-          B='https://scraper.vidbolt.xyz'
-          probe 'FastVa movie' "$B/scrape/FastVa/movie/tt0816692?tmdbId=157336&imdbId=tt0816692"
-          probe 'FastVa TV' "$B/scrape/FastVa/tv/tt9288030?tmdbId=108978&imdbId=tt9288030&season=1&episode=1"
-          probe 'Ninetta movie' "$B/scrape/Ninetta/movie/tt0816692?title=Interstellar&year=2014&tmdbId=157336"
-          probe 'Ninetta TV' "$B/scrape/Ninetta/tv/tt9288030?title=Reacher&year=2022&tmdbId=108978&season=1&episode=1"
-          probe 'Naija movie' "$B/scrape/Naija/movie/tt0816692?title=Interstellar&year=2014&tmdbId=157336&imdbId=tt0816692"
-          probe 'Naija TV' "$B/scrape/Naija/tv/tt9288030?title=Reacher&year=2022&tmdbId=108978&imdbId=tt9288030&season=1&episode=1"
-          probe 'Nova movie' "$B/scrape/Nova/movie/tt0816692?tmdbId=157336"
-          probe 'Nova TV' "$B/scrape/Nova/tv/tt9288030?tmdbId=108978&season=1&episode=1"
+          probe 'VidRock movie' '/scrape/VidRock/movie/tt0816692?tmdbId=157336&title=Interstellar&year=2014'
+          probe 'VidRock TV' '/scrape/VidRock/tv/tt9288030?tmdbId=108978&title=Reacher&year=2022&season=1&episode=1'

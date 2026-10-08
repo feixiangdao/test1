@@ -1,31 +1,20 @@
 // YFlix Local for Nuvio
-// v0.4.1 - YFlix Server 2 / VidBolt Quasar strict + live-validation build
+// v0.5.0 - YFlix Server 2 / VidBolt live-source build
 //
-// Fixes:
-// - Removed opaque Orion movie fallback (could not verify title identity).
-// - Removed stale Callisto route.
-// - Uses current Quasar backend.
-// - Only returns HLS rows whose source name proves the requested title/year.
-// - TV rows must also prove the requested SxxExx.
+// Mirrors VidBolt's current Quasar resolver:
+//   /scrape/Quasar/{movie|tv}/{imdb}?tmdbId=...
 //
-// Nuvio/Hermes friendly: Promise chains, no async/await.
+// HLS rows are opened before display. Direct-file rows are probed with a
+// 1-byte Range request and are returned only on HTTP 206.
+// This intentionally hides broken/expired cards instead of rendering DIAG
+// items that look like playable streams.
 
 var SCRAPER_BASE="https://scraper.vidbolt.xyz";
 var TMDB_BASE="https://api.themoviedb.org/3";
 var DEFAULT_TMDB_API_KEY="1865f43a0549ca50d341dd9ab8b29f49";
 var UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36";
-var DIAG=[];
 
 function clean(v){return v==null?"":String(v).trim();}
-function diag(msg){msg=clean(msg).replace(/\s+/g," ").slice(0,180);if(msg&&DIAG.indexOf(msg)<0)DIAG.push(msg);}
-function statusRows(){
-  var a=DIAG.slice(-4);
-  if(!a.length)a=["No trusted stream returned"];
-  return a.map(function(msg,i){
-    var n="YFlix · S2 · DIAG "+(i+1)+" · "+msg;
-    return{name:n,title:n,url:"about:error",quality:"Status",type:"diagnostic",provider:"yflix-server2",headers:{},subtitles:[]};
-  });
-}
 function settings(){try{return(typeof globalThis!=="undefined"&&globalThis.SCRAPER_SETTINGS)||{};}catch(_){return{};}}
 function tmdbKey(){
   var s=settings(),k=clean(s.tmdbApiKey);
@@ -52,12 +41,11 @@ function getTmdbInfo(tmdbId,mediaType){
       var date=clean(d.release_date||d.first_air_date);
       var year=parseInt(date.slice(0,4),10)||0;
       var imdb=clean(d.imdb_id||(d.external_ids&&d.external_ids.imdb_id));
-      if(!title)throw new Error("TMDB title missing");
-      if(!imdb)throw new Error("TMDB IMDb id missing");
+      if(!title||!imdb)throw new Error("TMDB metadata incomplete");
       return{title:title,year:year,imdbId:imdb,tmdbId:String(tmdbId)};
     });
 }
-function stripUnsafeHeaders(src){
+function safeHeaders(src){
   var out={},h=src&&typeof src==="object"?src:{};
   Object.keys(h).forEach(function(k){
     var lk=String(k).toLowerCase();
@@ -67,34 +55,19 @@ function stripUnsafeHeaders(src){
   if(!out["User-Agent"]&&!out["user-agent"])out["User-Agent"]=UA;
   return out;
 }
-function subtitleRows(list){
-  var out=[],seen={};
-  (Array.isArray(list)?list:[]).forEach(function(s,i){
-    if(!s||typeof s!=="object")return;
-    var u=clean(s.url);
-    if(!/^https?:\/\//i.test(u)||seen[u])return;
-    seen[u]=1;
-    out.push({
-      url:u,
-      language:clean(s.lang||s.language||s.code)||"und",
-      name:clean(s.label||s.name||s.language||s.lang)||("Subtitle "+(i+1))
-    });
-  });
+function probeHeaders(src){
+  var out=safeHeaders(src);
+  out["Range"]="bytes=0-0";
   return out;
 }
-function compact(s){
-  return clean(s).toLowerCase().replace(/[^a-z0-9]+/g,"");
-}
+function compact(s){return clean(s).toLowerCase().replace(/[^a-z0-9]+/g,"");}
 function pad2(n){n=parseInt(n,10)||0;return n<10?"0"+n:String(n);}
-function trustedName(row,info,mediaType,season,episode){
+function nameMatchesIdentity(row,info,mediaType,season,episode){
   var raw=clean(row&&row.name);
   if(!raw)return false;
-
-  var n=compact(raw),t=compact(info&&info.title);
-  if(!t||n.indexOf(t)<0)return false;
-
+  var n=compact(raw),title=compact(info.title);
+  if(!title||n.indexOf(title)<0)return false;
   if(info.year&&raw.indexOf(String(info.year))<0)return false;
-
   if(mediaType==="tv"){
     var marker="s"+pad2(season)+"e"+pad2(episode);
     if(n.indexOf(marker)<0)return false;
@@ -111,14 +84,17 @@ function qualityOf(row){
   if(/^\d+$/.test(q))q+="p";
   return q;
 }
+function qualityRank(q){
+  var m=String(q||"").match(/(2160|1440|1080|720|480|360|240)/);
+  return m?parseInt(m[1],10):0;
+}
 function expiryMs(url){
   var m=String(url||"").match(/[?&]expire=(\d{10,13})(?:&|$)/i);
   if(!m)return 0;
   var n=parseInt(m[1],10)||0;
   return n>20000000000?n:n*1000;
 }
-function probeHlsRow(row){
-  if(!row||!row.url)return Promise.resolve(null);
+function probeHls(row){
   var exp=expiryMs(row.url);
   if(exp&&exp<=Date.now()+60000)return Promise.resolve(null);
   return fetch(row.url,{headers:row.headers||{}})
@@ -127,111 +103,127 @@ function probeHlsRow(row){
       return r.text().then(function(t){
         return String(t||"").indexOf("#EXTM3U")===0?row:null;
       });
-    }).catch(function(){return null;});
+    })
+    .catch(function(){return null;});
 }
-function liveRows(rows){
-  rows=rows||[];
-  if(!rows.length)return Promise.resolve([]);
-  return Promise.all(rows.map(probeHlsRow)).then(function(all){
-    return all.filter(function(x){return!!x;});
-  });
+function probeFile(row){
+  return fetch(row.url,{headers:probeHeaders(row.headers),skipSizeCheck:true})
+    .then(function(r){
+      if(!r)return null;
+      return Number(r.status)===206?row:null;
+    })
+    .catch(function(){return null;});
 }
-function normalizeQuasar(j,info,mediaType,season,episode){
+function makeStream(row,kind,index){
+  var q=qualityOf(row);
+  var src=clean(row.name);
+  if(src.length>42)src=src.slice(0,42);
+  var label="YFlix · S2 · "+kind+" · "+q;
+  if(src&&src.toLowerCase().indexOf("vidlink")>=0)label="YFlix · S2 · Vidlink · "+q;
+  return{
+    name:label,
+    title:label,
+    url:clean(row.url),
+    quality:q,
+    type:isHls(row)?"hls":"mp4",
+    provider:"yflix-server2",
+    headers:safeHeaders(row.headers),
+    subtitles:[],
+    _rank:(isHls(row)?10000:20000)+qualityRank(q)-index
+  };
+}
+function normalizeCandidates(j,info,mediaType,season,episode){
   var rows=j&&Array.isArray(j.sources)?j.sources:[];
-  var subs=subtitleRows(j&&j.subtitles);
-  var out=[],seen={};
-
-  rows.forEach(function(row){
+  var files=[],hls=[];
+  rows.forEach(function(row,i){
     if(!row||typeof row!=="object")return;
-    if(!trustedName(row,info,mediaType,season,episode))return;
-    if(!isHls(row))return;
-
     var u=clean(row.url);
-    if(!/^https?:\/\//i.test(u)||seen[u])return;
-    seen[u]=1;
+    if(!/^https?:\/\//i.test(u))return;
+    if(isHls(row)){
+      // HLS must prove title/year/episode in its own name because the current
+      // Quasar pool has produced stale/mismatched signed HLS in the past.
+      if(nameMatchesIdentity(row,info,mediaType,season,episode)){
+        hls.push({row:row,index:i});
+      }
+      return;
+    }
 
-    var lang=clean(row.language)||"Original";
-    var q=qualityOf(row);
-    var name="YFlix · S2 · Quasar · "+lang+" · "+q;
-
-    out.push({
-      name:name,
-      title:name,
-      url:u,
-      quality:q,
-      type:"hls",
-      provider:"yflix-server2",
-      headers:stripUnsafeHeaders(row.headers),
-      subtitles:subs,
-      _rank:(parseInt(q,10)||0)
-    });
+    if(mediaType==="movie"){
+      // Movie files must carry title + year in the filename/source name.
+      if(nameMatchesIdentity(row,info,mediaType,season,episode)){
+        files.push({row:row,index:i});
+      }
+    }else{
+      // VidBolt's TV Vidlink MP4 rows are unnamed by show, but are generated
+      // from the exact IMDb + TMDB + S/E query. Only admit the Vidlink family.
+      var n=clean(row.name).toLowerCase();
+      if(n.indexOf("vidlink")>=0)files.push({row:row,index:i});
+    }
   });
 
-  out.sort(function(a,b){return(b._rank||0)-(a._rank||0);});
-  out.forEach(function(x){try{delete x._rank;}catch(_){}});
-  return out;
+  files.sort(function(a,b){return qualityRank(qualityOf(b.row))-qualityRank(qualityOf(a.row));});
+  hls.sort(function(a,b){return qualityRank(qualityOf(b.row))-qualityRank(qualityOf(a.row));});
+
+  // Keep device-side probing bounded.
+  files=files.slice(0,4);
+  hls=hls.slice(0,4);
+  return{files:files,hls:hls};
 }
 function callQuasar(info,mediaType,season,episode){
   var kind=mediaType==="tv"?"tv":"movie";
-  var q=[];
-  q.push("tmdbId="+encodeURIComponent(info.tmdbId));
-  q.push("imdbId="+encodeURIComponent(info.imdbId));
-  q.push("title="+encodeURIComponent(info.title));
-  if(info.year)q.push("year="+encodeURIComponent(String(info.year)));
+  var q=["tmdbId="+encodeURIComponent(info.tmdbId)];
   if(mediaType==="tv"){
     q.push("season="+encodeURIComponent(String(season)));
     q.push("episode="+encodeURIComponent(String(episode)));
   }
   var u=SCRAPER_BASE+"/scrape/Quasar/"+kind+"/"+encodeURIComponent(info.imdbId)+"?"+q.join("&");
-
   return fetchJson(u,{
-    headers:{
-      "Accept":"application/json",
-      "User-Agent":UA,
-      "Referer":"https://vidbolt.xyz/"
-    }
+    headers:{"Accept":"application/json","User-Agent":UA,"Referer":"https://vidbolt.xyz/"}
   }).then(function(j){
-    var out=normalizeQuasar(j,info,mediaType,season,episode);
-    if(!out.length){diag("Quasar · no title-verified HLS");return[];}
-    return liveRows(out).then(function(live){
-      if(!live.length)diag("Quasar · title matched, but all HLS are expired/unplayable");
-      return live;
+    var c=normalizeCandidates(j,info,mediaType,season,episode);
+    var jobs=[];
+    c.files.forEach(function(x){
+      var s=makeStream(x.row,"Quasar",x.index);
+      jobs.push(probeFile(s));
     });
-  }).catch(function(e){
-    var m=e&&e.message?e.message:e;
-    diag("Quasar · "+m);
-    return[];
-  });
+    c.hls.forEach(function(x){
+      var s=makeStream(x.row,"Quasar",x.index);
+      jobs.push(probeHls(s));
+    });
+    if(!jobs.length)return[];
+    return Promise.all(jobs).then(function(all){
+      var out=all.filter(function(x){return!!x;});
+      var seen={};
+      out=out.filter(function(x){
+        if(!x.url||seen[x.url])return false;
+        seen[x.url]=1;return true;
+      });
+      out.sort(function(a,b){return(b._rank||0)-(a._rank||0);});
+      out.forEach(function(x){try{delete x._rank;}catch(_){}});
+      return out;
+    });
+  }).catch(function(){return[];});
 }
 function getStreams(tmdbId,mediaType,season,episode){
-  DIAG=[];
-  if(!tmdbId){diag("missing TMDB id");return Promise.resolve(statusRows());}
+  if(!tmdbId)return Promise.resolve([]);
   mediaType=mediaType==="tv"?"tv":"movie";
   season=parseInt(season,10)||0;
   episode=parseInt(episode,10)||0;
-  if(mediaType==="tv"&&(!season||!episode)){diag("TV missing season/episode");return Promise.resolve(statusRows());}
+  if(mediaType==="tv"&&(!season||!episode))return Promise.resolve([]);
 
   return getTmdbInfo(String(tmdbId),mediaType)
     .then(function(info){return callQuasar(info,mediaType,season,episode);})
-    .then(function(rows){
-      if(!rows||!rows.length)return statusRows();
-      return rows;
-    })
-    .catch(function(e){
-      var m=e&&e.message?e.message:e;
-      diag("TMDB/runtime · "+m);
-      return statusRows();
-    });
+    .catch(function(){return[];});
 }
 function onSettings(){
   return[
     {type:"header",label:"YFlix Local · Server 2"},
-    {type:"info",label:"VidBolt/Quasar 严格匹配 + 实时验证版：片名/年份/集数必须匹配，并且 HLS 在返回前必须实际可打开；过期签名和失效代理不会显示。"},
+    {type:"info",label:"VidBolt 实时可播版：每条 HLS 会先实际打开，文件流会先做 1-byte Range 检查；失效、过期或不能证明影片身份的线路直接隐藏，不再显示不可播放的 DIAG 卡。"},
     {
       type:"text",
       key:"tmdbApiKey",
       label:"TMDB API Key（可选）",
-      description:"用于取得英文片名、年份和 IMDb ID。留空使用备用 Key。",
+      description:"用于核对标题、年份和 IMDb ID。留空使用备用 Key。",
       defaultValue:"",
       isPassword:true
     }

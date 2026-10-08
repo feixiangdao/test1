@@ -6,19 +6,27 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
-      - name: Inspect active VidBolt provider modules
+      - name: Probe FastVa Ninetta Naija Nova
         shell: bash
         run: |
           set -e
           UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'
-          mkdir -p /tmp/vbmods
-          mods='vaplayer-0F78SnNd.js fourkhdhub-DhLoTLQ0.js netnaija-fyGxFQcY.js vidlink-_TJ5hLAe.js vidr-_MrUkJWh.js localapiscraper-B_Gz3ANy.js oasis-Bg0zIFi7.js darkmatter-HpTILE1p.js playapi-Dh80i7LV.js allmovieland-CsLQcLP1.js callisto-Ud7vipgB.js scraperUrl-DC5Xrq2-.js'
-          for m in $mods; do
-            echo "=== $m ==="
-            curl -fsSL --max-time 25 -A "$UA" -e 'https://vidbolt.xyz/movie/157336' "https://vidbolt.xyz/assets/$m" -o "/tmp/vbmods/$m" || true
-            echo "SIZE $(wc -c < /tmp/vbmods/$m 2>/dev/null || echo 0)"
-            cat "/tmp/vbmods/$m" | head -c 18000 || true
+          probe(){
+            label="$1"; url="$2";
+            echo "--- $label ---"
+            code=$(curl -sS -L --max-time 25 -A "$UA" -e 'https://vidbolt.xyz/' -H 'Accept: application/json' -o /tmp/out.json -w '%{http_code}' "$url" || true)
+            echo "HTTP $code SIZE $(wc -c < /tmp/out.json 2>/dev/null || echo 0)"
+            head -c 16000 /tmp/out.json || true
             echo
-          done
+          }
+          B='https://scraper.vidbolt.xyz'
+          probe 'FastVa movie' "$B/scrape/FastVa/movie/tt0816692?tmdbId=157336&imdbId=tt0816692"
+          probe 'FastVa TV' "$B/scrape/FastVa/tv/tt9288030?tmdbId=108978&imdbId=tt9288030&season=1&episode=1"
+          probe 'Ninetta movie' "$B/scrape/Ninetta/movie/tt0816692?title=Interstellar&year=2014&tmdbId=157336"
+          probe 'Ninetta TV' "$B/scrape/Ninetta/tv/tt9288030?title=Reacher&year=2022&tmdbId=108978&season=1&episode=1"
+          probe 'Naija movie' "$B/scrape/Naija/movie/tt0816692?title=Interstellar&year=2014&tmdbId=157336&imdbId=tt0816692"
+          probe 'Naija TV' "$B/scrape/Naija/tv/tt9288030?title=Reacher&year=2022&tmdbId=108978&imdbId=tt9288030&season=1&episode=1"
+          probe 'Nova movie' "$B/scrape/Nova/movie/tt0816692?tmdbId=157336"
+          probe 'Nova TV' "$B/scrape/Nova/tv/tt9288030?tmdbId=108978&season=1&episode=1"

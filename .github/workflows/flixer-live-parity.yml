@@ -26,7 +26,7 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: |
-          npm install --no-save binaryen@132.0.0 playwright hermes-parser
+          npm install --no-save binaryen@132.0.0 playwright hermes-parser quickjs-emscripten
           npx playwright install --with-deps chromium
       - name: Capture current Flixer encrypted fixture with headed Chromium
         env:
@@ -51,6 +51,8 @@ jobs:
           node --check /tmp/flixer-local-candidate.js
           node -e 'const {parse}=require("hermes-parser");const fs=require("fs");const s=fs.readFileSync("/tmp/flixer-local-candidate.js","utf8");parse(s,{sourceType:"script"});console.log("LOCAL_BUNDLE_HERMES_PARSE_PASS",s.length)'
           node flixer-provider-lab/test-local-bundle.mjs
+      - name: Decode same-version real HLS ciphertext in QuickJS
+        run: node flixer-provider-lab/test-quickjs-cipher.mjs
       - name: Verify unsigned-secret-free direct Node network retrieval from local Provider
         run: node flixer-provider-lab/test-local-live.mjs
       - name: Publish verified single-file Local provider to development branch

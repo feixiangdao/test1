@@ -28,7 +28,7 @@ jobs:
           node --check flixer-provider-lab/providers/flixer-local.js
           PORT=8833 MAX_WAIT_MS=9000 node flixer-provider-lab/resolver.mjs > /tmp/flixer-resolver.log 2>&1 &
           pid=$!
-          trap 'kill $pid || true' EXIT
+          trap 'cat /tmp/flixer-resolver.log || true; kill $pid || true' EXIT
           for i in $(seq 1 25); do
             if curl --fail --silent http://127.0.0.1:8833/health > /dev/null; then break; fi
             sleep 1

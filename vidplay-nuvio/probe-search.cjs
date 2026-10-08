@@ -1,0 +1,9 @@
+const {chromium}=require('playwright');
+(async()=>{const b=await chromium.launch({headless:true,args:['--no-sandbox']});const p=await b.newPage({userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'});
+const events=[];p.on('request',r=>{if(r.url().startsWith('https://vidplay.top'))events.push({method:r.method(),url:r.url().slice(0,220),post:r.postData()?.slice(0,300)});});
+const resp=await p.goto('https://vidplay.top/',{waitUntil:'domcontentloaded',timeout:30000});await p.waitForTimeout(1200);
+console.log('HOME',JSON.stringify({status:resp.status(),title:await p.title()}));
+console.log('SEARCH_UI',JSON.stringify(await p.evaluate(()=>({forms:[...document.forms].map(e=>e.outerHTML.slice(0,1900)),inputs:[...document.querySelectorAll('input')].map(e=>e.outerHTML.slice(0,1000)),scripts:[...document.scripts].filter(e=>/search|autocomplete|input/i.test(e.textContent)).map(e=>e.textContent.slice(0,4000)).slice(0,6)}))).slice(0,17000));
+const fields=p.locator('input[type="search"],input[name*="search"],input[placeholder*="earch"],input[id*="search"]');
+if(await fields.count()){await fields.first().fill('Life');await p.waitForTimeout(2500);console.log('AFTER_INPUT',JSON.stringify({html:(await p.locator('body').innerText()).slice(0,1600),events:events.slice(-25)}));try{await fields.first().press('Enter');await p.waitForTimeout(1200);console.log('AFTER_ENTER',JSON.stringify({url:p.url(),title:await p.title(),links:(await p.locator('a[href*="/movie/"]').evaluateAll(xs=>xs.slice(0,15).map(x=>({text:x.innerText?.slice(0,100),href:x.href}))))}));}catch(e){console.log('ENTER_ERR',e.message.slice(0,300))}}
+await b.close();})().catch(e=>{console.error(e.stack||e);process.exitCode=1});

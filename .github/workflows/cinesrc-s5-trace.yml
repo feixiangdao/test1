@@ -6,150 +6,67 @@ on:
 jobs:
   trace:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 5
     steps:
-      - name: Run full CineSrc flow with headless crypto scripts
+      - name: Diagnose CineSrc gc methods
         shell: bash
         run: |
           set -e
           curl -fsSL --max-time 30 'https://cinesrc.st/300726c-prod.js' -o /tmp/crypto.js
           curl -fsSL --max-time 30 'https://cinesrc.st/donut.js' -o /tmp/donut.js
           node - <<'NODE'
-          const fs=require('fs'), vm=require('vm');
-          const UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36';
-          const ORIGIN='https://cinesrc.st';
-          const PAGE=ORIGIN+'/embed/movie/157336';
-          const ACTION_PROVIDERS='00709a44ddb018c921339ab3213396ad85c0dc0237';
-          const ACTION_STREAM='7e278c7b1a4440a99a81b5c121b5f93193ce0a3f64';
-
-          const listeners={};
+          const fs=require('fs'),vm=require('vm');
+          const ORIGIN='https://cinesrc.st', PAGE=ORIGIN+'/embed/movie/157336';
+          const UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36';
+          const listeners={}; let api=null;
           function addEventListener(n,fn){(listeners[n]||(listeners[n]=[])).push(fn)}
           function removeEventListener(n,fn){if(listeners[n])listeners[n]=listeners[n].filter(x=>x!==fn)}
-          function dispatchEvent(ev){for(const fn of (listeners[ev.type]||[]).slice())try{fn(ev)}catch(e){console.log('LISTENER_ERR',e.message)};return true}
+          function dispatchEvent(ev){for(const fn of (listeners[ev.type]||[]).slice())try{fn(ev)}catch{};return true}
           class CE{constructor(type,opt){this.type=type;this.detail=opt&&opt.detail}}
-          let cryptoApi=null;
-          addEventListener('_cs',ev=>{
-            const key=ev&&ev.detail;
-            if(key && g[key]){
-              cryptoApi=g[key];
-              console.log('CRYPTO_EVENT',key,Object.keys(cryptoApi||{}));
-            }
-          });
-
-          const g={
-            console,setTimeout,clearTimeout,setInterval,clearInterval,
-            TextEncoder,TextDecoder,URL,URLSearchParams,
-            atob:s=>Buffer.from(s,'base64').toString('binary'),
-            btoa:s=>Buffer.from(s,'binary').toString('base64'),
-            crypto:require('crypto').webcrypto,WebAssembly,
-            CustomEvent:CE,Event:CE,
-            addEventListener,removeEventListener,dispatchEvent,
-            fetch,
+          const g={console:{log(){},error(){}},setTimeout,clearTimeout,setInterval,clearInterval,TextEncoder,TextDecoder,URL,URLSearchParams,
+            atob:s=>Buffer.from(s,'base64').toString('binary'),btoa:s=>Buffer.from(s,'binary').toString('base64'),
+            crypto:require('crypto').webcrypto,WebAssembly,CustomEvent:CE,Event:CE,
+            addEventListener,removeEventListener,dispatchEvent,fetch,
             location:{origin:ORIGIN,href:PAGE,pathname:'/embed/movie/157336',search:''},
-            navigator:{userAgent:UA,language:'en-US',languages:['en-US','en']},
-            performance:{now:()=>Date.now()},
-          };
+            navigator:{userAgent:UA,language:'en-US',languages:['en-US','en']},performance:{now:()=>Date.now()}};
           g.window=g;g.self=g;g.globalThis=g;
-          g.document={
-            createElement:()=>({style:{},setAttribute(){},appendChild(){},remove(){}}),
-            head:{appendChild(){}},body:{appendChild(){}},documentElement:{},
-            querySelector:()=>null,querySelectorAll:()=>[],addEventListener,removeEventListener
-          };
+          g.document={createElement:()=>({style:{},setAttribute(){},appendChild(){},remove(){}}),head:{appendChild(){}},body:{appendChild(){}},documentElement:{},querySelector:()=>null,querySelectorAll:()=>[],addEventListener,removeEventListener};
+          addEventListener('_cs',ev=>{if(ev&&ev.detail&&g[ev.detail])api=g[ev.detail]});
           const ctx=vm.createContext(g);
           vm.runInContext(fs.readFileSync('/tmp/crypto.js','utf8'),ctx,{timeout:10000});
           vm.runInContext(fs.readFileSync('/tmp/donut.js','utf8'),ctx,{timeout:10000});
-          console.log('APIS',cryptoApi&&Object.keys(cryptoApi),g.__ss2_challenge&&Object.keys(g.__ss2_challenge));
+          process.stdout.write('API_KEYS '+JSON.stringify(api&&Object.keys(api))+' DONUT '+JSON.stringify(g.__ss2_challenge&&Object.keys(g.__ss2_challenge))+'\n');
 
-          function b64url(s){return Buffer.from(s,'utf8').toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
-          function cookieJar(){const map={};return{
-            add(res){const arr=typeof res.headers.getSetCookie==='function'?res.headers.getSetCookie():[];for(const x of arr){const p=x.split(';')[0],i=p.indexOf('=');if(i>0)map[p.slice(0,i)]=p.slice(i+1)}},
-            value(){return Object.keys(map).map(k=>k+'='+map[k]).join('; ')}
-          }}
-
-          async function postAction(action,payload,cookie){
-            const r=await fetch(PAGE,{
-              method:'POST',
-              headers:{
-                'User-Agent':UA,'Origin':ORIGIN,'Referer':ORIGIN+'/',
-                'Content-Type':'text/plain;charset=UTF-8',
-                'Next-Action':action,
-                'Cookie':cookie||''
-              },
-              body:JSON.stringify(payload),
-              signal:AbortSignal.timeout(20000)
-            });
-            const text=await r.text();
-            console.log('ACTION',action.slice(0,8),r.status,'LEN',text.length,'HEAD',text.slice(0,280).replace(/\n/g,'\\n'));
-            return {r,text};
+          function b64url(s){return Buffer.from(s).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+          const jar={};
+          function addCookies(res){
+            const arr=typeof res.headers.getSetCookie==='function'?res.headers.getSetCookie():[];
+            for(const x of arr){const p=x.split(';')[0],i=p.indexOf('=');if(i>0)jar[p.slice(0,i)]=p.slice(i+1)}
           }
-
+          function cookie(){return Object.keys(jar).map(k=>k+'='+jar[k]).join('; ')}
           async function main(){
-            if(!cryptoApi || typeof cryptoApi.gc!=='function' || typeof cryptoApi.dr!=='function')throw new Error('crypto gc/dr missing');
-            if(!g.__ss2_challenge || typeof g.__ss2_challenge.gc!=='function')throw new Error('stage2 gc missing');
-
             const q=b64url(JSON.stringify(['movie','157336',null,null]));
-            const jar=cookieJar();
-            const boot=await fetch(ORIGIN+'/api/c/bootstrap',{
-              method:'POST',
-              headers:{'User-Agent':UA,'x-cs-q':q},
-              signal:AbortSignal.timeout(15000)
-            });
-            jar.add(boot);
-            const bj=await boot.json();
-            console.log('BOOT',boot.status,'r',String(bj.r).length,'p',String(bj.p).length,'cookies',jar.value().split(';').length);
-
-            const nativeFetch=g.fetch;
-            g.fetch=async function(input,opt){
-              let url=typeof input==='string'?input:String(input&&input.url||input);
-              if(url.startsWith('/'))url=ORIGIN+url;
-              const u=new URL(url,ORIGIN);
-              opt=Object.assign({},opt||{});
-              const h=new Headers(opt.headers||{});
-              h.set('User-Agent',UA);
-              h.set('Cookie',jar.value());
-              if(u.origin===ORIGIN && (u.pathname==='/api/c/issue'||u.pathname==='/api/c/stage2/issue')){
-                h.set('x-cs-r',bj.r);h.set('x-cs-q',q);
-                if(u.pathname==='/api/c/issue')h.set('x-cs-p',bj.p);
+            const boot=await fetch(ORIGIN+'/api/c/bootstrap',{method:'POST',headers:{'User-Agent':UA,'x-cs-q':q}});
+            addCookies(boot); const bj=await boot.json();
+            process.stdout.write('BOOT '+boot.status+' COOKIE_KEYS '+Object.keys(jar).join(',')+'\n');
+            const native=fetch;
+            async function wrapped(input,opt){
+              let url=typeof input==='string'?input:String(input&&input.url||input); if(url.startsWith('/'))url=ORIGIN+url;
+              const u=new URL(url,ORIGIN); opt=Object.assign({},opt||{});
+              const h=new Headers(opt.headers||{});h.set('User-Agent',UA);h.set('Cookie',cookie());
+              if(u.pathname==='/api/c/issue'||u.pathname==='/api/c/stage2/issue'){
+                h.set('x-cs-r',bj.r);h.set('x-cs-q',q);if(u.pathname==='/api/c/issue')h.set('x-cs-p',bj.p);
               }
               opt.headers=h;
-              const res=await nativeFetch(url,opt);
-              jar.add(res);
-              return res;
-            };
-            ctx.fetch=g.fetch;
-
-            const [s1,s2]=await Promise.all([
-              cryptoApi.gc(),
-              g.__ss2_challenge.gc()
-            ]);
-            console.log('GC1',typeof s1,String(s1).slice(0,120),'LEN',String(s1).length);
-            console.log('GC2',typeof s2,String(s2).slice(0,120),'LEN',String(s2).length);
-            const token=String(s1)+'::c2::'+String(s2)+'::c3::'+String(bj.r);
-            console.log('TOKEN_LEN',token.length);
-
-            const providers=await postAction(ACTION_PROVIDERS,[],jar.value());
-            const pline=providers.text.split(/\r?\n/).find(x=>/^1:/.test(x))||'';
-            const pjson=pline?JSON.parse(pline.slice(2)):[];
-            console.log('PROVIDERS',pjson.map(x=>({id:x.id,name:x.name})));
-            if(!pjson.length)throw new Error('no providers');
-
-            for(const p of pjson.slice(0,4)){
-              try{
-                const sr=await postAction(ACTION_STREAM,['157336','movie','$undefined','$undefined',token,p.id],jar.value());
-                if(!sr.r.ok){console.log('PROVIDER_FAIL',p.id,sr.r.status);continue}
-                const line=sr.text.split(/\r?\n/).find(x=>/^1:/.test(x))||'';
-                console.log('STREAM_LINE',p.id,line.slice(0,500));
-                const after=line.slice(2);
-                const comma=after.indexOf(',');
-                const colon=after.indexOf(':',comma+1);
-                const enc=comma>=0&&colon>comma?after.slice(comma+1,colon):'';
-                console.log('ENC_LEN',enc.length,'ENC_HEAD',enc.slice(0,100));
-                if(!enc)continue;
-                const dec=await cryptoApi.dr(enc);
-                console.log('DECRYPTED',p.id,typeof dec,JSON.stringify(dec).slice(0,6000));
-                break;
-              }catch(e){console.log('PROVIDER_ERR',p.id,String(e&&e.stack||e))}
+              const r=await native(url,opt);addCookies(r);
+              process.stdout.write('FETCH '+u.pathname+' '+r.status+' COOKIES '+Object.keys(jar).length+'\n');
+              return r;
             }
+            g.fetch=wrapped;ctx.fetch=wrapped;
+            try{const v=await api.gc();process.stdout.write('GC1_OK '+String(v).slice(0,120)+' LEN '+String(v).length+'\n')}
+            catch(e){process.stdout.write('GC1_ERR name='+String(e&&e.name)+' msg='+String(e&&e.message||e).slice(0,800)+'\n')}
+            try{const v=await g.__ss2_challenge.gc();process.stdout.write('GC2_OK '+String(v).slice(0,120)+' LEN '+String(v).length+'\n')}
+            catch(e){process.stdout.write('GC2_ERR name='+String(e&&e.name)+' msg='+String(e&&e.message||e).slice(0,800)+'\n')}
           }
-          main().catch(e=>{console.error('FATAL',e&&e.stack||e);process.exit(1)});
+          main().catch(e=>{process.stdout.write('FATAL '+String(e&&e.message||e).slice(0,1000)+'\n');process.exit(1)});
           NODE

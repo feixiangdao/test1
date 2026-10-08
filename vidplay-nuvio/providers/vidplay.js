@@ -385,7 +385,7 @@ function resolveYthd(imdb,siteReferer){
     .then(function(inner){
       var c=parseInlineConfig(inner.html,"CONFIG");
       if(!c)throw new Error("V1 player config unavailable");
-      if(c.turnstile)throw new Error("V1 requires browser verification");
+      if(c.turnstile)log("V1 browser verification advertised; using only current server-issued signed API token");
       if(c.mediaType&&c.mediaType!=="movie")throw new Error("V1 wrong media type");
       if(c.imdb&&c.imdb!==imdb)throw new Error("V1 wrong IMDb ID");
       var api=playerAPIURL(c.api,clean(c.apiToken),inner.ref);
@@ -396,11 +396,22 @@ function resolveYthd(imdb,siteReferer){
           return safeMediaURLs(j,inner.ref);
         }).then(function(urls){
           if(!urls.length)throw new Error("V1 API returned no supported media");
-          return Promise.all(urls.slice(0,3).map(function(u){return verifyMedia(u,inner.ref);}));
-        }).then(function(parts){
-          var rows=[],seen={};
-          [].concat.apply([],parts).forEach(function(r){if(r&&!seen[r.url]){seen[r.url]=1;rows.push(r);}});
-          return rows;
+          // CDN /generate.php is rate-limited (429) when called in parallel.
+          // A successfully verified master playlist supplies quality variants;
+          // avoid generating multiple tokens for other hosts unnecessarily.
+          function resolveNext(index){
+            if(index>=Math.min(urls.length,3))return Promise.resolve([]);
+            return verifyMedia(urls[index],inner.ref).then(function(rows){
+              return rows&&rows.length?rows:resolveNext(index+1);
+            });
+          }
+          return resolveNext(0);
+        }).then(function(rows){
+          var out=[],seen={};
+          (rows||[]).forEach(function(r){
+            if(r&&!seen[r.url]){seen[r.url]=true;out.push(r);}
+          });
+          return out;
         });
     });
 }

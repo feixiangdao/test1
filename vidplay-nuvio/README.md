@@ -71,3 +71,29 @@ With an optional TMDB API key, the experimental Nuvio provider now fetches film/
 - Proof: https://github.com/feixiangdao/test1/actions/runs/37775709582
 - The Opera connector supports tab reading, navigation and screenshots, but exposes no click/DevTools/network-capture action. To investigate media only visible after human interaction in residential Opera, the site must be clicked in Opera before the connector captures subsequent state, or an expressly connected browser interaction capability must be used.
 - No video URL was identified, no provider streams added, no playback claim. Retain v0.1.2 pending live playable media evidence.
+
+## 2026-10-08: Real V1 iframe and new downstream player architecture
+
+Confirmed from a **working playback session in Opera**: the Life (2017) VidPlay V1 iframe URL is **`https://ythd.org/embed/tt5442430`** (IMDb ID). Opera actually showed playback progress and the player's Auto/360p/720p/1080p controls; this only proves those controls are offered in the working iframe, not that a raw stream is accessible to Nuvio or that every quality is available.
+
+Isolated Chromium / GitHub Actions inspection then confirmed this *current* network chain:
+
+1. `GET https://ythd.org/embed/tt5442430` → **200**.
+2. YTHD page embeds an iframe with `data-api="/vs_src.php?type=movie&id=tt5442430"`.
+3. `GET https://ythd.org/vs_src.php?type=movie&id=tt5442430` → JSON `{src: ...}`; returned player location `https://stellarconductornexus.com/embed/movie/tt5442430`, **200 in browser**.
+4. That landing page embeds `https://stellarconductornexus.com/embed/player/movie/tt5442430`, **200 in browser**.
+5. The nested player loads `/embed/iframe_player/assets/player.js` and `vsdec.js`, with **`CONFIG.api` pointing to the `data.vidsrcme.ru` source backend**. The response's `stream_urls` may be encrypted and decrypted by the WebAssembly code exposed through `vsdec.js`.
+6. `player.js` documents a **single-use `CONFIG.apiToken`** for fetching stream URLs; the player can also require Cloudflare Turnstile verification before playback. Raw direct requests from the GitHub runner to the nested page or the API return 403, whereas properly contextualized browser iframe requests can return 200.
+
+**Do not assume** the older MediaFlow proxy documented `data-hash → cloudnestra.com/rcp → /prorcp` sequence is still accurate for current `ythd.org`. The observed host is now `stellarconductornexus.com`. The generic VidSrc backend is shared with the YesMovies S2 implementation, but the public cloud-runner reuse test still returned **403** for the underlying API: https://github.com/feixiangdao/test1/actions/runs/37779174090 . YesMovies S1 provided separate candidate streams for the two probe titles; those are not claimed as VidPlay V1 media sources.
+
+**Live evidence:**
+- Live YTHD frame navigation and request hosts: https://github.com/feixiangdao/test1/actions/runs/37778057602
+- YTHD `vs_src.php` browser responses, nested player HTML and external JS resources: https://github.com/feixiangdao/test1/actions/runs/37778257972
+- Config extraction, live API JSON response and nested-player metadata: https://github.com/feixiangdao/test1/actions/runs/37778458266
+- Player.js/ vsdec.js code: encrypted `stream_urls`, browser challenge and single-use stream-data API token: https://github.com/feixiangdao/test1/actions/runs/37778741571
+- Original user-confirmed iframe location: `https://ythd.org/embed/tt5442430`.
+
+**Remaining release gate:** A genuine, reachable (and appropriately authorized) HLS/MP4 URL with verified media response and playback in Nuvio. No embedded HTML/iframe URL should ever be falsely returned as `type: hls`, and no Chrome-only or challenge-protected source should be considered portable until independently validated.
+
+No `manifest.json` or Provider version change made based only on these diagnostics. Version remains v0.1.2.

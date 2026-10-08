@@ -1,13 +1,13 @@
 {
   "name": "VidPlay Local Lab",
-  "version": "0.1.1",
-  "description": "VidPlay experimental AJAX resolver with strict media URL parsing. Live AJAX access remains Cloudflare-blocked.",
+  "version": "0.1.2",
+  "description": "VidPlay experimental direct AJAX resolver with exact title/year site discovery; real playback remains unverified due to Cloudflare 403.",
   "scrapers": [
     {
       "id": "vidplay-direct-lab",
       "name": "VidPlay · V1–V3 (Lab)",
-      "description": "Strict HLS/MP4/DASH parsing; movie V3 and TV V1–V3 currently blocked by site-side 403 in GitHub testing.",
-      "version": "0.1.1",
+      "description": "First-party title/year site matching, per-title Referer, movie/TV AJAX V1–V3, fail-closed on blocked/invalid media.",
+      "version": "0.1.2",
       "author": "VidPlay Lab",
       "supportedTypes": [
         "movie",

@@ -16,6 +16,8 @@ jobs:
           curl -fsSL --max-time 30 'https://cinesrc.st/donut.js' -o /tmp/donut.js
           curl -fsSL --max-time 30 'https://cinesrc.st/pow-worker-v3.js' -o /tmp/worker.js
           node - <<'NODE'
+          process.on('uncaughtException',e=>console.log('IGNORED_UNCAUGHT',e&&e.name,String(e&&e.message||e).slice(0,300)));
+          process.on('unhandledRejection',e=>console.log('IGNORED_REJECTION',e&&e.name,String(e&&e.message||e).slice(0,300)));
           const fs=require('fs'),vm=require('vm');
           const ORIGIN='https://cinesrc.st';
           const PAGE=ORIGIN+'/embed/movie/157336';
@@ -122,8 +124,8 @@ jobs:
             vm.runInContext(mainCode,ctx,{timeout:10000});
             vm.runInContext(donutCode,ctx,{timeout:10000});
             console.log('APIS',cryptoApi&&Object.keys(cryptoApi),g.__ss2_challenge&&Object.keys(g.__ss2_challenge));
-            const s1=await cryptoApi.gc();console.log('S1',String(s1).slice(0,120),'LEN',String(s1).length);
-            const s2=await g.__ss2_challenge.gc();console.log('S2',String(s2).slice(0,120),'LEN',String(s2).length);
+            let s1;try{s1=await cryptoApi.gc();console.log('S1',String(s1).slice(0,120),'LEN',String(s1).length);}catch(e){console.log('S1_ERR',e&&e.name,String(e&&e.message||e).slice(0,500));throw e;}
+            let s2;try{s2=await g.__ss2_challenge.gc();console.log('S2',String(s2).slice(0,120),'LEN',String(s2).length);}catch(e){console.log('S2_ERR',e&&e.name,String(e&&e.message||e).slice(0,500));throw e;}
             const token=String(s1)+'::c2::'+String(s2)+'::c3::'+String(boot.r);
             console.log('TOKEN_PREFIX',token.slice(0,40),'LEN',token.length);
             const pr=await postAction(ACTION_PROVIDERS,[]);

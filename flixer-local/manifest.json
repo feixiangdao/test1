@@ -1,13 +1,13 @@
 {
   "name": "Flixer Local (Alpha test)",
-  "version": "0.3.2",
-  "description": "Flixer Local Alpha v0.3.2: restored persistent 329 KB QuickJS-validated script and fixed automatic publishing. Android Nuvio source-chip disappearance still requires device diagnostics.",
+  "version": "0.3.3",
+  "description": "Flixer Local Alpha v0.3.3: Nuvio QuickJS window/self shim E18 fixed. Nuvio-like key generation and Node live Alpha HLS smoke passed; Android playback remains to be verified.",
   "scrapers": [
     {
       "id": "flixer-local-alpha-030",
       "name": "Flixer Local · Alpha",
-      "description": "Pure Local Alpha. QuickJS real-cipher parity and live HLS fetch passed; mobile Android runtime not yet verified. CI now always publishes minified script.",
-      "version": "0.3.2",
+      "description": "Pure Local Alpha. QuickJS Nuvio global-object compatibility and direct Alpha HLS validated in CI; verify Android playback.",
+      "version": "0.3.3",
       "supportedTypes": [
         "movie",
         "tv"

@@ -1,0 +1,21 @@
+name: VidPlay V1 YTHD chain probe
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'vidplay-nuvio/probe-ythd.cjs'
+      - '.github/workflows/probe-ythd.yml'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save playwright@1.56.1
+      - run: npx playwright install chromium
+      - run: node vidplay-nuvio/probe-ythd.cjs

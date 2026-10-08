@@ -1,7 +1,7 @@
 {
   "name": "YFlix Local",
   "version": "0.4.0",
-  "description": "YFlix Local v0.4.0. S2 was rebuilt around title-verified VidBolt Quasar HLS to prevent wrong-video playback. S4 was simplified to FilmU Singularity HLS after Pulsar failed on-device.",
+  "description": "YFlix Local v0.4.1. S2 now requires both identity match and a live HLS probe; expired/failed Quasar links are hidden. S4 validates and expands FilmU Singularity master HLS before returning streams.",
   "scrapers": [
     {
       "id": "yflix-server1",
@@ -20,7 +20,7 @@
     {
       "id": "yflix-server2",
       "name": "YFlix · Server 2",
-      "description": "YFlix Server 2 (Multi Dubbed): strict VidBolt Quasar build. Only HLS rows whose names match the requested title/year and, for TV, exact SxxExx are returned.",
+      "description": "YFlix Server 2 (Multi Dubbed): strict VidBolt Quasar build. Title/year/SxxExx must match and each HLS is live-probed before being returned.",
       "version": "0.4.0",
       "author": "YFlix Local",
       "supportedTypes": ["movie", "tv"],
@@ -34,7 +34,7 @@
     {
       "id": "yflix-server4",
       "name": "YFlix · Server 4",
-      "description": "YFlix Server 4 (Multi Audio): stable FilmU Singularity HLS only. Pulsar/Allmovieland is temporarily removed after Nuvio Android playback failures.",
+      "description": "YFlix Server 4 (Multi Audio): FilmU Singularity only. Master HLS is verified and expanded into directly playable variant playlists before display.",
       "version": "0.4.0",
       "author": "YFlix Local",
       "supportedTypes": ["movie", "tv"],

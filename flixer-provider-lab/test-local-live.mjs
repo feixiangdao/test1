@@ -18,7 +18,9 @@ function pinnedFetch(address,opts={}){
   },res=>{
    const chunks=[];res.on("data",c=>chunks.push(c));res.on("end",()=>{
     const body=Buffer.concat(chunks).toString("utf8");
-    statuses.push({path:u.pathname,status:res.statusCode,bytes:body.length});
+    statuses.push({path:u.pathname,status:res.statusCode,bytes:body.length,
+     error:res.statusCode>=400?body.slice(0,120).replace(/[0-9a-f]{20,}/ig,"[redacted]"):undefined,
+     headerLengths:u.pathname.endsWith("/images")?Object.fromEntries(Object.entries(opts.headers||{}).filter(([k])=>k.toLowerCase().startsWith("x-")).map(([k,v])=>[k,String(v).length])):undefined});
     resolve({ok:res.statusCode>=200&&res.statusCode<300,status:res.statusCode,
       text:()=>Promise.resolve(body),json:()=>Promise.resolve(JSON.parse(body))});
    });

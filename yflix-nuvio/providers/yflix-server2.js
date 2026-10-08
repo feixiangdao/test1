@@ -1,5 +1,5 @@
 // YFlix Local for Nuvio
-// v0.4.0 - YFlix Server 2 / VidBolt Quasar strict-match build
+// v0.4.1 - YFlix Server 2 / VidBolt Quasar strict + live-validation build
 //
 // Fixes:
 // - Removed opaque Orion movie fallback (could not verify title identity).
@@ -111,6 +111,31 @@ function qualityOf(row){
   if(/^\d+$/.test(q))q+="p";
   return q;
 }
+function expiryMs(url){
+  var m=String(url||"").match(/[?&]expire=(\d{10,13})(?:&|$)/i);
+  if(!m)return 0;
+  var n=parseInt(m[1],10)||0;
+  return n>20000000000?n:n*1000;
+}
+function probeHlsRow(row){
+  if(!row||!row.url)return Promise.resolve(null);
+  var exp=expiryMs(row.url);
+  if(exp&&exp<=Date.now()+60000)return Promise.resolve(null);
+  return fetch(row.url,{headers:row.headers||{}})
+    .then(function(r){
+      if(!r||!r.ok)return null;
+      return r.text().then(function(t){
+        return String(t||"").indexOf("#EXTM3U")===0?row:null;
+      });
+    }).catch(function(){return null;});
+}
+function liveRows(rows){
+  rows=rows||[];
+  if(!rows.length)return Promise.resolve([]);
+  return Promise.all(rows.map(probeHlsRow)).then(function(all){
+    return all.filter(function(x){return!!x;});
+  });
+}
 function normalizeQuasar(j,info,mediaType,season,episode){
   var rows=j&&Array.isArray(j.sources)?j.sources:[];
   var subs=subtitleRows(j&&j.subtitles);
@@ -167,8 +192,11 @@ function callQuasar(info,mediaType,season,episode){
     }
   }).then(function(j){
     var out=normalizeQuasar(j,info,mediaType,season,episode);
-    if(!out.length)diag("Quasar · no title-verified HLS");
-    return out;
+    if(!out.length){diag("Quasar · no title-verified HLS");return[];}
+    return liveRows(out).then(function(live){
+      if(!live.length)diag("Quasar · title matched, but all HLS are expired/unplayable");
+      return live;
+    });
   }).catch(function(e){
     var m=e&&e.message?e.message:e;
     diag("Quasar · "+m);
@@ -198,7 +226,7 @@ function getStreams(tmdbId,mediaType,season,episode){
 function onSettings(){
   return[
     {type:"header",label:"YFlix Local · Server 2"},
-    {type:"info",label:"VidBolt/Quasar 严格匹配版：只返回能同时证明正确片名、年份（剧集还需匹配 SxxExx）的 HLS；不可验证的 Orion/Vidlink/VaPlayer/MKV 路线已过滤。"},
+    {type:"info",label:"VidBolt/Quasar 严格匹配 + 实时验证版：片名/年份/集数必须匹配，并且 HLS 在返回前必须实际可打开；过期签名和失效代理不会显示。"},
     {
       type:"text",
       key:"tmdbApiKey",

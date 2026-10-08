@@ -1,3 +1,25 @@
+# CURRENT: VidPlay V1 Local v0.1.5 — real signed HLS verified (2026-10-08)
+
+**Scope:** Stock/official Nuvio Android app + this local JavaScript Provider only; no app modification, custom server, proxy or extra installer URL. The original manifest remains:
+\`https://raw.githubusercontent.com/feixiangdao/test1/main/vidplay-nuvio/manifest.json\` with unchanged scraper ID \`vidplay-direct-lab\`. V2 and V3 remain disabled.
+
+**What changed vs v0.1.4:** The nested first-party player advertises \`turnstile: true\` **but also exposes a fresh, server-signed single-use \`apiToken\`** in its session-specific configuration. The server **accepted this token over ordinary HTTP**, returning HTTP 200 with encrypted \`stream_urls\`; the old Provider prematurely aborted without trying the server-issued signed token merely because the front-end Turnstile flag was set. V1 now checks the valid server-issued token through the normal supported API and still fails closed if the API rejects authorization. No user Opera cookies, human CAPTCHA tokens or Cloudflare challenge bypass are used.
+
+The existing VidSrc WASM/ChaCha20 decoder processed the **actual live encrypted stream data**, then issued one CDN token request. The verified master playlist and three variant playlists returned HLS HTTP 200. The first TS segment was also HTTP 200 and began with byte \`0x47\` (MPEG transport stream sync), despite its non-media-looking \`.html\` filename and response MIME. Actual server-advertised variant heights for the tested Life (2017) film were **266p, 534p, and 800p**; no unverified 1080p claim.
+
+**Fix for 429 rate limiting:** The provider now tries CDN stream URLs **sequentially** and stops after the first confirmed live master playlist. The previously concurrent token requests caused HTTP 429 and 401 for secondary candidates. Device time budget raised from 7 to 15 seconds, still below Nuvio's upstream 60-second plugin runtime timeout. The explicit non-playable Status row remains a fallback only when a genuinely validated stream cannot be retrieved.
+
+**Verification evidence:**
+- [Authorized public signed-token API for TMDB and IMDb IDs](https://github.com/feixiangdao/test1/actions/runs/37788542982): both HTTP 200 with encrypted stream URLs.
+- [Real HLS master + three variant playlists HTTP 200](https://github.com/feixiangdao/test1/actions/runs/37788893041).
+- [Actual first video transport-stream segment HTTP 200 / MPEG-TS sync](https://github.com/feixiangdao/test1/actions/runs/37789067226).
+- [Published Provider itself: real V1 extraction, 3 HLS, ~2.7 seconds, no V2/V3](https://github.com/feixiangdao/test1/actions/runs/37789563230).
+- [Regression tests for signed token despite Turnstile flag and sequential CDN auth](https://github.com/feixiangdao/test1/actions/runs/37789593501).
+
+**Important:** Android Nuvio's native player playback has **NOT YET BEEN CONFIRMED**. A real HLS manifest and segment accessible on a CI IP does not guarantee the phone's VPN/proxy, ExoPlayer, DRM/codec compatibility or CDN IP-bound token will also succeed. User should refresh the existing manifest version **0.1.5**, test the Life (2017) movie V1 variants, and report whether playback starts and continues for >30 sec, or give the specific error/loading state. A user-visible Status diagnostic instead of real quality choices would indicate a remaining device-specific network or token failure.
+
+---
+
 
 ## 2026-10-08 — NuvioMobile upstream source compatibility audit (V1 only)
 

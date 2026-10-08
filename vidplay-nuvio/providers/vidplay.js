@@ -492,7 +492,7 @@ function getStreams(id,mediaType,season,episode){
     var issue=briefError(e);log("V1 runtime: "+issue);
     return[statusRow("查询异常："+issue)];
   });
-  return withinBudget(work,7000).catch(function(e){
+  return withinBudget(work,15000).catch(function(e){
     var issue=briefError(e);log("V1 timeout: "+issue);
     return[statusRow(issue+"；站点访问可能被限制")];
   });
@@ -500,7 +500,7 @@ function getStreams(id,mediaType,season,episode){
 function onSettings(){
   return [
     {type:"header",label:"VidPlay · V1 only (experimental)"},
-    {type:"info",label:"V1 retrieves a public TMDB-to-IMDb lookup, then resolves the ythd.org playback chain. Only verified HLS/MP4/DASH streams are playable. If V1 requires browser verification, a clearly labeled NON-PLAYABLE diagnostic/status row is shown to keep the provider visible. Requests have a 7s time budget. No V2/V3."},
+    {type:"info",label:"V1 retrieves a public TMDB-to-IMDb lookup, then resolves the ythd.org playback chain. Only verified HLS/MP4/DASH streams are playable. If V1 requires browser verification, a clearly labeled NON-PLAYABLE diagnostic/status row is shown to keep the provider visible. Requests have a 15s time budget. No V2/V3."},
     {type:"text",key:"tmdbApiKey",label:"TMDB key (optional fallback only)",defaultValue:"",isPassword:true}
   ];
 }

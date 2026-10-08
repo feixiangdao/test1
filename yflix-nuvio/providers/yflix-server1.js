@@ -1,5 +1,5 @@
 // YFlix Local for Nuvio
-// v0.3.1
+// v0.3.2
 // Current YFlix.in Server 1 (Multi Source):
 // TMDB -> player.playapi.eu.cc -> tmdb-embed-api.stayawayx.workers.dev
 //
@@ -156,7 +156,7 @@ function getStreams(tmdbId, mediaType, season, episode){
     skipSizeCheck:true
   })
   .then(function(r){
-    if(!r || !r.ok) throw new Error("PlayAPI HTTP " + (r ? r.status : "no-response"));
+    if(!r || !r.ok) throw new Error("PlayAPI HTTP " + (r ? r.status : "no-response") + (r && r.statusText ? " · " + r.statusText : ""));
     return r.json();
   })
   .then(function(j){

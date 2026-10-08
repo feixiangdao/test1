@@ -11,6 +11,7 @@ on:
       - 'flixer-provider-lab/pack-local.mjs'
       - 'flixer-provider-lab/test-local-bundle.mjs'
       - 'flixer-provider-lab/test-local-live.mjs'
+      - 'flixer-provider-lab/test-quickjs-cipher.mjs'
       - '.github/workflows/flixer-live-parity.yml'
   workflow_dispatch:
 jobs:

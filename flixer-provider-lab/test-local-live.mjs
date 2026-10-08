@@ -15,10 +15,10 @@ function pinnedFetch(address,opts={}){
  const u=new URL(address);
  return new Promise((resolve,reject)=>{
   const outHeaders=Object.assign({},opts.headers||{});
-  if(variant==="controlled"&&u.pathname.endsWith("/images")){
-    if(publicContext.fingerprintLite)outHeaders["X-Fingerprint-Lite"]=publicContext.fingerprintLite;
-    if(publicContext.clientFingerprint)outHeaders["X-Client-Fingerprint"]=publicContext.clientFingerprint;
-    if(publicContext.userAgent)outHeaders["User-Agent"]=publicContext.userAgent;
+  if(variant!=="local"&&u.pathname.endsWith("/images")){
+    if((variant==="lite"||variant==="controlled")&&publicContext.fingerprintLite)outHeaders["X-Fingerprint-Lite"]=publicContext.fingerprintLite;
+    if((variant==="client"||variant==="controlled")&&publicContext.clientFingerprint)outHeaders["X-Client-Fingerprint"]=publicContext.clientFingerprint;
+    if((variant==="ua"||variant==="controlled")&&publicContext.userAgent)outHeaders["User-Agent"]=publicContext.userAgent;
   }
   const req=https.request({
    hostname:u.hostname,path:u.pathname+u.search,port:443,method:"GET",
@@ -44,9 +44,13 @@ vm.createContext(sandbox);
 vm.runInContext(code,sandbox,{timeout:25000});
 const streams=await sandbox.module.exports.getStreams("9502","movie");
 if((!streams||!streams.length)&&publicContext.fingerprintLite){
- variant="controlled";
- const controlStreams=await sandbox.module.exports.getStreams("9502","movie");
- console.log("BROWSER_PUBLIC_HEADER_CONTROL",JSON.stringify({contextHeaderLengths:Object.fromEntries(Object.entries(publicContext).map(([k,v])=>[k,String(v).length])),streamCount:controlStreams?.length||0}));
+ const diagnostics=[];
+ for(const candidate of ["lite","client","ua","controlled"]){
+   variant=candidate;
+   const testResult=await sandbox.module.exports.getStreams("9502","movie");
+   diagnostics.push({variant:candidate,streamCount:testResult?.length||0});
+ }
+ console.log("LOCAL_FINGERPRINT_FIELD_ISOLATION",JSON.stringify({fingerprintLiteLength:publicContext.fingerprintLite.length,results:diagnostics}));
 }
 console.log("NATIVELESS_LIVE_LOCAL_REQUEST",JSON.stringify({statuses,streamCount:streams?.length||0,types:(streams||[]).map(x=>x.type)}));
 if(!Array.isArray(streams)||!streams.some(x=>/^https:/.test(x.url)))throw Error("LOCAL_HTTP_LIVE_NO_PLAYABLE_STREAM");

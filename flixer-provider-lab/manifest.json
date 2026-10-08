@@ -1,0 +1,26 @@
+{
+  "name": "Flixer Local Lab (Experimental)",
+  "version": "0.1.0",
+  "description": "Flixer independent browser resolver prototype. Disabled until a secured HTTPS resolver is hosted.",
+  "scrapers": [
+    {
+      "id": "flixer-local-lab",
+      "name": "Flixer Local Lab (requires resolver)",
+      "description": "TMDB-exact movie/TV matching. Alpha HLS only. Requires external browser resolver; do not enable before configuration.",
+      "version": "0.1.0",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/flixer-provider-lab-20261008/flixer-provider-lab/providers/flixer-local.js",
+      "enabled": false,
+      "formats": [
+        "m3u8"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "hasSettings": true
+    }
+  ]
+}

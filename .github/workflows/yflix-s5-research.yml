@@ -8,50 +8,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Test first-session CineSrc token
+      - name: Trace native Stage2 request headers
         shell: bash
         run: |
           set -e
           git clone --depth 1 https://github.com/sharoon7171/cinesrc-stream-resolver /tmp/cs
           cd /tmp/cs
-          python3 -c "p='src/protection/host.js';s=open(p).read();old=\"headers.set('x-cs-r', requestToken)\\n      }\";new=\"headers.set('x-cs-r', requestToken)\\n        if (protectionHeader) headers.set('x-cs-q', protectionHeader)\\n        if (requestPacket) headers.set('x-cs-p', requestPacket)\\n      }\";assert old in s;open(p,'w').write(s.replace(old,new))"
+          python3 -c "p='src/protection/host.js';s=open(p).read();old=\"    const response = await fetch(url, { ...init, headers })\\n    captureSetCookies(response, cookies)\\n    return response\";new=\"    if (parsed.pathname === '/api/c/stage2/issue') console.log('STAGE2_REQ_HEADERS', JSON.stringify([...headers.entries()]))\\n    const response = await fetch(url, { ...init, headers })\\n    if (parsed.pathname === '/api/c/stage2/issue') { console.log('STAGE2_STATUS', response.status); try { console.log('STAGE2_BODY', (await response.clone().text()).slice(0,1200)) } catch {} }\\n    captureSetCookies(response, cookies)\\n    return response\";assert old in s;open(p,'w').write(s.replace(old,new))"
           npm ci >/dev/null
-          cat > first-session.mjs <<'NODE'
-          import { parseStreamQuery } from './src/resolve/live.js';
+          cat > trace-stage2.mjs <<'NODE'
           import { createChallengeHost } from './src/protection/host.js';
           import { mintLockedSession } from './src/protection/session.js';
-          import { discoverServerActions } from './src/site/actions.js';
-          import { buildActionHeaders, SITE_ORIGIN } from './src/site/config.js';
-
-          const input=parseStreamQuery({id:'157336',type:'movie'});
-          const actions=await discoverServerActions(input.embedPath);
-          const host=await createChallengeHost(input.embedPath);
+          let host;
           try{
-            const t0=Date.now();
+            host=await createChallengeHost('/embed/movie/157336');
+            console.log('HOST_READY');
             const session=await mintLockedSession(host,false);
-            console.log('MINT_MS',Date.now()-t0,'TOKEN_LEN',session.token.length);
-            console.log('TOKEN_PREFIX',session.token.slice(0,40));
-            console.log('TOKEN_HAS_C2',session.token.includes('::c2::'),'TOKEN_HAS_C3',session.token.includes('::c3::'));
-            const args=[String(input.id),'movie','$undefined','$undefined',session.token,'surge'];
-            const p0=Date.now();
-            const response=await session.fetch(SITE_ORIGIN+input.embedPath,{
-              method:'POST',
-              headers:buildActionHeaders(actions.fetchStream,input.route),
-              body:JSON.stringify(args)
-            });
-            const raw=await response.text();
-            console.log('POST_MS',Date.now()-p0,'STATUS',response.status,'LEN',raw.length,'RAW',raw.slice(0,1200).replace(/\n/g,'\\n'));
-            try{
-              const decoded=await session.decode(raw);
-              console.log('DECODED',JSON.stringify(decoded).slice(0,4000));
-            }catch(e){
-              console.log('DECODE_ERR',String(e?.message||e));
-            }
+            console.log('MINT_OK',session.token.length);
           }catch(e){
-            console.log('ERR',String(e?.message||e));
+            console.log('ERR_TYPE',typeof e,e?.constructor?.name);
+            console.log('ERR_STRING',String(e?.message||e));
           }finally{
-            try{host.release();}catch{}
+            try{host?.release();}catch{}
           }
           process.exit(0);
           NODE
-          node first-session.mjs
+          node trace-stage2.mjs

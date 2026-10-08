@@ -98,3 +98,9 @@ All generated upstream-derived bundles remain ephemeral in the testing runner, *
 - An original local `hls.js` helper parses HLS master manifests and exposes resolution-labelled variants. Its independent unit tests passed: https://github.com/feixiangdao/test1/actions/runs/37776407842
 
 **Outstanding for installable local plugin:** reproduce the browser's legitimate signed HTTP request path from Nuvio's Hermes environment; integrate a permitted, distributable local decryption implementation; verify media URL headers and HLS playback on-device. The generated research bundle has not been committed or distributed. The lab manifest stays disabled, and no existing provider has been changed.
+
+## Remaining reliability issue (October 8)
+
+A second live Alpha capture (200 response, same 232-character ciphertext length) returned WASM-compatible decoder error `E57` in the standalone JS runtime, despite one earlier successful Alpha extraction. CI: https://github.com/feixiangdao/test1/actions/runs/37776565567 . This means **live-source decoding is not yet deterministic**. Nine naïve standard AES-256-GCM key/layout hypotheses did not decode the response, so a small hand-written raw-AES substitute is not validated.
+
+The research is comparing decryption of the *same* captured ciphertext inside the site's own browser environment versus the translated JS environment. Do not activate the Local manifest unless that consistency question and on-device signed HTTP requests are resolved.

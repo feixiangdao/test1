@@ -1,0 +1,20 @@
+name: Probe VidPlay site structure
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-vidplay.yml'
+      - 'vidplay-nuvio/probe.js'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: VidPlay public site HTML structure
+        run: node vidplay-nuvio/probe.js

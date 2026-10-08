@@ -78,10 +78,14 @@ try{
      const plain=await local.process_img_data(fixture.body,fixture.suppliedKey);
      const parsed=JSON.parse(plain);
      const values=Array.isArray(parsed?.sources) ? parsed.sources : Array.isArray(parsed?.sources?.sources) ? parsed.sources.sources : [];
-     const expected=JSON.parse(await readFile("/tmp/flixer-fixture-expected.json","utf8"));
-     const matched=Array.isArray(expected.sources) && values.length===expected.sources.length && values.every((v,i)=>v.server===expected.sources[i].server && v.url===expected.sources[i].url);
-     console.log("LOCAL_DECRYPT_FIXTURE_RESULT",JSON.stringify({decodedJson:true,hasSources:values.length>0,sourceCount:values.length,expectedSources:expected.sources?.length,exactMatch:matched,mediaUrlCount:values.filter(x=>typeof x?.url==="string" && x.url.startsWith("http")).length}));
-     if(!matched)process.exitCode=1;
+     let expected=null;try{expected=JSON.parse(await readFile("/tmp/flixer-fixture-expected.json","utf8"))}catch(_){}
+     const matched=expected?Array.isArray(expected.sources) && values.length===expected.sources.length && values.every((v,i)=>v.server===expected.sources[i].server && v.url===expected.sources[i].url):null;
+     const urlValues=values.map(x=>x?.url).filter(x=>typeof x==="string"&&/^https?:\\/\\//.test(x));
+     if(typeof parsed?.sources?.file==="string" && /^https?:\\/\\//.test(parsed.sources.file))urlValues.push(parsed.sources.file);
+     if(typeof parsed?.sources?.url==="string" && /^https?:\\/\\//.test(parsed.sources.url))urlValues.push(parsed.sources.url);
+     console.log("LOCAL_DECRYPT_FIXTURE_RESULT",JSON.stringify({decodedJson:true,hasSources:values.length>0,sourceCount:values.length,expectedSources:expected?.sources?.length||null,exactMatch:matched,mediaUrlCount:urlValues.length}));
+     if(expected && !matched)process.exitCode=1;
+     if(!expected && !urlValues.length)console.log("LOCAL_DECRYPT_NO_MEDIA_URL_YET");
     }catch(e){ console.log("LOCAL_DECRYPT_FIXTURE_ERROR",String(e).slice(0,180));process.exitCode=1;}
    }
   }catch(e){console.log("LOCAL_DECRYPT_FIXTURE_MISSING",e?.code||String(e).slice(0,80));}

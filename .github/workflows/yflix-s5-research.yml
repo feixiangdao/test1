@@ -8,30 +8,66 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Run current public CineSrc resolver
+      - name: Run patched current CineSrc resolver
         shell: bash
         run: |
           set -e
           git clone --depth 1 https://github.com/sharoon7171/cinesrc-stream-resolver /tmp/cs
           cd /tmp/cs
+          python3 - <<'PY'
+          p='src/protection/host.js'
+          s=open(p,encoding='utf-8').read()
+          old="""      } else if (parsed.pathname === '/api/c/stage2/issue' && requestToken) {
+        headers.set('x-cs-r', requestToken)
+      }"""
+          new="""      } else if (parsed.pathname === '/api/c/stage2/issue' && requestToken) {
+        headers.set('x-cs-r', requestToken)
+        if (protectionHeader) headers.set('x-cs-q', protectionHeader)
+        if (requestPacket) headers.set('x-cs-p', requestPacket)
+      }"""
+          if old not in s:
+              raise SystemExit('patch target not found')
+          open(p,'w',encoding='utf-8').write(s.replace(old,new))
+          print('PATCHED_STAGE2_QP')
+          PY
           npm ci
           node --input-type=module <<'NODE'
           import { parseStreamQuery, fetchProviderCatalog, resolveProviderStream } from './src/resolve/live.js';
 
+          async function probeFinal(label, result) {
+            const urls = [];
+            function walk(v) {
+              if (!v) return;
+              if (typeof v === 'string') {
+                if (/^https?:\/\//i.test(v)) urls.push(v);
+                return;
+              }
+              if (Array.isArray(v)) { for (const x of v) walk(x); return; }
+              if (typeof v === 'object') { for (const k of Object.keys(v)) walk(v[k]); }
+            }
+            walk(result);
+            console.log('URLS', label, JSON.stringify(urls));
+            for (const u of urls.filter(x=>/m3u8|playlist/i.test(x)).slice(0,4)) {
+              try {
+                const r = await fetch(u,{headers:{Referer:'https://cinesrc.st/','User-Agent':'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/137.0.0.0 Mobile Safari/537.36'},signal:AbortSignal.timeout(15000)});
+                const t = await r.text();
+                console.log('HLS',label,r.status,r.headers.get('content-type'),u,t.slice(0,160).replace(/\n/g,'\\n'));
+              } catch(e) { console.log('HLS_ERR',label,u,String(e?.message||e)); }
+            }
+          }
+
           async function test(label, query) {
             const input = parseStreamQuery(query);
             console.log('INPUT', label, JSON.stringify(input));
-            try {
-              const cat = await fetchProviderCatalog(input);
-              console.log('CATALOG', label, JSON.stringify(cat.providers));
-            } catch (e) {
-              console.log('CATALOG_ERR', label, String(e?.stack || e));
-            }
-            for (const id of ['surge','nebula','wave']) {
+            const cat = await fetchProviderCatalog(input);
+            console.log('CATALOG', label, JSON.stringify(cat.providers));
+            for (const id of ['surge','nebula','wave','thunder','storm']) {
               const started = Date.now();
               try {
                 const r = await resolveProviderStream(input, id);
                 console.log('RESULT', label, id, Date.now()-started, JSON.stringify(r));
+                await probeFinal(label+' '+id,r);
+                break;
               } catch (e) {
                 console.log('RESULT_ERR', label, id, Date.now()-started, String(e?.stack || e));
               }

@@ -1,13 +1,13 @@
 {
   "name": "NOVIPNOAD Local Alpha",
-  "version": "0.1.3",
-  "description": "Independent NOVIPNOAD provider using first-party title/episode discovery and direct player resolution, including Chinese season labels. Includes persistent diagnostic rows when resolution fails.",
+  "version": "0.1.4",
+  "description": "Independent NOVIPNOAD provider using first-party title/episode discovery, TMDB Chinese aliases, and direct player resolution. Includes persistent diagnostic rows when resolution fails.",
   "scrapers": [
     {
       "id": "novipnoad-local",
       "name": "NOVIPNOAD Local",
       "description": "NOVIPNOAD .ca/.uk/.net search + strict movie/TV/anime/show/Chinese-season matching + direct player quality extraction.",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "author": "NOVIPNOAD Local Lab",
       "supportedTypes": [
         "movie",

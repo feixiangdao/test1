@@ -9,39 +9,43 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Extract actual resolver APIs
+      - name: Probe FilmU/VidBolt first-party Quasar and VidBolt PlayerPage
         shell: bash
         run: |
           set -e
           python3 - <<'PY'
-          import requests,re
+          import requests,re,json,urllib.parse
           S=requests.Session(); S.headers.update({"User-Agent":"Mozilla/5.0"})
-          urls=[
-            ("filmu-servers","https://embed.filmu.in/assets/servers-B7U1aDDl.js"),
-            ("filmu-embed","https://embed.filmu.in/assets/EmbedPage-DKo4EtSL.js"),
-            ("vidbolt-player","https://vidbolt.xyz/assets/PlayerPage-CxGTx3In.js"),
-            ("vidbolt-entry","https://vidbolt.xyz/assets/index-CWZT0e_1.js")
+          endpoints=[
+            ("filmu-movie-tmdb","https://embed.filmu.in/api/quasar?type=movie&id=157336&title=Interstellar&year=2014"),
+            ("filmu-movie-imdb","https://embed.filmu.in/api/quasar?type=movie&id=tt0816692&title=Interstellar&year=2014"),
+            ("filmu-tv-tmdb","https://embed.filmu.in/api/quasar?type=tv&id=108978&title=Reacher&year=2022&season=1&episode=1"),
+            ("filmu-tv-imdb","https://embed.filmu.in/api/quasar?type=tv&id=tt9288030&title=Reacher&year=2022&season=1&episode=1"),
+            ("vidbolt-movie-tmdb","https://vidbolt.xyz/api/quasar?type=movie&id=157336&title=Interstellar&year=2014"),
+            ("vidbolt-movie-imdb","https://vidbolt.xyz/api/quasar?type=movie&id=tt0816692&title=Interstellar&year=2014")
           ]
-          keys=["singularity","quasar","callisto","scrape","/api/","tmdbId","imdbId","imdb_id","allmovieland","movy","proxy"]
-          for name,url in urls:
-            print("\n###",name,url)
-            r=S.get(url,timeout=30,headers={"Referer":url.rsplit("/assets/",1)[0]+"/"})
-            print("STATUS",r.status_code,"LEN",len(r.text),"CTYPE",r.headers.get("content-type"))
-            text=r.text
-            low=text.lower()
-            for key in keys:
-              hits=[m.start() for m in re.finditer(re.escape(key.lower()),low)]
-              if not hits: continue
-              print("\nKEY",key,"COUNT",len(hits))
-              for idx in hits[:12]:
-                a=max(0,idx-700); b=min(len(text),idx+1200)
-                print(text[a:b].replace("\n"," ")[:2200])
-            lits=re.findall(r'["\']([^"\']{1,260})["\']',text)
-            interesting=[]
-            for s in lits:
-              sl=s.lower()
-              if any(x in sl for x in ["/api/","/scrape/","singularity","quasar","callisto","allmovieland","movy"]):
-                if s not in interesting: interesting.append(s)
-            print("\nINTERESTING_LITERALS",len(interesting))
-            for s in interesting[:120]: print(s)
+          for name,url in endpoints:
+            print("\n### API",name)
+            try:
+              r=S.get(url,timeout=35,headers={"Referer":url.split("/api/")[0]+"/movie/157336","Accept":"application/json"})
+              print("STATUS",r.status_code,"CTYPE",r.headers.get("content-type"),"LEN",len(r.text))
+              print(r.text[:8000])
+            except Exception as e:
+              print("ERR",repr(e))
+
+          url="https://vidbolt.xyz/assets/assets/PlayerPage-CxGTx3In.js"
+          print("\n### VIDBOLT PLAYER",url)
+          r=S.get(url,timeout=30,headers={"Referer":"https://vidbolt.xyz/movie/157336"})
+          print("STATUS",r.status_code,"CTYPE",r.headers.get("content-type"),"LEN",len(r.text))
+          text=r.text
+          keys=["quasar","callisto","/api/","/scrape/","tmdbId","imdbId","movy","orion","source"]
+          for key in keys:
+            hits=[m.start() for m in re.finditer(re.escape(key.lower()),text.lower())]
+            if not hits: continue
+            print("\nKEY",key,"COUNT",len(hits))
+            for idx in hits[:15]:
+              a=max(0,idx-650); b=min(len(text),idx+1250)
+              print(text[a:b].replace("\n"," ")[:2200])
+          refs=sorted(set(re.findall(r'["\']([^"\']+\.js)["\']',text)))
+          print("\nJSREFS",refs[:100])
           PY

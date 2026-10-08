@@ -6,43 +6,153 @@ on:
 jobs:
   trace:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 5
     steps:
-      - name: Capture real PoW worker response shape
+      - name: Run CineSrc fully in Node without Chrome
         shell: bash
         run: |
           set -e
-          CHROME=$(command -v google-chrome)
-          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --ignore-certificate-errors --remote-debugging-port=9222 about:blank >/tmp/chrome.log 2>&1 &
-          CPID=$!
-          trap 'kill $CPID 2>/dev/null || true' EXIT
-          for i in $(seq 1 80); do
-            curl -fsS http://127.0.0.1:9222/json/version >/dev/null && break
-            sleep .25
-          done
+          curl -fsSL --max-time 30 'https://cinesrc.st/300726c-prod.js' -o /tmp/main.js
+          curl -fsSL --max-time 30 'https://cinesrc.st/donut.js' -o /tmp/donut.js
+          curl -fsSL --max-time 30 'https://cinesrc.st/pow-worker-v3.js' -o /tmp/worker.js
           node - <<'NODE'
-          const http=require('http');
-          const WORK='Q1NQMwMNAQEQEQMEMl1FJmMwN16YENJC10mWKKPHkW0';
-          function api(path,method='GET'){return new Promise((resolve,reject)=>{const req=http.request({host:'127.0.0.1',port:9222,path,method},r=>{let s='';r.on('data',d=>s+=d);r.on('end',()=>{try{resolve(JSON.parse(s))}catch(e){reject(new Error(s))}})});req.on('error',reject);req.end()})}
-          async function main(){
-            const page=await api('/json/new?about%3Ablank','PUT');
-            const ws=new WebSocket(page.webSocketDebuggerUrl);await new Promise((res,rej)=>{ws.onopen=res;ws.onerror=rej});
-            let seq=0,pending=new Map();
-            function send(method,params={}){const id=++seq;return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}))})}
-            ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data)}catch{return}if(m.id&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.error?p.reject(new Error(JSON.stringify(m.error))):p.resolve(m.result)}};
-            await send('Page.enable');await send('Runtime.enable');
-            await send('Page.navigate',{url:'https://cinesrc.st/'});
-            await new Promise(r=>setTimeout(r,4000));
-            const expr=`new Promise((resolve)=>{
-              const w=new Worker('/pow-worker-v3.js');
-              const timer=setTimeout(()=>{try{w.terminate()}catch{};resolve({timeout:true})},20000);
-              w.onmessage=e=>{clearTimeout(timer);const d=e.data;try{w.terminate()}catch{};resolve({data:d,keys:d&&Object.keys(d)})};
-              w.onerror=e=>{clearTimeout(timer);try{w.terminate()}catch{};resolve({error:String(e.message||e)})};
-              w.postMessage({id:123,work:'${WORK}'});
-            })`;
-            const r=await send('Runtime.evaluate',{expression:expr,awaitPromise:true,returnByValue:true});
-            console.log('WORKER_RESULT='+JSON.stringify(r.result.value));
-            ws.close();
+          const fs=require('fs'),vm=require('vm');
+          const ORIGIN='https://cinesrc.st';
+          const PAGE=ORIGIN+'/embed/movie/157336';
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
+          const ACTION_PROVIDERS='00709a44ddb018c921339ab3213396ad85c0dc0237';
+          const ACTION_STREAM='7e278c7b1a4440a99a81b5c121b5f93193ce0a3f64';
+          const mainCode=fs.readFileSync('/tmp/main.js','utf8');
+          const donutCode=fs.readFileSync('/tmp/donut.js','utf8');
+          const workerCode=fs.readFileSync('/tmp/worker.js','utf8');
+          const cookies={};
+          function ingest(res){
+            const arr=typeof res.headers.getSetCookie==='function'?res.headers.getSetCookie():[];
+            for(const s of arr){const p=s.split(';')[0],i=p.indexOf('=');if(i>0)cookies[p.slice(0,i)]=p.slice(i+1)}
           }
-          main().catch(e=>{console.error(e.stack||e);process.exit(1)});
+          function cookie(){return Object.entries(cookies).map(([k,v])=>k+'='+v).join('; ')}
+          let boot=null,q='';
+          async function browserFetch(input,opt){
+            let url=typeof input==='string'?input:String(input&&input.url||input);
+            if(url.startsWith('/'))url=ORIGIN+url;
+            opt=Object.assign({},opt||{});
+            const u=new URL(url,ORIGIN),h=new Headers(opt.headers||{});
+            h.set('User-Agent',UA);
+            if(cookie())h.set('Cookie',cookie());
+            if(u.origin===ORIGIN){
+              if(!h.has('Origin')&&opt.method&&String(opt.method).toUpperCase()!=='GET')h.set('Origin',ORIGIN);
+              if(!h.has('Referer'))h.set('Referer',PAGE);
+              if(boot&&(u.pathname==='/api/c/issue'||u.pathname==='/api/c/stage2/issue')){
+                h.set('x-cs-r',boot.r);h.set('x-cs-q',q);
+                if(u.pathname==='/api/c/issue')h.set('x-cs-p',boot.p);
+              }
+            }
+            opt.headers=h;
+            const r=await fetch(url,opt);ingest(r);
+            if(/\/api\/c\//.test(u.pathname))console.log('FETCH',u.pathname,r.status);
+            return r;
+          }
+          function makeBase(){
+            const listeners={};
+            function addEventListener(n,f){(listeners[n]||(listeners[n]=[])).push(f)}
+            function removeEventListener(n,f){if(listeners[n])listeners[n]=listeners[n].filter(x=>x!==f)}
+            function dispatchEvent(e){for(const f of (listeners[e.type]||[]).slice())try{f(e)}catch(err){console.log('EVENT_ERR',err.message)};return true}
+            class CE{constructor(type,opt){this.type=type;this.detail=opt&&opt.detail}}
+            const g={console,setTimeout,clearTimeout,setInterval,clearInterval,TextEncoder,TextDecoder,URL,URLSearchParams,Headers,Request,Response,Blob,
+              atob:s=>Buffer.from(s,'base64').toString('binary'),btoa:s=>Buffer.from(s,'binary').toString('base64'),
+              crypto:require('crypto').webcrypto,WebAssembly,Uint8Array,Uint32Array,ArrayBuffer,DataView,Promise,
+              CustomEvent:CE,Event:CE,addEventListener,removeEventListener,dispatchEvent,fetch:browserFetch,
+              location:{origin:ORIGIN,href:PAGE,pathname:'/embed/movie/157336',search:'',protocol:'https:',host:'cinesrc.st',hostname:'cinesrc.st'},
+              navigator:{userAgent:UA,language:'en-US',languages:['en-US','en'],hardwareConcurrency:8,platform:'Win32'},
+              performance:{now:()=>Date.now(),timeOrigin:Date.now()},
+            };
+            g.window=g;g.self=g;g.globalThis=g;
+            g.document={cookie:'',visibilityState:'visible',hidden:false,
+              createElement:()=>({style:{},setAttribute(){},appendChild(){},remove(){},click(){}}),
+              head:{appendChild(){}},body:{appendChild(){}},documentElement:{},
+              querySelector:()=>null,querySelectorAll:()=>[],addEventListener,removeEventListener};
+            return g;
+          }
+          class InlineWorker{
+            constructor(url){this.url=String(url);this.onmessage=null;this.onerror=null;this._terminated=false;}
+            postMessage(msg){
+              const outer=this;
+              setTimeout(async()=>{
+                if(outer._terminated)return;
+                try{
+                  const wg=makeBase();
+                  wg.fetch=async function(input,opt){
+                    let url=typeof input==='string'?input:String(input&&input.url||input);
+                    if(url.startsWith('/'))url=ORIGIN+url;
+                    return fetch(url,Object.assign({},opt||{},{headers:Object.assign({'User-Agent':UA},(opt&&opt.headers)||{})}));
+                  };
+                  wg.postMessage=function(data){
+                    if(outer._terminated)return;
+                    setTimeout(()=>{if(typeof outer.onmessage==='function')outer.onmessage({data});},0);
+                  };
+                  wg.self=wg;wg.window=undefined;wg.globalThis=wg;
+                  const wc=vm.createContext(wg);
+                  vm.runInContext(workerCode,wc,{timeout:10000});
+                  if(typeof wg.onmessage!=='function')throw new Error('worker onmessage missing');
+                  await wg.onmessage({data:msg});
+                }catch(e){
+                  console.log('INLINE_WORKER_ERR',e&&e.stack||e);
+                  if(typeof outer.onerror==='function')outer.onerror({message:String(e&&e.message||e)});
+                }
+              },0);
+            }
+            terminate(){this._terminated=true;}
+            addEventListener(type,fn){if(type==='message')this.onmessage=fn;else if(type==='error')this.onerror=fn;}
+            removeEventListener(type,fn){if(type==='message'&&this.onmessage===fn)this.onmessage=null;if(type==='error'&&this.onerror===fn)this.onerror=null;}
+          }
+          async function postAction(action,payload){
+            const r=await browserFetch(PAGE,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8','Next-Action':action},body:JSON.stringify(payload)});
+            const t=await r.text();
+            console.log('ACTION',action.slice(0,8),r.status,t.slice(0,220).replace(/\n/g,'\\n'));
+            return{r,t};
+          }
+          async function main(){
+            q=Buffer.from(JSON.stringify(['movie','157336',null,null])).toString('base64url');
+            const br=await browserFetch(ORIGIN+'/api/c/bootstrap',{method:'POST',headers:{'x-cs-q':q}});
+            boot=await br.json();console.log('BOOT',br.status,'r',String(boot.r).length,'p',String(boot.p).length);
+            const g=makeBase();g.Worker=InlineWorker;
+            let cryptoApi=null;
+            g.addEventListener('_cs',e=>{if(e&&e.detail&&g[e.detail])cryptoApi=g[e.detail]});
+            const ctx=vm.createContext(g);
+            vm.runInContext(mainCode,ctx,{timeout:10000});
+            vm.runInContext(donutCode,ctx,{timeout:10000});
+            console.log('APIS',cryptoApi&&Object.keys(cryptoApi),g.__ss2_challenge&&Object.keys(g.__ss2_challenge));
+            const s1=await cryptoApi.gc();console.log('S1',String(s1).slice(0,120),'LEN',String(s1).length);
+            const s2=await g.__ss2_challenge.gc();console.log('S2',String(s2).slice(0,120),'LEN',String(s2).length);
+            const token=String(s1)+'::c2::'+String(s2)+'::c3::'+String(boot.r);
+            console.log('TOKEN_PREFIX',token.slice(0,40),'LEN',token.length);
+            const pr=await postAction(ACTION_PROVIDERS,[]);
+            const pline=pr.t.split(/\r?\n/).find(x=>/^1:/.test(x))||'';
+            const providers=pline?JSON.parse(pline.slice(2)):[];
+            console.log('PROVIDERS',providers.map(x=>x.id));
+            let ok=false;
+            for(const p of providers.slice(0,5)){
+              const sr=await postAction(ACTION_STREAM,['157336','movie','$undefined','$undefined',token,p.id]);
+              if(!sr.r.ok||/invalid_challenge|missing_challenge/.test(sr.t))continue;
+              const line=sr.t.split(/\r?\n/).find(x=>/^1:/.test(x))||'';
+              console.log('SEALED_LINE',p.id,line.slice(0,500));
+              if(!line)continue;
+              const after=line.slice(2),comma=after.indexOf(','),colon=after.indexOf(':',comma+1);
+              const enc=comma>=0&&colon>comma?after.slice(comma+1,colon):'';
+              if(!enc)continue;
+              const dec=await cryptoApi.dr(enc);
+              console.log('DECRYPTED',p.id,JSON.stringify(dec).slice(0,8000));
+              const urls=dec&&Array.isArray(dec.url)?dec.url:[];
+              for(const row of urls.slice(0,5)){
+                const u=row&&row.url;if(!u)continue;
+                const rr=await fetch(u,{headers:{'User-Agent':UA},signal:AbortSignal.timeout(15000)});
+                const tx=await rr.text();
+                console.log('PROBE',p.id,row.source||'',rr.status,rr.headers.get('content-type'),tx.slice(0,40).replace(/\n/g,'\\n'));
+                if(rr.ok&&tx.startsWith('#EXTM3U'))ok=true;
+              }
+              if(ok)break;
+            }
+            console.log('SUCCESS',ok);if(!ok)process.exitCode=2;
+          }
+          main().catch(e=>{console.error('FATAL',e&&e.stack||e);process.exit(1)});
           NODE

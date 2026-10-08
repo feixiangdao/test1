@@ -44,7 +44,13 @@ try {
    return ctx.newString(JSON.stringify(response));
  });
  let p=ctx.evalCode("var console={log:function(){},error:function(){},warn:function(){}};\n"+polyfill,"nuvio-polyfill.js",{type:"global"});
- if(p.error){const e=ctx.dump(p.error);p.error.dispose();throw Error("POLYFILL_ERROR: "+String(e).slice(0,300))}
+ if(p.error){
+  const e=ctx.dump(p.error);
+  const msg=ctx.getProp(p.error,"message"),stack=ctx.getProp(p.error,"stack"),name=ctx.getProp(p.error,"name");
+  console.log("NUVIO_POLYFILL_DIAG",JSON.stringify({e,msg:ctx.dump(msg),stack:String(ctx.dump(stack)).slice(0,550),name:ctx.dump(name),sourceLength:polyfill.length,first:polyfill.slice(0,110)}));
+  msg.dispose();stack.dispose();name.dispose();p.error.dispose();
+  throw Error("POLYFILL_ERROR");
+ }
  p.value.dispose();
  // Nuvio performs eval in an IIFE, after injecting its polyfill.
  const wrapped="var module={exports:{}};var exports=module.exports;(function(){\n"+original+

@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'vidplay-nuvio/live-smoke.cjs'
+      - 'vidplay-nuvio/providers/vidplay.js'
       - '.github/workflows/vidplay-live-smoke.yml'
 permissions:
   contents: read
@@ -16,5 +17,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run live VidPlay movie and episode requests
+      - name: Run real V1 live stream validation
         run: node vidplay-nuvio/live-smoke.cjs

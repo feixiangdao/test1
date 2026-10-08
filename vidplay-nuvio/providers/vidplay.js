@@ -84,23 +84,36 @@ function normTitle(s){
     .replace(/[^a-z0-9]+/g," ").replace(/\s+/g," ").trim();
 }
 function tmdbMeta(id,type){
-  var key=clean(settings().tmdbApiKey);
-  if(!key){try{key=clean(globalThis.TMDB_API_KEY);}catch(e){}}
-  if(!key)return Promise.resolve(null);
-  var u="https://api.themoviedb.org/3/"+(type==="tv"?"tv":"movie")+
-    "/"+encodeURIComponent(String(id))+"?api_key="+encodeURIComponent(key)+
-    "&append_to_response=external_ids";
-  return fetchText(u,{"Accept":"application/json"}).then(function(t){
-    var j=JSON.parse(t);
-    var released=clean(j.release_date||j.first_air_date);
-    var imdb=clean((j.external_ids&&j.external_ids.imdb_id)||j.imdb_id);
-    return {
-      title:clean(j.title||j.name),
-      original:clean(j.original_title||j.original_name),
-      year:/^\d{4}/.test(released)?released.slice(0,4):"",
-      imdb:/^tt\d+$/.test(imdb)?imdb:""
-    };
-  }).catch(function(e){log("TMDB metadata: "+(e&&e.message||e));return null;});
+  // Metadata-only requests require no API key and do not request streams.
+  // The service returns a real IMDb ID for its corresponding TMDB title.
+  var publicURL="https://data.vidsrc.sh/api.php?type="+(type==="tv"?"tv":"movie")+
+    "&tmdb="+encodeURIComponent(id);
+  var fromPublic=fetchText(publicURL,{"User-Agent":UA,"Accept":"application/json"})
+    .then(function(t){
+      var j=JSON.parse(t),d=j&&j.data||{};
+      if(String(j&&j.status_code)!=="200"||!/^tt\d+$/.test(clean(d.imdb_id)))throw new Error("metadata unavailable");
+      var title=clean(d.title),year="";
+      var match=title.match(/\s+((?:19|20)\d{2})$/);
+      if(match){year=match[1];title=title.slice(0,-match[0].length);}
+      return {title:title,original:title,year:year,imdb:clean(d.imdb_id)};
+    });
+  return fromPublic.catch(function(e){
+    log("V1 public metadata: "+(e&&e.message||e));
+    var key=clean(settings().tmdbApiKey);
+    if(!key){try{key=clean(globalThis.TMDB_API_KEY);}catch(err){}}
+    if(!key)return null;
+    var u="https://api.themoviedb.org/3/"+(type==="tv"?"tv":"movie")+
+      "/"+encodeURIComponent(String(id))+"?api_key="+encodeURIComponent(key)+
+      "&append_to_response=external_ids";
+    return fetchText(u,{"Accept":"application/json"}).then(function(t){
+      var j=JSON.parse(t);
+      var released=clean(j.release_date||j.first_air_date);
+      var imdb=clean((j.external_ids&&j.external_ids.imdb_id)||j.imdb_id);
+      return {title:clean(j.title||j.name),original:clean(j.original_title||j.original_name),
+        year:/^\d{4}/.test(released)?released.slice(0,4):"",
+        imdb:/^tt\d+$/.test(imdb)?imdb:""};
+    }).catch(function(err){log("TMDB fallback metadata: "+(err&&err.message||err));return null;});
+  });
 }
 function searchPage(html,meta,type,season,episode){
   if(!meta||!meta.title)return"";
@@ -433,8 +446,8 @@ function getStreams(id,mediaType,season,episode){
 function onSettings(){
   return [
     {type:"header",label:"VidPlay · V1 only (experimental)"},
-    {type:"info",label:"Movie V1 uses TMDB → IMDb → ythd.org → its authorized player API, validates direct media. If API requires browser-only verification or no valid signed token, no stream is returned. TV V1 retains first-party AJAX fallback. No V2 or V3 routes."},
-    {type:"text",key:"tmdbApiKey",label:"TMDB API key for movie V1 (required)",defaultValue:"",isPassword:true}
+    {type:"info",label:"V1 retrieves a public TMDB-to-IMDb lookup, then resolves the ythd.org playback chain. Only verified HLS/MP4/DASH streams are shown. Server-side browser verification or missing player-signed tokens prevent direct Nuvio playback. No V2/V3."},
+    {type:"text",key:"tmdbApiKey",label:"TMDB key (optional fallback only)",defaultValue:"",isPassword:true}
   ];
 }
 module.exports={getStreams:getStreams,onSettings:onSettings};

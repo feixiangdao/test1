@@ -9,7 +9,7 @@ const q=[
     const r=await fetch(url,{signal:AbortSignal.timeout(10000),headers:{Accept:"application/json",Referer:"https://stellarconductornexus.com/","User-Agent":"Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36"}});
     const txt=await r.text();let j;try{j=JSON.parse(txt)}catch(e){}
     const s=j?.data?.stream_urls;const encrypted=typeof s==="string";const count=Array.isArray(s)?s.length:0;
-    console.log("PUBLIC_STREAM_API",JSON.stringify({label,status:r.status,contentType:(r.headers.get("content-type")||"").split(";")[0],json:!!j,jsonKeys:j?Object.keys(j):[],statusCode:j?.status_code,dataKeys:j?.data?Object.keys(j.data):[],streamsPresent:!!s,encrypted,count,wasmReferencePresent:!!j?.vs?.wasm_url,responseBytes:txt.length,isChallenge:/Just a moment|cf-chl|Turnstile/i.test(txt)}));
+    console.log("PUBLIC_STREAM_API",JSON.stringify({label,status:r.status,contentType:(r.headers.get("content-type")||"").split(";")[0],json:!!j,jsonKeys:j?Object.keys(j):[],statusCode:j?.status_code,errorCategory:(typeof j?.error==='string'?j.error.slice(0,120).replace(/[A-Za-z0-9_-]{35,}/g,"[opaque]"):typeof j?.error),dataKeys:j?.data?Object.keys(j.data):[],streamsPresent:!!s,encrypted,count,wasmReferencePresent:!!j?.vs?.wasm_url,responseBytes:txt.length,isChallenge:/Just a moment|cf-chl|Turnstile/i.test(txt)}));
   }catch(e){console.log("API_ERROR",JSON.stringify({label,name:e.name,message:e.message.slice(0,110)}))}
  }
 })().catch(e=>{console.error(e.stack);process.exitCode=1});

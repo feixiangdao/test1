@@ -6,6 +6,7 @@ on:
       - 'flixer-provider-lab/capture-live-fixture.mjs'
       - 'flixer-provider-lab/build-local.mjs'
       - 'flixer-provider-lab/local-protocol.js'
+      - 'flixer-provider-lab/local-protocol.js'
       - 'flixer-provider-lab/local-environment.js'
       - 'flixer-provider-lab/pack-local.mjs'
       - 'flixer-provider-lab/test-local-bundle.mjs'

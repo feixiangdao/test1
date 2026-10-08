@@ -11,7 +11,24 @@ const MAX_WAIT_MS = Math.max(3000, Math.min(25000, Number(process.env.MAX_WAIT_M
 const TTL_MS = 2 * 60 * 1000;
 const cache = new Map();
 let active = 0;
-const browser = await chromium.launch({headless:true,args:["--no-sandbox"]});
+async function publicDnsA(hostname) {
+  try {
+    const r = await fetch("https://dns.google/resolve?name=" + encodeURIComponent(hostname) + "&type=A&cd=true", {
+      signal: AbortSignal.timeout(7000)
+    });
+    if (!r.ok) return null;
+    const data=await r.json();
+    const a=(data.Answer || []).find(x=>x.type===1 && /^\\d{1,3}(\\.\\d{1,3}){3}$/.test(x.data));
+    return a ? a.data : null;
+  } catch (e) { console.warn("[DNS] DoH unavailable for",hostname,String(e).slice(0,120));return null; }
+}
+const originHosts=["flixer.su","plsdontscrapemelove.flixer.su"];
+const aRecords=await Promise.all(originHosts.map(publicDnsA));
+const mappings=originHosts.map((h,i)=>aRecords[i] ? "MAP " + h + " " + aRecords[i] : "").filter(Boolean);
+console.log("[DNS] Origin mappings",mappings.length,"of",originHosts.length);
+const chromeArgs=["--no-sandbox"];
+if (mappings.length) chromeArgs.push("--host-resolver-rules=" + mappings.join(", "));
+const browser = await chromium.launch({headless:true,args:chromeArgs});
 
 function respond(res, status, body) {
   res.writeHead(status, {

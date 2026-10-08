@@ -26,7 +26,7 @@ for(const memMiB of [32,64,128]){
    res.value.dispose();
    const key=ctx.evalCode("(function(){try{var k=module.exports.__testKey();return JSON.stringify({type:typeof k,length:typeof k==='string'?k.length:-1});}catch(e){return String(e)}})()");
    if(key.error){console.log("QUICKJS_KEY_ERROR",JSON.stringify(ctx.dump(key.error)));key.error.dispose()}
-   else {console.log("QUICKJS_KEY_RESULT",JSON.stringify(ctx.dump(key.value)));key.value.dispose()}
+   else {const decoded=ctx.dump(key.value);console.log("QUICKJS_KEY_RESULT",JSON.stringify(decoded));if(!(typeof decoded==='string' && decoded.includes('"length":64'))){console.error("QUICKJS_KEY_INVALID",JSON.stringify({preset:preset,memoryMiB:memMiB,result:decoded}));process.exitCode=1;}key.value.dispose()}
   }
  }catch(e){console.log("QUICKJS_HOST_EXCEPTION",JSON.stringify({preset:preset,memoryMiB:memMiB,message:String(e).slice(0,900)}))}
  finally{ctx.dispose();runtime.dispose()}

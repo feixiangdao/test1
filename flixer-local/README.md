@@ -55,3 +55,13 @@ Research in branch `flixer-provider-lab-20261008` has since advanced beyond the 
 - The lab now traces calls to the wasm-bindgen imports to determine which browser-context input remains required.
 
 This is not an end-to-end decryption success, so this Local manifest stays disabled. No hosted resolver is incorporated.
+
+## Pure-JS key generation milestone (2026-10-08)
+
+- After translating the upstream WASM and linking it to the upstream wasm-bindgen glue, the standalone JavaScript module loads successfully in Node without invoking native WebAssembly.
+- Additional on-device-style compatibility shims for `Window`, `document.body`, screen, and monotonic timing allow **`get_img_key()` to return a 64-character string** in a browser-free CI test.
+- This does **not** prove that the real Flixer API accepts the key or that `process_img_data` can decode protected live responses. The web application performs additional source-request verification.
+- Next prerequisite for a finished Local Provider: a verified, authorized media-response sample or stable public API contract, plus Hermes runtime playback tests.
+- CI evidence: https://github.com/feixiangdao/test1/actions/runs/37772723652 .
+
+**Keep manifest disabled** until actual media extraction is verified on Nuvio. Do not replace the currently working provider set.

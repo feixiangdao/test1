@@ -2,7 +2,7 @@ name: Flixer local JavaScript Hermes runtime
 on:
   push:
     branches: [flixer-provider-lab-20261008]
-    paths: ['.github/workflows/flixer-hermes-real.yml']
+    paths: ['.github/workflows/flixer-hermes-real.yml', 'flixer-provider-lab/hermes-runtime-harness.mjs']
   workflow_dispatch:
 jobs:
   hermes:
@@ -39,4 +39,6 @@ jobs:
           if test -x node_modules/hermes-engine-cli/linux64-bin/hermes; then
             timeout 35s node_modules/hermes-engine-cli/linux64-bin/hermes /tmp/flixer-hermes-syntax-preview.js
             echo HERMES_CLI_SCRIPT_RUN_PASS
+            node flixer-provider-lab/hermes-runtime-harness.mjs
+            timeout 35s node_modules/hermes-engine-cli/linux64-bin/hermes /tmp/flixer-hermes-runtime-probe.js
           fi

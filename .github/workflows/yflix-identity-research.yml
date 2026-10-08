@@ -9,58 +9,39 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Inspect PlayerPage chunks
+      - name: Extract actual resolver APIs
         shell: bash
         run: |
           set -e
           python3 - <<'PY'
-          import requests,re,urllib.parse
-          S=requests.Session()
-          S.headers.update({"User-Agent":"Mozilla/5.0"})
-          targets=[
-            ("filmu","https://embed.filmu.in/movie/157336"),
-            ("vidbolt","https://vidbolt.xyz/movie/157336")
+          import requests,re
+          S=requests.Session(); S.headers.update({"User-Agent":"Mozilla/5.0"})
+          urls=[
+            ("filmu-servers","https://embed.filmu.in/assets/servers-B7U1aDDl.js"),
+            ("filmu-embed","https://embed.filmu.in/assets/EmbedPage-DKo4EtSL.js"),
+            ("vidbolt-player","https://vidbolt.xyz/assets/PlayerPage-CxGTx3In.js"),
+            ("vidbolt-entry","https://vidbolt.xyz/assets/index-CWZT0e_1.js")
           ]
-          needles=[
-            "singularity","allmovieland","/api/proxy","api.themoviedb.org",
-            "external_ids","imdb_id","/scrape/","quasar","callisto","movy.lol",
-            "auth_key","expire=","tmdb","imdb","fetch(","axios"
-          ]
-          for name,url in targets:
-            print("\n###",name)
-            page=S.get(url,timeout=20)
-            srcs=re.findall(r'<script[^>]+src=["\']([^"\']+)["\']',page.text,re.I)
-            host=urllib.parse.urlparse(page.url).netloc
-            entry=None
-            for src in srcs:
-              u=urllib.parse.urljoin(page.url,src)
-              if urllib.parse.urlparse(u).netloc==host:
-                entry=u
-            print("ENTRY",entry)
-            text=S.get(entry,timeout=20,headers={"Referer":page.url}).text
-            refs=set()
-            for m in re.findall(r'["\'](\.?/?[^"\']+\.js)["\']',text):
-              refs.add(urllib.parse.urljoin(entry,m))
-            for m in re.findall(r'import\(["\']([^"\']+\.js)["\']\)',text):
-              refs.add(urllib.parse.urljoin(entry,m))
-            refs=sorted(refs)
-            print("REFS",len(refs))
-            for u in refs:
-              if urllib.parse.urlparse(u).netloc!=host: continue
-              try:
-                rr=S.get(u,timeout=20,headers={"Referer":page.url})
-              except Exception:
-                continue
-              low=rr.text.lower()
-              if not any(n.lower() in low for n in needles): continue
-              print("\nBUNDLE",u,"LEN",len(rr.text))
-              for needle in needles:
-                pos=0; count=0
-                while True:
-                  idx=low.find(needle.lower(),pos)
-                  if idx<0 or count>=12: break
-                  a=max(0,idx-500); b=min(len(rr.text),idx+900)
-                  print("\n--",needle,"@",idx,"--")
-                  print(rr.text[a:b].replace("\n"," ")[:1600])
-                  pos=idx+len(needle); count+=1
+          keys=["singularity","quasar","callisto","scrape","/api/","tmdbId","imdbId","imdb_id","allmovieland","movy","proxy"]
+          for name,url in urls:
+            print("\n###",name,url)
+            r=S.get(url,timeout=30,headers={"Referer":url.rsplit("/assets/",1)[0]+"/"})
+            print("STATUS",r.status_code,"LEN",len(r.text),"CTYPE",r.headers.get("content-type"))
+            text=r.text
+            low=text.lower()
+            for key in keys:
+              hits=[m.start() for m in re.finditer(re.escape(key.lower()),low)]
+              if not hits: continue
+              print("\nKEY",key,"COUNT",len(hits))
+              for idx in hits[:12]:
+                a=max(0,idx-700); b=min(len(text),idx+1200)
+                print(text[a:b].replace("\n"," ")[:2200])
+            lits=re.findall(r'["\']([^"\']{1,260})["\']',text)
+            interesting=[]
+            for s in lits:
+              sl=s.lower()
+              if any(x in sl for x in ["/api/","/scrape/","singularity","quasar","callisto","allmovieland","movy"]):
+                if s not in interesting: interesting.append(s)
+            print("\nINTERESTING_LITERALS",len(interesting))
+            for s in interesting[:120]: print(s)
           PY

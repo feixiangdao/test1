@@ -26,7 +26,7 @@ async function main(){
     if(requests.length<45){requests.push({status:msg.params.response.status,resource: u.replace(/https?:\/\/[^/]+/,''),type:msg.params.response.mimeType})}
   }
  });
- const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++index;pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));setTimeout(()=>{if(pending.has(id)){pending.delete(id);reject(Error(method+' timeout'))}},85000)});
+ const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++index;pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));setTimeout(()=>{if(pending.has(id)){pending.delete(id);reject(Error(method+' timeout'))}},85000).unref()});
  await call('Runtime.enable');await call('Page.enable');await call('Network.enable');
  await call('Page.navigate',{url:'https://flixer.su/watch/movie/550'});
  await sleep(6000);
@@ -36,7 +36,8 @@ async function main(){
   return val.result?.value;
  };
  console.log('PAGE',JSON.stringify(await ev('({title:document.title,url:location.href,clientLoaded:!!window.__TMDB_CLIENT_MODULES__,videoCount:document.querySelectorAll("video").length})')));
- const result=await ev("(async()=>{const m=await import('https://plsdontscrapemelove.flixer.su/assets/client/tmdb-poster-utils.js');const v=await m.getMoviePosterData('550');const servers=v?.poster_sources||{};return {count:Object.keys(servers).length,results:Object.entries(servers).slice(0,26).map(([k,v])=>({name:k,available:!!(v?.url||v?.file),kind:typeof v,host:(()=>{try{return new URL(v?.url||v?.file||\"\").hostname}catch{return\"\"}})()}))}})()");
+ await sleep(12000);
+ const result=await ev('({videoUrl:document.querySelector("video")?.currentSrc||"",videoSrc:document.querySelector("video")?.src||"",wasmLoaded:!!window.wasmImgData,wasmReady:!!window.wasmImgData?.ready,keyLength:window.wasmImgData?.key?.length||0,sourceModuleMethods:Object.keys(window.__TMDB_CLIENT_MODULES__||{}).filter(k=>/Source|Poster|Enhance/i.test(k)).slice(0,30),visibleText:document.body.innerText.slice(-900)})');
 
  console.log('MOVIE',JSON.stringify(result));
  console.log('NETWORK',JSON.stringify(requests));

@@ -1,0 +1,18 @@
+name: Test Flixer Node Resolver
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'flixer-nuvio/resolver-core.mjs'
+      - 'flixer-nuvio/test-resolver.mjs'
+      - '.github/workflows/test-flixer-resolver.yml'
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node flixer-nuvio/test-resolver.mjs

@@ -1,0 +1,2 @@
+import {resolveFlixer} from './resolver-core.mjs';
+(async()=>{for(const item of [{type:'movie',id:550},{type:'tv',id:1399,season:1,episode:1}]){try{const r=await resolveFlixer(item.id,item.type,item.season,item.episode);console.log('RESULT',JSON.stringify({target:item,servers:r.servers,streams:r.streams.map(x=>({server:x.server,host:new URL(x.url).hostname,extension:new URL(x.url).pathname.split('.').pop()}))}));}catch(e){console.log('ERROR',JSON.stringify({target:item,error:e.message}))}}})().catch(e=>{console.log('FATAL',e.message);process.exitCode=1});

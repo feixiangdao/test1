@@ -6,73 +6,37 @@ on:
 jobs:
   trace:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 4
     steps:
-      - name: Capture only valid getStream request
+      - name: Extract Febbox fallback implementation
         shell: bash
         run: |
           set -e
-          CHROME=$(command -v google-chrome)
-          UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
-          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --ignore-certificate-errors --autoplay-policy=no-user-gesture-required --user-agent="$UA" --remote-debugging-port=9222 about:blank >/tmp/chrome.log 2>&1 &
-          CPID=$!
-          trap 'kill $CPID 2>/dev/null || true' EXIT
-          for i in $(seq 1 80); do
-            curl -fsS http://127.0.0.1:9222/json/version >/dev/null && break
-            sleep .25
-          done
-          node - <<'NODE'
-          const http=require('http');
-          const TARGET='https://cinesrc.st/embed/movie/157336';
-          const STREAM_ACTION='7e278c7b1a4440a99a81b5c121b5f93193ce0a3f64';
-          function api(path,method='GET'){
-            return new Promise((resolve,reject)=>{
-              const req=http.request({host:'127.0.0.1',port:9222,path,method},r=>{let s='';r.on('data',d=>s+=d);r.on('end',()=>{try{resolve(JSON.parse(s))}catch(e){reject(new Error(s))}})});
-              req.on('error',reject);req.end();
-            });
-          }
-          async function main(){
-            const page=await api('/json/new?about%3Ablank','PUT');
-            const ws=new WebSocket(page.webSocketDebuggerUrl);
-            await new Promise((res,rej)=>{ws.onopen=res;ws.onerror=rej});
-            let seq=0,pending=new Map(),capture={getStream:[],playlists:[],media:[]},reqs=new Map();
-            function send(method,params={}){
-              const id=++seq;return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}))});
-            }
-            ws.onmessage=async ev=>{
-              let m;try{m=JSON.parse(ev.data)}catch{return}
-              if(m.id&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.error?p.reject(new Error(JSON.stringify(m.error))):p.resolve(m.result);return}
-              if(m.method==='Network.requestWillBeSent'){
-                const p=m.params,req=p.request,h=req.headers||{},na=h['Next-Action']||h['next-action']||'';
-                if(na===STREAM_ACTION){
-                  reqs.set(p.requestId,{kind:'stream',url:req.url,postData:req.postData||'',headers:h});
-                  capture.getStream.push({requestId:p.requestId,url:req.url,postData:req.postData||''});
-                }else if(/\/api\/playlist\/.*\.m3u8/i.test(req.url)){
-                  capture.playlists.push(req.url);
-                }else if(/bright67\.online/i.test(req.url)&&/(\.m3u8|\.mp4|playlist_|init\.mp4)/i.test(req.url)){
-                  capture.media.push(req.url);
-                }
-              }else if(m.method==='Network.responseReceived'){
-                const x=reqs.get(m.params.requestId);
-                if(x){x.status=m.params.response.status;x.mime=m.params.response.mimeType;}
-              }else if(m.method==='Network.loadingFinished'){
-                const x=reqs.get(m.params.requestId);
-                if(x){
-                  try{const b=await send('Network.getResponseBody',{requestId:m.params.requestId});x.response=b.body||'';}catch{}
-                }
-              }
-            };
-            await send('Page.enable');await send('Runtime.enable');await send('Network.enable',{maxTotalBufferSize:50000000,maxResourceBufferSize:5000000});
-            await send('Page.navigate',{url:TARGET});
-            await new Promise(r=>setTimeout(r,14000));
-            const expr="JSON.stringify({href:location.href,title:document.title,duration:[...document.querySelectorAll('video')].map(v=>v.duration),text:(document.body&&document.body.innerText||'').slice(0,500)})";
-            const state=await send('Runtime.evaluate',{expression:expr,returnByValue:true});
-            capture.state=JSON.parse(state.result.value||'{}');
-            capture.getStreamDetails=[...reqs.values()].map(x=>({url:x.url,status:x.status,mime:x.mime,postData:x.postData,response:(x.response||'').slice(0,1200)}));
-            capture.playlists=[...new Set(capture.playlists)];
-            capture.media=[...new Set(capture.media)].slice(0,20);
-            console.log('CAPTURE_JSON='+JSON.stringify(capture));
-            ws.close();
-          }
-          main().catch(e=>{console.error(e.stack||e);process.exit(1)});
-          NODE
+          UA='Mozilla/5.0'
+          curl -fsSL --max-time 30 -A "$UA" 'https://cinesrc.st/embed/movie/157336' -o /tmp/page.html
+          grep -oE '<script[^>]+src="[^"]+"' /tmp/page.html | sed -E 's/.*src="([^"]+)"/\1/' | sort -u > /tmp/scripts.txt
+          n=0
+          while read -r p; do
+            [ -z "$p" ] && continue
+            n=$((n+1))
+            curl -fsSL --max-time 30 -A "$UA" -e 'https://cinesrc.st/embed/movie/157336' "https://cinesrc.st$p" -o "/tmp/js$n.js" || true
+          done < /tmp/scripts.txt
+          python3 - <<'PY'
+          import glob,re,os
+          keys=['fetchFebboxHLS','fetchFebboxMP4','febboxToken','febbox-hls','febbox-mp4','v2()']
+          for fn in glob.glob('/tmp/js*.js'):
+              txt=open(fn,encoding='utf-8',errors='replace').read()
+              if not any(k in txt for k in keys): continue
+              print('FILE',fn,'LEN',len(txt))
+              seen=[]
+              for kw in keys:
+                  pos=0
+                  while True:
+                      i=txt.find(kw,pos)
+                      if i<0: break
+                      if all(abs(i-x)>2500 for x in seen):
+                          seen.append(i)
+                          print('\n---',kw,'@',i,'---')
+                          print(txt[max(0,i-3500):min(len(txt),i+5000)])
+                      pos=i+len(kw)
+          PY

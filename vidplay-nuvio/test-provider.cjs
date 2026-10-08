@@ -26,10 +26,12 @@ function mock(responder){
     let out=responder(String(url),options||{});
     if(!out)throw new Error("Unexpected URL "+url);
     let body=typeof out.body==="string"?out.body:JSON.stringify(out.body||{});
-    return {ok:out.status>=200&&out.status<300,status:out.status,
+    const response={ok:out.status>=200&&out.status<300,status:out.status,
       headers:{get:(name)=>out.contentType||"application/json"},
-      text:async()=>body,arrayBuffer:async()=>new TextEncoder().encode(body).buffer
+      text:async()=>body
     };
+    if(!out.noArrayBuffer)response.arrayBuffer=async()=>new TextEncoder().encode(body).buffer;
+    return response;
   };
 }
 function common(u,opts){
@@ -97,6 +99,21 @@ function common(u,opts){
   });
   assertDiagnostics(await getStreams(395992,"movie"),"V1 player blocked");
   console.log("PASS: invalid signed token 403 shows diagnostic");
+
+  // Older/modified Nuvio bridges may have a fetch response without a
+  // binary arrayBuffer reader. Report the precise stage instead of a generic
+  // "not a function" error.
+  mock((u,o)=>{
+    if(u===api)return{status:200,body:{status_code:"200",data:{stream_urls:"AAECAwQFBgcICQoLDA0ODw=="},vs:{wasm_url:"https://data.vidsrc.sh/wasm.php"}}};
+    if(u==="https://data.vidsrc.sh/wasm.php")return{status:200,body:"wasm bytes",noArrayBuffer:true};
+    return common(u,o);
+  });
+  const noBinary=await getStreams(395992,"movie");
+  assertDiagnostics(noBinary,"No binary response reader");
+  assert.match(noBinary[0].name,/WASM.*arrayBuffer/);
+  console.log("PASS: missing binary fetch reader is reported with exact V1 WASM stage");
+
+
 
   mock((u,o)=>{
     if(u.startsWith("https://ythd.org/"))return{status:403,body:"blocked"};

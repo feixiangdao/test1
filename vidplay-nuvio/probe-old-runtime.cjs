@@ -28,12 +28,20 @@ globalThis.__native_fetch=async function(url,method,headersJSON,bodyKind,body,fo
   return JSON.stringify({ok:r.ok,status:r.status,bodyBase64:b.toString("base64")});
 };
 (async()=>{
-  for(const [title,id] of [["Kung Fu Panda (2008)",9502],["Life (2017)",395992]]){
+  for(const [title,id] of [["Life (2017)",395992],["Kung Fu Panda (2008)",9502]]){
     const start=Date.now(),from=requests.length;
-    const rows=await provider.getStreams(id,"movie");
-    const streams=rows.filter(x=>x.quality!=="Status"&&!String(x.url).startsWith("data:"));
+    let rows=[],streams=[],attempts=0;
+    // External player occasionally sends HTTP 504; retry independently
+    // to separate transient upstream availability from binary compatibility.
+    while(attempts<3){
+      attempts++;
+      rows=await provider.getStreams(id,"movie");
+      streams=rows.filter(x=>x.quality!=="Status"&&!String(x.url).startsWith("data:"));
+      if(streams.length)break;
+      if(attempts<3)await new Promise(resolve=>setTimeout(resolve,900));
+    }
     console.log("OLD_NUVIO_COMPAT",JSON.stringify({
-      title,ms:Date.now()-start,
+      title,ms:Date.now()-start,attempts,
       streamCount:streams.length,qualities:streams.map(x=>x.quality),
       status:rows.filter(x=>x.quality==="Status").map(x=>x.name),
       rawBridgeCount,binaryReaderBlockedCount,

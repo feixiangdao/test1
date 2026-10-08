@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Inspect only first-party app bundles
+      - name: Inspect PlayerPage chunks
         shell: bash
         run: |
           set -e
@@ -22,35 +22,45 @@ jobs:
             ("vidbolt","https://vidbolt.xyz/movie/157336")
           ]
           needles=[
-            "singularity-movie","singularity-tv","allmovieland","/api/proxy",
-            "api.themoviedb.org","append_to_response","external_ids","imdb_id",
-            "/scrape/","quasar","callisto","movy.lol","auth_key","expire=",
-            "movie/","tv/"
+            "singularity","allmovieland","/api/proxy","api.themoviedb.org",
+            "external_ids","imdb_id","/scrape/","quasar","callisto","movy.lol",
+            "auth_key","expire=","tmdb","imdb","fetch(","axios"
           ]
           for name,url in targets:
             print("\n###",name)
-            r=S.get(url,timeout=20)
-            print("PAGE",r.status_code,r.url)
-            srcs=re.findall(r'<script[^>]+src=["\']([^"\']+)["\']',r.text,re.I)
-            first=[]
-            host=urllib.parse.urlparse(r.url).netloc
+            page=S.get(url,timeout=20)
+            srcs=re.findall(r'<script[^>]+src=["\']([^"\']+)["\']',page.text,re.I)
+            host=urllib.parse.urlparse(page.url).netloc
+            entry=None
             for src in srcs:
-              u=urllib.parse.urljoin(r.url,src)
+              u=urllib.parse.urljoin(page.url,src)
               if urllib.parse.urlparse(u).netloc==host:
-                first.append(u)
-            print("FIRST_PARTY",first)
-            for u in first:
-              rr=S.get(u,timeout=20,headers={"Referer":r.url})
-              print("BUNDLE",rr.status_code,u,"LEN",len(rr.text))
-              text=rr.text
-              low=text.lower()
+                entry=u
+            print("ENTRY",entry)
+            text=S.get(entry,timeout=20,headers={"Referer":page.url}).text
+            refs=set()
+            for m in re.findall(r'["\'](\.?/?[^"\']+\.js)["\']',text):
+              refs.add(urllib.parse.urljoin(entry,m))
+            for m in re.findall(r'import\(["\']([^"\']+\.js)["\']\)',text):
+              refs.add(urllib.parse.urljoin(entry,m))
+            refs=sorted(refs)
+            print("REFS",len(refs))
+            for u in refs:
+              if urllib.parse.urlparse(u).netloc!=host: continue
+              try:
+                rr=S.get(u,timeout=20,headers={"Referer":page.url})
+              except Exception:
+                continue
+              low=rr.text.lower()
+              if not any(n.lower() in low for n in needles): continue
+              print("\nBUNDLE",u,"LEN",len(rr.text))
               for needle in needles:
                 pos=0; count=0
                 while True:
                   idx=low.find(needle.lower(),pos)
-                  if idx<0 or count>=8: break
-                  a=max(0,idx-350); b=min(len(text),idx+700)
+                  if idx<0 or count>=12: break
+                  a=max(0,idx-500); b=min(len(rr.text),idx+900)
                   print("\n--",needle,"@",idx,"--")
-                  print(text[a:b].replace("\n"," ")[:1200])
+                  print(rr.text[a:b].replace("\n"," ")[:1600])
                   pos=idx+len(needle); count+=1
           PY

@@ -1,5 +1,5 @@
 // CineVibe Local for Nuvio
-// v0.2.5
+// v0.2.6
 //
 // Proven current chain (2026-10-07):
 // cinevibe.cc Server 1 -> vidsrc.wtf API 1 -> Viduki V1.
@@ -140,24 +140,167 @@ function parseMaster(text,base){
   ded.sort(function(a,b){return qualityScore(b.quality)-qualityScore(a.quality);});
   return ded;
 }
+function firstMediaSegment(text,base){
+  var lines=String(text||"").split(/\r?\n/),i;
+  for(i=0;i<lines.length;i++){
+    var s=clean(lines[i]);
+    if(s&&s.charAt(0)!=="#")return absUrl(base,s);
+  }
+  return"";
+}
+function rbspFromNal(nal){
+  var out=[],zeros=0,i,b;
+  for(i=1;i<nal.length;i++){
+    b=nal[i];
+    if(zeros>=2&&b===3){zeros=0;continue;}
+    out.push(b);
+    if(b===0)zeros++;else zeros=0;
+  }
+  return new Uint8Array(out);
+}
+function bitReader(buf){
+  var bit=0;
+  return{
+    u:function(n){
+      var v=0,i;
+      for(i=0;i<n;i++){v=(v<<1)|((buf[bit>>3]>>(7-(bit&7)))&1);bit++;}
+      return v;
+    },
+    ue:function(){
+      var z=0,v=0,i;
+      while(bit<buf.length*8&&((buf[bit>>3]>>(7-(bit&7)))&1)===0){z++;bit++;}
+      bit++;
+      for(i=0;i<z;i++){v=(v<<1)|((buf[bit>>3]>>(7-(bit&7)))&1);bit++;}
+      return Math.pow(2,z)-1+v;
+    },
+    se:function(){
+      var v=this.ue();
+      return(v&1)?((v+1)>>1):-(v>>1);
+    }
+  };
+}
+function skipScaling(br,n){
+  var last=8,next=8,j,d;
+  for(j=0;j<n;j++){
+    if(next!==0){d=br.se();next=(last+d+256)%256;}
+    last=next===0?last:next;
+  }
+}
+function parseH264Sps(nal){
+  try{
+    var b=rbspFromNal(nal),br=bitReader(b),profile=br.u(8);
+    br.u(8);br.u(8);br.ue();
+    var chroma=1,count,i;
+    if([100,110,122,244,44,83,86,118,128,138,139,134,135].indexOf(profile)>=0){
+      chroma=br.ue();
+      if(chroma===3)br.u(1);
+      br.ue();br.ue();br.u(1);
+      if(br.u(1)){
+        count=chroma!==3?8:12;
+        for(i=0;i<count;i++)if(br.u(1))skipScaling(br,i<6?16:64);
+      }
+    }
+    br.ue();
+    var poc=br.ue(),n;
+    if(poc===0)br.ue();
+    else if(poc===1){
+      br.u(1);br.se();br.se();n=br.ue();for(i=0;i<n;i++)br.se();
+    }
+    br.ue();br.u(1);
+    var w=br.ue(),h=br.ue(),frame=br.u(1);
+    if(!frame)br.u(1);
+    br.u(1);
+    var cropL=0,cropR=0,cropT=0,cropB=0;
+    if(br.u(1)){cropL=br.ue();cropR=br.ue();cropT=br.ue();cropB=br.ue();}
+    var cropX=1,cropY=2-frame;
+    if(chroma===1){cropX=2;cropY=2*(2-frame);}
+    else if(chroma===2){cropX=2;cropY=1*(2-frame);}
+    else if(chroma===3){cropX=1;cropY=1*(2-frame);}
+    return{
+      width:(w+1)*16-(cropL+cropR)*cropX,
+      height:(2-frame)*(h+1)*16-(cropT+cropB)*cropY
+    };
+  }catch(_){return null;}
+}
+function findH264Sps(buf){
+  var i,start,end,j,p;
+  for(i=0;i+5<buf.length;i++){
+    start=-1;
+    if(buf[i]===0&&buf[i+1]===0&&buf[i+2]===1)start=i+3;
+    else if(buf[i]===0&&buf[i+1]===0&&buf[i+2]===0&&buf[i+3]===1)start=i+4;
+    if(start<0)continue;
+    if((buf[start]&31)!==7)continue;
+    end=buf.length;
+    for(j=start+1;j+4<buf.length;j++){
+      if(buf[j]===0&&buf[j+1]===0&&(buf[j+2]===1||(buf[j+2]===0&&buf[j+3]===1))){end=j;break;}
+    }
+    p=parseH264Sps(buf.slice(start,end));
+    if(p&&p.width&&p.height)return p;
+  }
+  return null;
+}
+function fetchBytes(url,headers){
+  var opt={headers:{}},k;
+  headers=headers||{};
+  for(k in headers)if(Object.prototype.hasOwnProperty.call(headers,k))opt.headers[k]=headers[k];
+  opt.headers.Range="bytes=0-262143";
+  try{opt.skipSizeCheck=true;}catch(_){}
+  return fetch(url,opt).then(function(r){
+    if(!r.ok&&r.status!==206)throw new Error("segment HTTP "+r.status);
+    return r.arrayBuffer();
+  }).then(function(buf){return new Uint8Array(buf);});
+}
+function probeQualityFromSegment(playlist,row){
+  var seg=firstMediaSegment(playlist,row.url);
+  if(!seg)return Promise.resolve("");
+  return fetchBytes(seg,row.headers||{}).then(function(bytes){
+    var sps=findH264Sps(bytes);
+    if(!sps||!sps.height)return"";
+    return String(sps.height)+"p";
+  }).catch(function(e){
+    try{console.log("[CineVibe] SPS probe "+row.name+" · "+(e&&e.message?e.message:e));}catch(_){}
+    return"";
+  });
+}
+function rowWithQuality(row,q){
+  q=clean(q)||"Auto";
+  var name=row.name;
+  if(q!=="Auto")name+=" · "+q;
+  return{
+    name:name,
+    title:name,
+    url:row.url,
+    quality:q,
+    type:row.type,
+    provider:row.provider,
+    headers:row.headers||{},
+    subtitles:row.subtitles||[]
+  };
+}
 function expandHls(row){
   if(!row||row.type!=="hls"||!/\.m3u8(?:$|[?#])/i.test(clean(row.url)))return Promise.resolve([row]);
   return fetchText(row.url,row.headers||{}).then(function(t){
     var vars=parseMaster(t,row.url);
-    if(!vars.length)return[row];
-    return vars.map(function(v){
-      var q=v.quality||"Auto";
-      var name=row.name+(q&&q!=="Auto"?" · "+q:"");
-      return{
-        name:name,
-        title:name,
-        url:v.url,
-        quality:q,
-        type:"hls",
-        provider:row.provider,
-        headers:row.headers||{},
-        subtitles:row.subtitles||[]
-      };
+    if(vars.length){
+      return vars.map(function(v){
+        var q=v.quality||"Auto";
+        var name=row.name+(q&&q!=="Auto"?" · "+q:"");
+        return{
+          name:name,
+          title:name,
+          url:v.url,
+          quality:q,
+          type:"hls",
+          provider:row.provider,
+          headers:row.headers||{},
+          subtitles:row.subtitles||[]
+        };
+      });
+    }
+    var inferred=qualityFromVariant("",row.url);
+    if(inferred&&inferred!=="Auto")return[rowWithQuality(row,inferred)];
+    return probeQualityFromSegment(t,row).then(function(q){
+      return[rowWithQuality(row,q||"Auto")];
     });
   }).catch(function(e){
     try{console.log("[CineVibe] HLS expand "+row.name+" · "+(e&&e.message?e.message:e));}catch(_){}
@@ -237,7 +380,7 @@ function getStreams(tmdbId,mediaTypeArg,season,episode){
 function onSettings(){
   return[
     {type:"header",label:"CineVibe Local · Server 1"},
-    {type:"info",label:"当前真实链路：CineVibe → vidsrc.wtf API 1 → Viduki V1。已过滤不可移交线路；Jill / Ethan / Wesker 等可用 HLS 会在手机端读取 master playlist，并尽量展开真实 1080p / 720p / 480p 清晰度。"},
+    {type:"info",label:"当前真实链路：CineVibe → vidsrc.wtf API 1 → Viduki V1。若 HLS 没有 master 多码率信息，会读取首个 TS 分片的 H.264 SPS，直接从码流解析真实宽高并显示 1080p / 720p 等。"},
     {
       type:"text",
       key:"resolverUrl",

@@ -7,46 +7,66 @@ on:
 jobs:
   research:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
-      - name: Enumerate FilmU servers and VidBolt chunk refs
+      - name: Probe FilmU Rive and inspect VidBolt embed chunk
         shell: bash
         run: |
           set -e
           python3 - <<'PY'
-          import requests,re
-          S=requests.Session();S.headers.update({"User-Agent":"Mozilla/5.0"})
-          u="https://embed.filmu.in/assets/servers-B7U1aDDl.js"
-          t=S.get(u,timeout=30).text
-          print("FILMU_LEN",len(t))
-          pairs=[]
-          for m in re.finditer(r'id:"([^"]+)",name:"([^"]+)"',t):
-            p=m.groups()
-            if p not in pairs:pairs.append(p)
-          print("SERVER_PAIRS",pairs)
-          for pat,label in [
-            (r'scraperName:"([^"]+)"',"SCRAPER_NAMES"),
-            (r'subKey:"([^"]+)"',"SUBKEYS"),
-            (r'extractor:"([^"]+)"',"EXTRACTORS"),
-            (r'it\([^\)]{0,500},"([^"]+)"\)',"IT_EXTRACTORS"),
-            (r'v\("([^"]+)"',"V_LITERAL_CALLS"),
-            (r'/scrape/\$\{e\}',"SCRAPE_GENERIC")
-          ]:
-            vals=[]
-            for m in re.finditer(pat,t):
-              v=m.group(1) if m.groups() else m.group(0)
-              if v not in vals: vals.append(v)
-            print(label,vals)
-          for needle in ['id:"bastion"','id:"quasar"','id:"citadel"','id:"primevids"','id:"singularity"','FilmU Vortex']:
-            i=t.find(needle)
-            print("\nNEEDLE",needle,"POS",i)
-            if i>=0: print(t[max(0,i-1200):min(len(t),i+5000)].replace("\n"," "))
+          import requests,re,json,urllib.parse
+          S=requests.Session()
+          S.headers.update({"User-Agent":"Mozilla/5.0"})
 
-          vu="https://vidbolt.xyz/assets/index-CWZT0e_1.js"
-          v=S.get(vu,timeout=30).text
-          print("\nVIDBOLT_ENTRY_LEN",len(v))
-          for m in re.finditer(r'([A-Za-z0-9_./-]+\.js)',v):
-            s=m.group(1)
-            if "Page" in s or "server" in s.lower() or "asset" in s.lower():
-              print("REF",s)
+          print("=== FILMU RIVE ===")
+          endpoints=[
+            ("movie-imdb","https://rive.filmu.in/stream/movie/tt0816692?title=Interstellar&tmdbId=157336&imdbId=tt0816692&year=2014"),
+            ("movie-tmdb","https://rive.filmu.in/stream/movie/157336?title=Interstellar&tmdbId=157336&imdbId=tt0816692&year=2014"),
+            ("tv-imdb","https://rive.filmu.in/stream/tv/tt9288030?title=Reacher&tmdbId=108978&imdbId=tt9288030&year=2022&season=1&episode=1"),
+            ("tv-tmdb","https://rive.filmu.in/stream/tv/108978?title=Reacher&tmdbId=108978&imdbId=tt9288030&year=2022&season=1&episode=1")
+          ]
+          for name,url in endpoints:
+            print("\n---",name,url)
+            try:
+              r=S.get(url,timeout=40,headers={"Accept":"application/json","Referer":"https://embed.filmu.in/"})
+              print("STATUS",r.status_code,"CTYPE",r.headers.get("content-type"),"LEN",len(r.text))
+              print(r.text[:16000])
+            except Exception as e:
+              print("ERR",repr(e))
+
+          print("\n=== VIDBOLT EMBED CHUNK ===")
+          candidates=[
+            "https://vidbolt.xyz/assets/assets/EmbeddedOnlyEmbedPage-CxGTx3In.js",
+            "https://vidbolt.xyz/assets/EmbeddedOnlyEmbedPage-CxGTx3In.js"
+          ]
+          text=""
+          for url in candidates:
+            try:
+              r=S.get(url,timeout=30,headers={"Referer":"https://vidbolt.xyz/movie/157336"})
+              print("CHUNK",url,r.status_code,r.headers.get("content-type"),"LEN",len(r.text),r.text[:80].replace("\n"," "))
+              if "javascript" in (r.headers.get("content-type") or "").lower() and len(r.text)>5000:
+                text=r.text
+                print("USING",url)
+                break
+            except Exception as e:
+              print("CHUNKERR",url,repr(e))
+          if not text:
+            raise SystemExit("No VidBolt JS chunk")
+
+          keys=["/api/","/scrape/","scraper.","stream/","tmdbId","imdbId","quasar","callisto","orion","citadel","primevids","solstice","flowcast","bastion","videasy","source"]
+          for key in keys:
+            hits=[m.start() for m in re.finditer(re.escape(key.lower()),text.lower())]
+            if not hits: continue
+            print("\nKEY",key,"COUNT",len(hits))
+            for idx in hits[:20]:
+              a=max(0,idx-700); b=min(len(text),idx+1400)
+              print(text[a:b].replace("\n"," ")[:2400])
+
+          lits=[]
+          for s in re.findall(r'["\']([^"\']{2,320})["\']',text):
+            sl=s.lower()
+            if any(x in sl for x in ["http","/api/","/scrape/","/stream/","quasar","callisto","orion","citadel","primevids","solstice","flowcast","bastion"]):
+              if s not in lits:lits.append(s)
+          print("\nINTERESTING",len(lits))
+          for s in lits[:250]:print(s)
           PY

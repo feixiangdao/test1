@@ -1,5 +1,5 @@
 // YFlix Local for Nuvio
-// v0.4.0 - YFlix Server 4 / FilmU Singularity stable build
+// v0.4.1 - YFlix Server 4 / FilmU Singularity expanded-HLS build
 //
 // Current YFlix S4 iframe:
 //   https://embed.filmu.in/movie/{tmdb}
@@ -72,6 +72,65 @@ function subtitleRows(list){
   });
   return out;
 }
+function absoluteUrl(base,ref){
+  ref=clean(ref);
+  if(/^https?:\/\//i.test(ref))return ref;
+  try{return new URL(ref,base).toString();}catch(_){return ref;}
+}
+function qualityFromHeight(h){
+  h=parseInt(h,10)||0;
+  if(h>=1800)return"2160p";
+  if(h>=1300)return"1440p";
+  if(h>=1000)return"1080p";
+  if(h>=650)return"720p";
+  if(h>=440)return"480p";
+  if(h>=320)return"360p";
+  return h?(h+"p"):"Auto";
+}
+function expandHlsRow(row){
+  return fetch(row.url,{headers:row.headers||{}})
+    .then(function(r){
+      if(!r||!r.ok)throw new Error("master HTTP "+(r?r.status:"no-response")+(r&&r.statusText?(" · "+r.statusText):""));
+      return r.text();
+    })
+    .then(function(text){
+      text=String(text||"");
+      if(text.indexOf("#EXTM3U")!==0)throw new Error("not HLS");
+      var lines=text.replace(/\r/g,"").split("\n"),vars=[];
+      for(var i=0;i<lines.length;i++){
+        var line=lines[i].trim();
+        if(line.indexOf("#EXT-X-STREAM-INF:")!==0)continue;
+        var rm=line.match(/RESOLUTION=(\d+)x(\d+)/i),u="";
+        for(var j=i+1;j<lines.length;j++){
+          var n=lines[j].trim();
+          if(!n)continue;
+          if(n.charAt(0)==="#")continue;
+          u=absoluteUrl(row.url,n);break;
+        }
+        if(!u)continue;
+        vars.push({url:u,height:rm?parseInt(rm[2],10):0});
+      }
+      if(!vars.length){
+        row.quality=row.quality||"HLS";
+        row.name="YFlix · S4 · Singularity · "+row.quality;
+        row.title=row.name;
+        return[row];
+      }
+      vars.sort(function(a,b){return(b.height||0)-(a.height||0);});
+      var seen={},out=[];
+      vars.forEach(function(v){
+        if(!v.url||seen[v.url])return;
+        seen[v.url]=1;
+        var q=qualityFromHeight(v.height);
+        var n="YFlix · S4 · Singularity · "+q;
+        out.push({
+          name:n,title:n,url:v.url,quality:q,type:"hls",
+          provider:"yflix-server4",headers:row.headers||{},subtitles:row.subtitles||[]
+        });
+      });
+      return out;
+    });
+}
 function normalizeSingularity(j){
   var rows=[];
   if(j&&Array.isArray(j.sources))rows=rows.concat(j.sources);
@@ -119,8 +178,12 @@ function callSingularity(tmdbId,mediaType,season,episode){
   return fetchJson(u,{headers:apiHeaders(tmdbId,mediaType,season,episode)})
     .then(function(j){
       var rows=normalizeSingularity(j);
-      if(!rows.length)diag("Singularity · 0 HLS");
-      return rows;
+      if(!rows.length){diag("Singularity · 0 HLS");return[];}
+      return Promise.all(rows.map(expandHlsRow)).then(function(groups){
+        var out=[];groups.forEach(function(g){out=out.concat(g||[]);});
+        if(!out.length)diag("Singularity · no playable HLS variants");
+        return out;
+      });
     })
     .catch(function(e){
       var m=e&&e.message?e.message:e;
@@ -147,7 +210,7 @@ function getStreams(tmdbId,mediaType,season,episode){
 function onSettings(){
   return[
     {type:"header",label:"YFlix Local · Server 4"},
-    {type:"info",label:"FilmU 稳定版：暂时只使用 Singularity 直连 HLS。已移除手机端无法播放的 Pulsar/Allmovieland 代理链路。"}
+    {type:"info",label:"FilmU 稳定版：只使用 Singularity，并在返回前验证/展开 HLS master，直接给 Nuvio 已确认可访问的分辨率子线路。Pulsar/Allmovieland 已移除。"}
   ];
 }
 module.exports={getStreams:getStreams,onSettings:onSettings};

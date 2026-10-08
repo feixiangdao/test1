@@ -1,7 +1,7 @@
 {
   "name": "YFlix Local",
-  "version": "0.5.2",
-  "description": "YFlix Local v0.5.2. S2 is stabilized: movie sources are hidden while VidBolt has no verified playable movie route; TV keeps only live-probed Vidlink 480p/360p. S4 Videasy remains unchanged and verified.",
+  "version": "0.6.0",
+  "description": "YFlix Local v0.6.0. S2 uses the stabilized VidBolt subset (movie hidden while upstream is stale; TV live Vidlink only). S3 adds native VidNest Videasy + NextGen with runtime identity checks. S4 Videasy remains unchanged and verified.",
   "scrapers": [
     {
       "id": "yflix-server1",
@@ -91,4 +91,4 @@
       "supportsExternalPlayer": true
     }
   ]
-}\n
+}

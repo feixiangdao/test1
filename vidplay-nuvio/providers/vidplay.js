@@ -74,15 +74,67 @@ function streamRows(html,ref,sourceName,depth){
       .catch(function(e){log(sourceName+" embed: "+(e&&e.message||e));return[];});
   })).then(function(a){return [].concat.apply([],a);});
 }
-function tmdbImdb(id){
+function htmlDecode(s){
+  return clean(s).replace(/&amp;/g,"&").replace(/&quot;/g,'"')
+    .replace(/&#39;|&#x27;/gi,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">")
+    .replace(/<[^>]+>/g," ");
+}
+function normTitle(s){
+  return htmlDecode(s).toLowerCase().replace(/&/g,"and")
+    .replace(/[^a-z0-9]+/g," ").replace(/\s+/g," ").trim();
+}
+function tmdbMeta(id,type){
   var key=clean(settings().tmdbApiKey);
   if(!key){try{key=clean(globalThis.TMDB_API_KEY);}catch(e){}}
-  if(!key)return Promise.resolve("");
-  var u="https://api.themoviedb.org/3/movie/"+encodeURIComponent(String(id))+"/external_ids?api_key="+encodeURIComponent(key);
+  if(!key)return Promise.resolve(null);
+  var u="https://api.themoviedb.org/3/"+(type==="tv"?"tv":"movie")+
+    "/"+encodeURIComponent(String(id))+"?api_key="+encodeURIComponent(key)+
+    "&append_to_response=external_ids";
   return fetchText(u,{"Accept":"application/json"}).then(function(t){
-    var j=JSON.parse(t),imdb=clean(j.imdb_id);
-    return /^tt\d+$/.test(imdb)?imdb:"";
-  }).catch(function(e){log("TMDB lookup: "+(e&&e.message||e));return"";});
+    var j=JSON.parse(t);
+    var released=clean(j.release_date||j.first_air_date);
+    var imdb=clean((j.external_ids&&j.external_ids.imdb_id)||j.imdb_id);
+    return {
+      title:clean(j.title||j.name),
+      original:clean(j.original_title||j.original_name),
+      year:/^\d{4}/.test(released)?released.slice(0,4):"",
+      imdb:/^tt\d+$/.test(imdb)?imdb:""
+    };
+  }).catch(function(e){log("TMDB metadata: "+(e&&e.message||e));return null;});
+}
+function searchPage(html,meta,type,season,episode){
+  if(!meta||!meta.title)return"";
+  var re=/<figure\b[^>]*>[\s\S]*?<\/figure>/gi,m,candidates=[];
+  var wanted=[normTitle(meta.title),normTitle(meta.original)].filter(Boolean);
+  while((m=re.exec(clean(html)))!==null){
+    var block=m[0];
+    var link=block.match(/<a\b[^>]*\bhref=["']([^"']+)["']/i);
+    var title=block.match(/<div\b[^>]*class=["'][^"']*\btitle\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+    var year=block.match(/<div\b[^>]*class=["'][^"']*\byear\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+    if(!link||!title)continue;
+    var href=htmlDecode(link[1]).trim(),foundTitle=normTitle(title[1]);
+    if(type==="movie"&&!/^\/movie\/\d+-watch-[a-z0-9-]+-online\/?$/i.test(href))continue;
+    if(type==="tv"&&!/^\/watchseries\/[a-z0-9-]+-online-free\/?$/i.test(href))continue;
+    if(wanted.indexOf(foundTitle)<0)continue;
+    if(meta.year&&(!year||htmlDecode(year[1]).trim()!==meta.year))continue;
+    if(candidates.indexOf(href)<0)candidates.push(href);
+  }
+  // Ambiguity is never resolved by taking the first matching result.
+  if(candidates.length!==1)return"";
+  var url=BASE+candidates[0];
+  if(type==="tv")url=url.replace(/\/$/,"")+"/season/"+season+"/episode/"+episode;
+  return url;
+}
+function discoverReferer(meta,type,season,episode){
+  if(!meta||!meta.title)return Promise.resolve("");
+  var q=meta.title;
+  var url=BASE+"/index.php?menu=search&query="+encodeURIComponent(q);
+  return fetchText(url,requestHeaders(BASE+"/",false)).then(function(html){
+    var ref=searchPage(html,meta,type,season,episode);
+    if(ref)log("matched "+type+" page "+ref.replace(BASE,""));
+    else log("no unambiguous site match for "+q);
+    return ref;
+  }).catch(function(e){log("site search unavailable: "+(e&&e.message||e));return"";});
 }
 function row(name,u,ref){
   var type=extType(u);if(!type)return null;
@@ -93,27 +145,34 @@ function getStreams(id,mediaType,season,episode){
   if(!/^\d+$/.test(tmdb))return Promise.resolve([]);
   season=parseInt(season,10)||0;episode=parseInt(episode,10)||0;
   if(type==="tv"&&(!season||!episode))return Promise.resolve([]);
-  return (type==="movie"?tmdbImdb(tmdb):Promise.resolve("")).then(function(imdb){
-    var routes=[];
-    for(var i=1;i<=3;i++){
-      var v=i===1?"":String(i),source="VidPlay · V"+i,embed=type==="tv"?tmdb:(i===3?tmdb:imdb);
-      if(!embed)continue;
-      var action=type==="tv"?"tv_vplay":"mov_vplay";
-      var u=BASE+"/ajax/"+action+v+".php?embed="+encodeURIComponent(embed);
-      if(type==="tv")u+="&season="+season+"&episode="+episode;
-      routes.push({name:source,url:u});
-    }
-    return Promise.all(routes.map(function(rt){
-      return fetchText(rt.url,requestHeaders(BASE+"/",true)).then(function(html){
-        if(/Just a moment|<title>Access denied|challenge-platform/i.test(html))throw new Error("Cloudflare challenge");
-        return streamRows(html,rt.url,rt.name,2).then(function(entries){
-          return entries.map(function(e){return row(rt.name,e.url,e.ref);}).filter(Boolean);
+  return tmdbMeta(tmdb,type).then(function(meta){
+    return discoverReferer(meta,type,season,episode).then(function(detailRef){
+      var referer=detailRef||BASE+"/";
+      var imdb=meta&&meta.imdb||"",routes=[];
+      for(var i=1;i<=3;i++){
+        var v=i===1?"":String(i),source="VidPlay · V"+i;
+        var embed=type==="tv"?tmdb:(i===3?tmdb:imdb);
+        if(!embed)continue;
+        var action=type==="tv"?"tv_vplay":"mov_vplay";
+        var u=BASE+"/ajax/"+action+v+".php?embed="+encodeURIComponent(embed);
+        if(type==="tv")u+="&season="+season+"&episode="+episode;
+        routes.push({name:source,url:u});
+      }
+      return Promise.all(routes.map(function(rt){
+        return fetchText(rt.url,requestHeaders(referer,true)).then(function(html){
+          if(/Just a moment|<title>Access denied|challenge-platform/i.test(html))throw new Error("Cloudflare challenge");
+          return streamRows(html,rt.url,rt.name,2).then(function(entries){
+            return entries.map(function(e){return row(rt.name,e.url,e.ref);}).filter(Boolean);
+          });
+        }).catch(function(err){log(rt.name+" unavailable: "+(err&&err.message||err));return[];});
+      })).then(function(arr){
+        var out=[],seen={};
+        [].concat.apply([],arr).forEach(function(r){
+          if(!r||seen[r.url])return;seen[r.url]=1;out.push(r);
         });
-      }).catch(function(err){log(rt.name+" unavailable: "+(err&&err.message||err));return[];});
-    })).then(function(arr){
-      var out=[],seen={};[].concat.apply([],arr).forEach(function(r){if(!r||seen[r.url])return;seen[r.url]=1;out.push(r);});
-      log(type+" "+tmdb+" streams="+out.length);
-      return out;
+        log(type+" "+tmdb+" streams="+out.length+(detailRef?" matched-page-referer":" fallback-referer"));
+        return out;
+      });
     });
   });
 }

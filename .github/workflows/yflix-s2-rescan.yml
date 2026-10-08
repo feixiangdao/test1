@@ -6,20 +6,28 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 5
     steps:
-      - name: Probe VidRock via VidBolt proxy
+      - name: Probe direct VidRock backends
         shell: bash
         run: |
           set -e
           UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36'
+          # Public API key is read from the currently deployed S4 provider so this workflow does not duplicate it.
+          KEY=$(curl -fsSL 'https://raw.githubusercontent.com/feixiangdao/test1/main/yflix-nuvio/providers/yflix-server4-v051.js' | sed -n 's/.*BOX_KEY="\([^"]*\)".*/\1/p' | head -1)
+          echo "KEY_LEN=${#KEY}"
           probe(){
-            label="$1"; path="$2";
+            label="$1"; base="$2"; path="$3";
             echo "--- $label ---"
-            code=$(curl -sS -L --max-time 35 -A "$UA" -e 'https://vidbolt.xyz/movie/157336' -H 'Accept: application/json' -G --data-urlencode "path=$path" -o /tmp/out.json -w '%{http_code}' 'https://vidbolt.xyz/api/proxy' || true)
-            echo "HTTP $code SIZE $(wc -c < /tmp/out.json 2>/dev/null || echo 0)"
-            head -c 24000 /tmp/out.json || true
+            rm -f /tmp/out.json
+            code=$(curl -sS -L --connect-timeout 5 --max-time 20 -A "$UA" -H "x-api-key: $KEY" -H 'Accept: application/json' -o /tmp/out.json -w '%{http_code} %{time_total}' "$base$path" || true)
+            echo "RESULT $code SIZE $(wc -c < /tmp/out.json 2>/dev/null || echo 0)"
+            head -c 24000 /tmp/out.json 2>/dev/null || true
             echo
           }
-          probe 'VidRock movie' '/scrape/VidRock/movie/tt0816692?tmdbId=157336&title=Interstellar&year=2014'
-          probe 'VidRock TV' '/scrape/VidRock/tv/tt9288030?tmdbId=108978&title=Reacher&year=2022&season=1&episode=1'
+          M='/scrape/VidRock/movie/tt0816692?tmdbId=157336&title=Interstellar&year=2014'
+          T='/scrape/VidRock/tv/tt9288030?tmdbId=108978&title=Reacher&year=2022&season=1&episode=1'
+          probe 'showbox movie' 'https://showbox.filmu.in' "$M"
+          probe 'showbox TV' 'https://showbox.filmu.in' "$T"
+          probe 'sslip movie' 'https://backend-api2-bxhuur-7f7bc0-15-235-147-53.sslip.io' "$M"
+          probe 'sslip TV' 'https://backend-api2-bxhuur-7f7bc0-15-235-147-53.sslip.io' "$T"

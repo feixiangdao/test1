@@ -36,3 +36,10 @@ Tests cover movie/TV routing, safe direct HLS parsing, malformed IDs and the cru
 ## Deployment policy
 
 Do not install this disabled manifest expecting playable Flixer streams. The published code is a tested scaffold, not a completed decryptor. No existing provider is modified.
+
+## Local WASM conversion investigation (2026-10-08)
+
+- Flixer browser WASM measured **132,377 bytes**, with WebAssembly imports for browser fingerprint inputs (`navigator`, Canvas, localStorage, window, screen, time, etc.).
+- An automated Chromium initialization attempt failed with `E20` during key generation; other real-browser sessions had successfully resolved HLS. This suggests environment-sensitive logic but does not isolate the precise E20 cause.
+- Binaryen `wasm2js` **version 108** was tested without flags and with `--all-features`. Both failed validation of some `i64.trunc_sat_f64_u` instructions; therefore a direct WASM-to-pure-JavaScript translation is **not demonstrated**. This does not establish that a newer Binaryen or a manual port is impossible.
+- Until a decoder works inside Nuvio itself, the manifest must remain disabled and no claimed video playback success should be inferred from the direct-link unit tests.

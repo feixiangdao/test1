@@ -22,8 +22,10 @@ jobs:
         run: |
           npm install --no-save binaryen@132.0.0 playwright
           npx playwright install --with-deps chromium
-      - name: Capture current Flixer encrypted fixture locally
-        run: node flixer-provider-lab/capture-live-fixture.mjs
+      - name: Capture current Flixer encrypted fixture with headed Chromium
+        env:
+          FLIXER_HEADFUL: '1'
+        run: xvfb-run -a node flixer-provider-lab/capture-live-fixture.mjs
       - name: Fetch current Flixer WASM
         run: |
           set -euo pipefail

@@ -14,22 +14,7 @@ jobs:
           set -e
           git clone --depth 1 https://github.com/sharoon7171/cinesrc-stream-resolver /tmp/cs
           cd /tmp/cs
-          python3 - <<'PY'
-          p='src/protection/host.js'
-          s=open(p,encoding='utf-8').read()
-          old="""      } else if (parsed.pathname === '/api/c/stage2/issue' && requestToken) {
-        headers.set('x-cs-r', requestToken)
-      }"""
-          new="""      } else if (parsed.pathname === '/api/c/stage2/issue' && requestToken) {
-        headers.set('x-cs-r', requestToken)
-        if (protectionHeader) headers.set('x-cs-q', protectionHeader)
-        if (requestPacket) headers.set('x-cs-p', requestPacket)
-      }"""
-          if old not in s:
-              raise SystemExit('patch target not found')
-          open(p,'w',encoding='utf-8').write(s.replace(old,new))
-          print('PATCHED_STAGE2_QP')
-          PY
+          python3 -c "p='src/protection/host.js';s=open(p).read();old=\"headers.set('x-cs-r', requestToken)\n      }\";new=\"headers.set('x-cs-r', requestToken)\n        if (protectionHeader) headers.set('x-cs-q', protectionHeader)\n        if (requestPacket) headers.set('x-cs-p', requestPacket)\n      }\";assert old in s;open(p,'w').write(s.replace(old,new))"
           npm ci
           node --input-type=module <<'NODE'
           import { parseStreamQuery, fetchProviderCatalog, resolveProviderStream } from './src/resolve/live.js';

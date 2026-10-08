@@ -7,7 +7,26 @@ const targets = [
 ];
 const safe = u => { try { const x = new URL(u); return x.origin + x.pathname; } catch { return ''; } };
 const isInteresting = u => ['.m3u8','.mp4','.mpd','/api/','/source','/server','/embed','/watch','/stream','/play','/video','/proxy','/playlist'].some(s => u.toLowerCase().includes(s));
-const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+async function publicDnsA(hostname) {
+  try {
+    const r = await fetch("https://dns.google/resolve?name=" + encodeURIComponent(hostname) + "&type=A&cd=true", {
+      signal: AbortSignal.timeout(7000)
+    });
+    if (!r.ok) return null;
+    const data=await r.json();
+    const a=(data.Answer || []).find(x=>x.type===1 && /^\d{1,3}(\.\d{1,3}){3}$/.test(x.data));
+    return a ? a.data : null;
+  } catch (e) { console.warn("[DNS] DoH unavailable for",hostname,String(e).slice(0,120));return null; }
+}
+const originHosts=["flixer.su","plsdontscrapemelove.flixer.su"];
+const aRecords=await Promise.all(originHosts.map(publicDnsA));
+const mappings=originHosts.map((h,i)=>aRecords[i] ? "MAP " + h + " " + aRecords[i] : "").filter(Boolean);
+console.log("[DNS] Origin mappings",mappings.length,"of",originHosts.length);
+const chromeArgs=["--no-sandbox"];
+if (mappings.length) chromeArgs.push("--host-resolver-rules=" + mappings.join(", "));
+const browser = await chromium.launch({headless:true,args:chromeArgs});
+
+let verified = 0;
 for (const [name,url] of targets) {
   const ctx = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36', viewport: {width:1365,height:900} });
   const page = await ctx.newPage();
@@ -59,6 +78,9 @@ for (const [name,url] of targets) {
   console.log('FLIXER_RESULT_START');
   console.log(JSON.stringify({name,url,error,info:p,requests:[...requests.values()],responses:responseInfo,playlistDetails},null,2).slice(0,26000));
   console.log('FLIXER_RESULT_END');
+  if (!error && p && p.videos && p.videos.some(v => v.readyState === 4 && !v.error) && playlistDetails.some(x => x.isMaster && x.status === 200)) verified++;
   await ctx.close();
 }
 await browser.close();
+console.log("FLIXER_VERIFIED", verified, "/", targets.length);
+if (verified !== targets.length) process.exitCode = 1;

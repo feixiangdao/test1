@@ -20,12 +20,15 @@ globalThis.fetch=async function(url,opts){
 (async()=>{
   const start=Date.now();
   const rows=await provider.getStreams(395992,"movie");
+  const actual=rows.filter(x=>x&&x.quality!=="Status"&&!/^data:/i.test(x.url||""));
+  const diagnostics=rows.filter(x=>x&&x.quality==="Status");
   console.log("LIVE_V1",JSON.stringify({
     test:"Life (2017); live public keyless metadata and actual V1",ms:Date.now()-start,
-    streamCount:rows.length,quality:rows.map(x=>x.quality),formats:rows.map(x=>x.type),
+    streamCount:actual.length,diagnosticCount:diagnostics.length,
+    diagnostics:diagnostics.map(x=>x.name),quality:actual.map(x=>x.quality),formats:actual.map(x=>x.type),
     requestedServices:requests,
     v2v3Attempted:requests.some(x=>/mov_vplay[23]|tv_vplay[23]/.test(x.path)),
-    mediaVerified:rows.length>0,
-    note:rows.length?"Nuvio device playback still unverified":"No media available to CI; not a playback result"
+    mediaVerified:actual.length>0,
+    note:actual.length?"Nuvio device playback still unverified":"Nonplayable diagnostics only; no live media verified"
   }));
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1});

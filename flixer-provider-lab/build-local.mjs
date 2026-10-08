@@ -71,6 +71,18 @@ try{
  try{
   const v=await local.get_img_key();
   console.log("LOCAL_GET_IMG_KEY_RESULT",JSON.stringify({type:typeof v,length:typeof v==="string"?v.length:-1,keyLooksValid:typeof v==="string"&&v.length===64}));
+  try {
+   const fixture = JSON.parse(await readFile("/tmp/flixer-fixture.json","utf8"));
+   if(fixture && fixture.status === 200 && typeof fixture.body === "string" && fixture.suppliedKey.length === 64){
+    try{
+     const plain=await local.process_img_data(fixture.body,fixture.suppliedKey);
+     const parsed=JSON.parse(plain);
+     const values=Array.isArray(parsed?.sources) ? parsed.sources : Array.isArray(parsed?.sources?.sources) ? parsed.sources.sources : [];
+     console.log("LOCAL_DECRYPT_FIXTURE_RESULT",JSON.stringify({decodedJson:true,hasSources:values.length>0,sourceCount:values.length,mediaUrlCount:values.filter(x=>typeof x?.url==="string" && x.url.startsWith("http")).length}));
+    }catch(e){ console.log("LOCAL_DECRYPT_FIXTURE_ERROR",String(e).slice(0,180));process.exitCode=1;}
+   }
+  }catch(e){console.log("LOCAL_DECRYPT_FIXTURE_MISSING",e?.code||String(e).slice(0,80));}
+
  }catch(e){ console.log("LOCAL_GET_IMG_KEY_ERROR",String(e).slice(0,600));console.log("LOCAL_WBG_IMPORT_TRACE",JSON.stringify(globalThis.__FLIXER_WBG_CALLS.slice(-65))); }
 }catch(e){
  console.error("LOCAL_BUNDLE_IMPORT_FAILED",String(e),e?.stack?.slice(0,1200));

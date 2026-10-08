@@ -9,83 +9,68 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Validate identities and inspect remaining VidBolt modules
+      - name: Probe current VidBolt servers
         shell: bash
         run: |
           set -e
           python3 - <<'PY'
-          import requests,re,json,urllib.parse,math
+          import requests,re,json,urllib.parse
           S=requests.Session();S.headers.update({"User-Agent":"Mozilla/5.0"})
-          FILMU_KEY="09eb429913afb6b1cc90f23746f41fb3279aed77726c625c40672b81444c0bac"
 
-          def absurl(base,ref):
-            return urllib.parse.urljoin(base,ref)
-
-          def duration(url,headers=None,depth=0):
-            headers=headers or {}
+          def duration(url,headers=None):
             try:
-              r=S.get(url,timeout=25,headers=headers)
-              if r.status_code!=200:
-                return {"status":r.status_code,"head":r.text[:80]}
+              r=S.get(url,timeout=25,headers=headers or {})
+              if r.status_code!=200:return {"status":r.status_code,"head":r.text[:80]}
               txt=r.text
-              if "#EXTM3U" not in txt:
-                return {"status":r.status_code,"not_hls":txt[:80]}
+              if "#EXTM3U" not in txt:return {"status":200,"not_hls":True,"ct":r.headers.get("content-type")}
               vals=[float(x) for x in re.findall(r'#EXTINF:([0-9.]+)',txt)]
-              if vals:
-                return {"status":200,"seconds":round(sum(vals),2),"minutes":round(sum(vals)/60,2),"segments":len(vals)}
-              # master: follow first variant
-              lines=txt.replace("\r","").split("\n")
-              for line in lines:
+              if vals:return {"status":200,"minutes":round(sum(vals)/60,2),"segments":len(vals)}
+              for line in txt.replace("\r","").split("\n"):
                 line=line.strip()
                 if line and not line.startswith("#"):
-                  return {"status":200,"master":True,"child":duration(absurl(url,line),headers,depth+1)}
+                  return {"status":200,"master":True,"child":duration(urllib.parse.urljoin(url,line),headers)}
               return {"status":200,"empty":True}
-            except Exception as e:
-              return {"error":repr(e)}
+            except Exception as e:return {"error":repr(e)}
 
-          print("=== S4 FILMU VIDEASY IDENTITY ===")
-          for label,kind,ident,query in [
-            ("Interstellar","movie","tt0816692","title=Interstellar&tmdbId=157336&imdbId=tt0816692&year=2014"),
-            ("ReacherS01E01","tv","tt9288030","title=Reacher&tmdbId=108978&imdbId=tt9288030&year=2022&season=1&episode=1")
-          ]:
-            url=f"https://box.filmu.in/scrape/Videasy/{kind}/{ident}?{query}"
-            r=S.get(url,timeout=40,headers={"x-api-key":FILMU_KEY,"Accept":"application/json","Referer":"https://embed.filmu.in/"})
-            print("\nVIDEASY",label,"API",r.status_code,"LEN",len(r.text))
-            try:j=r.json()
-            except Exception:
-              print(r.text[:1000]);continue
-            rows=j.get("sources") or []
-            print("COUNT",len(rows))
-            for row in rows:
-              u=row.get("url",""); h=row.get("headers") or {}
-              print("ROW",row.get("name"),row.get("quality"),u)
-              print("DURATION",json.dumps(duration(u,h),ensure_ascii=False))
-
-          print("\n=== S2 CURRENT EXACT FRONTEND CALLS ===")
-          urls=[
-            ("QuasarExact","https://scraper.vidbolt.xyz/scrape/Quasar/movie/tt0816692?tmdbId=157336"),
-            ("CallistoExact","https://scraper.vidbolt.xyz/scrape/Callisto/movie/tt0816692?title=Interstellar&tmdbId=157336&year=2014")
+          cases=[
+            ("Interstellar","movie","tt0816692",157336,"Interstellar",2014,None,None),
+            ("ReacherS01E01","tv","tt9288030",108978,"Reacher",2022,1,1)
           ]
-          for name,url in urls:
-            r=S.get(url,timeout=35,headers={"Accept":"application/json","Referer":"https://vidbolt.xyz/movie/157336"})
-            print("\nS2",name,r.status_code,"LEN",len(r.text),r.text[:7000])
-            if r.status_code==200:
+          for label,kind,imdb,tmdb,title,year,season,episode in cases:
+            print("\n###",label)
+            specs=[]
+            q_fast=f"tmdbId={tmdb}&imdbId={imdb}"
+            q_nin=f"title={urllib.parse.quote(title)}&year={year}&tmdbId={tmdb}"
+            q_saf=f"tmdbId={tmdb}&imdbId={imdb}&title={urllib.parse.quote(title)}&year={year}"
+            q_nova=f"tmdbId={tmdb}"
+            if kind=="tv":
+              extra=f"&season={season}&episode={episode}"
+              q_fast+=extra;q_nin+=extra;q_saf+=extra;q_nova+=extra
+            specs=[
+              ("FastVa",f"https://scraper.vidbolt.xyz/scrape/FastVa/{kind}/{imdb}?{q_fast}"),
+              ("Ninetta",f"https://scraper.vidbolt.xyz/scrape/Ninetta/{kind}/{imdb}?{q_nin}"),
+              ("Saffron",f"https://scraper.vidbolt.xyz/scrape/Saffron/{kind}/{imdb}?{q_saf}"),
+              ("Nova",f"https://scraper.vidbolt.xyz/scrape/Nova/{kind}/{imdb}?{q_nova}")
+            ]
+            for name,url in specs:
               try:
-                j=r.json()
-                for row in (j.get("sources") or [])[:15]:
-                  u=row.get("url",""); h=row.get("headers") or {}
-                  if ".m3u8" in u or row.get("type")=="m3u8":
-                    print("S2PROBE",row.get("name"),row.get("quality"),json.dumps(duration(u,h),ensure_ascii=False))
-              except Exception as e: print("JSONERR",repr(e))
-
-          print("\n=== S2 OTHER CURRENT MODULES ===")
-          for name,url in [
-            ("FastVa","https://vidbolt.xyz/assets/vaplayer-0F78SnNd.js"),
-            ("Ninetta","https://vidbolt.xyz/assets/fourkhdhub-DhLoTLQ0.js"),
-            ("Saffron","https://vidbolt.xyz/assets/allmovieland-CsLQcLP1.js"),
-            ("Nova","https://vidbolt.xyz/assets/vidlink-_TJ5hLAe.js")
-          ]:
-            r=S.get(url,timeout=30,headers={"Referer":"https://vidbolt.xyz/movie/157336"})
-            print("\nMODULE",name,r.status_code,"LEN",len(r.text))
-            print(r.text[:9000])
+                r=S.get(url,timeout=40,headers={"Accept":"application/json","Referer":"https://vidbolt.xyz/"})
+                print("\nSERVER",name,"API",r.status_code,"LEN",len(r.text))
+                if r.status_code!=200:
+                  print(r.text[:500]);continue
+                j=r.json(); rows=j.get("sources") or []
+                print("ROWS",len(rows))
+                for idx,row in enumerate(rows[:20]):
+                  u=row.get("url",""); typ=str(row.get("type","")).lower()
+                  print("ROW",idx,row.get("name"),row.get("quality"),row.get("language"),u[:260])
+                  if "m3u8" in u.lower() or typ in ("m3u8","hls"):
+                    print("PROBE",json.dumps(duration(u,row.get("headers") or {}),ensure_ascii=False))
+                  else:
+                    try:
+                      rr=S.get(u,timeout=15,headers={**(row.get("headers") or {}),"Range":"bytes=0-1023"},stream=True)
+                      print("FILEPROBE",rr.status_code,rr.headers.get("content-type"),rr.headers.get("content-range"),rr.headers.get("content-length"))
+                      rr.close()
+                    except Exception as e: print("FILEERR",repr(e))
+              except Exception as e:
+                print("\nSERVER",name,"ERR",repr(e))
           PY

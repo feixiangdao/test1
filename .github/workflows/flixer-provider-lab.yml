@@ -1,0 +1,26 @@
+name: Flixer provider lab
+on:
+  push:
+    branches:
+      - flixer-provider-lab-20261008
+    paths:
+      - flixer-provider-lab/**
+      - .github/workflows/flixer-provider-lab.yml
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Inspect Flixer movie player
+        run: node flixer-provider-lab/probe.mjs

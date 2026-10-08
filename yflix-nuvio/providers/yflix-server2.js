@@ -1,5 +1,5 @@
 // YFlix Local for Nuvio
-// v0.3.1 - YFlix Server 2 / VidBolt
+// v0.3.2 - YFlix Server 2 / VidBolt
 //
 // Current YFlix S2 iframe:
 //   https://vidbolt.xyz/movie/{tmdb}
@@ -47,7 +47,7 @@ function fetchJson(url, opt){
   opt = opt || {};
   try { opt.skipSizeCheck = true; } catch(_) {}
   return fetch(url,opt).then(function(r){
-    if(!r || !r.ok) throw new Error("HTTP " + (r ? r.status : "no-response"));
+    if(!r || !r.ok) throw new Error("HTTP " + (r ? r.status : "no-response") + (r && r.statusText ? " · " + r.statusText : ""));
     return r.json();
   });
 }

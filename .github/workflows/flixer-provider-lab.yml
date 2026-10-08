@@ -33,7 +33,7 @@ jobs:
           sudo apt-get install -y -qq binaryen > /tmp/binaryen-install.log
           echo 'WASM2JS_VERSION:'
           wasm2js --version || true
-          timeout 70s wasm2js /tmp/flixer-img-data.wasm -o /tmp/flixer-wasm-translation.mjs
+          timeout 70s wasm2js /tmp/flixer-img-data.wasm --all-features -o /tmp/flixer-wasm-translation.mjs
           echo 'WASM2JS_OUTPUT_SIZE:'
           wc -c /tmp/flixer-img-data.wasm /tmp/flixer-wasm-translation.mjs
           node --check /tmp/flixer-wasm-translation.mjs

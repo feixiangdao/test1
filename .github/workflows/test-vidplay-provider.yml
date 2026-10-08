@@ -1,0 +1,23 @@
+name: Test VidPlay Lab Provider
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/test-vidplay-provider.yml'
+      - 'vidplay-nuvio/providers/vidplay.js'
+      - 'vidplay-nuvio/test-provider.cjs'
+      - 'vidplay-nuvio/manifest.json'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check vidplay-nuvio/providers/vidplay.js
+      - run: node vidplay-nuvio/test-provider.cjs
+      - run: node -e "const x=require('./vidplay-nuvio/manifest.json');if(!x.scrapers.some(x=>x.filename==='providers/vidplay.js'))process.exit(1);console.log('PASS manifest references provider')"

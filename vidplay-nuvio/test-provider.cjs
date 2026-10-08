@@ -110,8 +110,8 @@ function common(u,opts){
   });
   const noBinary=await getStreams(395992,"movie");
   assertDiagnostics(noBinary,"No binary response reader");
-  assert.match(noBinary[0].name,/WASM.*arrayBuffer/);
-  console.log("PASS: missing binary fetch reader is reported with exact V1 WASM stage");
+  assert.match(noBinary[0].name,/WASM.*native binary bridge unavailable/);
+  console.log("PASS: when neither fetch.arrayBuffer nor native bridge exists, report exact WASM-stage incompatibility");
 
 
 

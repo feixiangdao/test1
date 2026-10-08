@@ -8,7 +8,16 @@ const importText = "import * as wbg from 'wbg';";
 if(!translated.includes(importText)) throw new Error("Unsupported translated import structure");
 const exportStart = translated.lastIndexOf("\nexport var memory = ");
 if(exportStart<0) throw new Error("No translated export marker");
-const nativeShim = translated.slice(0,exportStart).replace(importText,"var wbg = __wbg_get_imports().wbg;");
+const nativeShim = translated.slice(0,exportStart).replace(importText,`var __flixerWbgRaw = __wbg_get_imports().wbg;
+globalThis.__FLIXER_WBG_CALLS = [];
+var wbg = {};
+Object.keys(__flixerWbgRaw).forEach(function(k){
+ var v=__flixerWbgRaw[k];
+ wbg[k]=typeof v==="function" ? function(){
+  globalThis.__FLIXER_WBG_CALLS.push(k);
+  return v.apply(this, arguments);
+ } : v;
+});`);
 if(!glue.includes("function __wbg_get_imports()")) throw new Error("Missing glue import factory");
 const assembled = glue + "\n// wasm2js translation starts here\n" + nativeShim +
  "\nwasm = retasmFunc;\n" +
@@ -41,7 +50,7 @@ try{
  try{
   const v=await local.get_img_key();
   console.log("LOCAL_GET_IMG_KEY_RESULT",JSON.stringify({type:typeof v,length:typeof v==="string"?v.length:-1,keyLooksValid:typeof v==="string"&&v.length===64}));
- }catch(e){ console.log("LOCAL_GET_IMG_KEY_ERROR",String(e).slice(0,600)); }
+ }catch(e){ console.log("LOCAL_GET_IMG_KEY_ERROR",String(e).slice(0,600));console.log("LOCAL_WBG_IMPORT_TRACE",JSON.stringify(globalThis.__FLIXER_WBG_CALLS.slice(-65))); }
 }catch(e){
  console.error("LOCAL_BUNDLE_IMPORT_FAILED",String(e),e?.stack?.slice(0,1200));
  process.exitCode=1;

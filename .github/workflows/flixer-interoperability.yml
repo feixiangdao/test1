@@ -1,0 +1,39 @@
+name: Flixer local decoder interoperability
+on:
+  push:
+    branches: [flixer-provider-lab-20261008]
+    paths:
+      - 'flixer-provider-lab/capture-fixture.mjs'
+      - 'flixer-provider-lab/build-local.mjs'
+      - '.github/workflows/flixer-interoperability.yml'
+  workflow_dispatch:
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install temporary test tools
+        run: |
+          npm install --no-save binaryen@132.0.0 playwright
+          npx playwright install --with-deps chromium
+      - name: Capture response via ordinary Flixer browser playback
+        run: |
+          node flixer-provider-lab/capture-fixture.mjs
+          test -s /tmp/flixer-fixture.json
+      - name: Retrieve public code and build local translation
+        run: |
+          set -euo pipefail
+          H=plsdontscrapemelove.flixer.su
+          IP=$(curl -fsSL --retry 2 --max-time 9 "https://dns.google/resolve?name=$H&type=A&cd=true" | jq -r '.Answer // [] | map(select(.type == 1)) | .[0].data // empty')
+          test -n "$IP"
+          curl -fsSL --retry 2 --max-time 20 --resolve "$H:443:$IP" "https://$H/assets/wasm/img_data_bg.wasm" -o /tmp/flixer-img-data.wasm
+          curl -fsSL --retry 2 --max-time 20 --resolve "$H:443:$IP" "https://$H/assets/wasm/img_data.js" -o /tmp/flixer-img-data.js
+          node node_modules/binaryen/bin/wasm-opt /tmp/flixer-img-data.wasm --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --llvm-nontrapping-fptoint-lowering --llvm-memory-copy-fill-lowering -o /tmp/flixer-lowered.wasm
+          node node_modules/binaryen/bin/wasm2js /tmp/flixer-lowered.wasm --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext -o /tmp/flixer-wasm-translation.mjs
+          node flixer-provider-lab/build-local.mjs

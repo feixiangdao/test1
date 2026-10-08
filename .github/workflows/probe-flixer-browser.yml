@@ -15,4 +15,4 @@ jobs:
         with:
           node-version: '22'
       - name: Chromium playback API smoke test
-        run: node flixer-nuvio/probe-flixer-browser.js
+        run: xvfb-run -a node flixer-nuvio/probe-flixer-browser.js

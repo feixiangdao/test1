@@ -8,35 +8,49 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Test current native CineSrc resolver
+      - name: Test CineSrc stage2 full protection headers
         shell: bash
         run: |
           set -e
           git clone --depth 1 https://github.com/sharoon7171/cinesrc-stream-resolver.git /tmp/cs
           cd /tmp/cs
           npm ci --ignore-scripts=false
+          python3 - <<'PY'
+          p='src/protection/host.js'
+          s=open(p,encoding='utf-8').read()
+          old="""      } else if (parsed.pathname === '/api/c/stage2/issue' && requestToken) {
+        headers.set('x-cs-r', requestToken)
+      }"""
+          new="""      } else if (parsed.pathname === '/api/c/stage2/issue' && requestToken) {
+        headers.set('x-cs-r', requestToken)
+        if (protectionHeader) headers.set('x-cs-q', protectionHeader)
+        if (requestPacket) headers.set('x-cs-p', requestPacket)
+      }"""
+          if old not in s: raise SystemExit('patch target missing')
+          open(p,'w',encoding='utf-8').write(s.replace(old,new))
+          PY
           cat > probe.mjs <<'JS'
           import { parseStreamQuery, fetchProviderCatalog, resolveProviderStream } from './src/resolve/live.js';
-          const input=parseStreamQuery({id:'157336',type:'movie'});
-          console.log('INPUT',JSON.stringify(input));
-          const started=Date.now();
-          const cat=await fetchProviderCatalog(input);
-          console.log('CATALOG_MS',Date.now()-started);
-          console.log('CATALOG',JSON.stringify(cat));
-          for(const p of cat.providers.slice(0,4)){
-            const t=Date.now();
-            try{
-              const r=await resolveProviderStream(input,p.id);
-              console.log('PROVIDER',p.id,p.name,'MS',Date.now()-t,JSON.stringify(r));
-              if(r?.ok && r?.url){
-                try{
-                  const pr=await fetch(r.url,{headers:{Referer:'https://cinesrc.st/'},signal:AbortSignal.timeout(15000)});
-                  const tx=await pr.text();
-                  console.log('PLAYLIST',pr.status,pr.headers.get('content-type'),tx.slice(0,220).replace(/\n/g,'\\n'));
-                }catch(e){console.log('PLAYLIST_ERR',String(e?.message||e));}
-                break;
-              }
-            }catch(e){console.log('PROVIDER_ERR',p.id,p.name,String(e?.message||e));}
+          async function runOne(label,q){
+            const input=parseStreamQuery(q);
+            const cat=await fetchProviderCatalog(input);
+            console.log('CATALOG',label,JSON.stringify(cat.providers));
+            for(const p of cat.providers.slice(0,6)){
+              const t=Date.now();
+              try{
+                const r=await resolveProviderStream(input,p.id);
+                console.log('PROVIDER',label,p.id,p.name,'MS',Date.now()-t,JSON.stringify(r));
+                if(r?.ok&&r?.url){
+                  try{
+                    const pr=await fetch(r.url,{headers:{Referer:'https://cinesrc.st/'},signal:AbortSignal.timeout(15000)});
+                    const tx=await pr.text();
+                    console.log('PLAYLIST',label,pr.status,pr.headers.get('content-type'),tx.slice(0,180).replace(/\n/g,'\\n'));
+                  }catch(e){console.log('PLAYLIST_ERR',label,String(e?.message||e));}
+                  return;
+                }
+              }catch(e){console.log('PROVIDER_ERR',label,p.id,p.name,String(e?.message||e));}
+            }
           }
+          await runOne('MOVIE',{id:'157336',type:'movie'});
           JS
           node probe.mjs

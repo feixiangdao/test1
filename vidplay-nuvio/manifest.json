@@ -1,13 +1,13 @@
 {
-  "name": "VidPlay Local Lab",
-  "version": "0.1.2",
-  "description": "VidPlay experimental direct AJAX resolver with exact title/year site discovery; real playback remains unverified due to Cloudflare 403.",
+  "name": "VidPlay V1 Local Lab",
+  "version": "0.1.3",
+  "description": "Experimental VidPlay V1-only Nuvio resolver: keyless TMDB-to-IMDb lookup, YTHD nested player extraction, signed media API, HLS verification; browser verification may prevent direct streams.",
   "scrapers": [
     {
       "id": "vidplay-direct-lab",
-      "name": "VidPlay · V1–V3 (Lab)",
-      "description": "First-party title/year site matching, per-title Referer, movie/TV AJAX V1–V3, fail-closed on blocked/invalid media.",
-      "version": "0.1.2",
+      "name": "VidPlay · V1 (Lab)",
+      "description": "Only VidPlay V1. Resolves keyless IMDb lookup and public YTHD player chain; emits only verified HLS/MP4/DASH, not HTML iframes. Browser-verified streams may be unavailable.",
+      "version": "0.1.3",
       "author": "VidPlay Lab",
       "supportedTypes": [
         "movie",

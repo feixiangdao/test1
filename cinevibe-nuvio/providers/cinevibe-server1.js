@@ -1,5 +1,5 @@
 // CineVibe Local for Nuvio
-// v0.2.2
+// v0.2.3
 //
 // Proven current chain (2026-10-07):
 // cinevibe.cc Server 1 -> vidsrc.wtf API 1 -> Viduki V1.
@@ -46,7 +46,7 @@ function routeRank(x){
   return 20;
 }
 function requestUrl(id,type,season,episode){
-  var u=resolverUrl()+"?type="+(type==="tv"?"tv":"movie")+"&id="+encodeURIComponent(String(id))+"&maxServers=8";
+  var u=resolverUrl()+"?type="+(type==="tv"?"tv":"movie")+"&id="+encodeURIComponent(String(id))+"&maxServers=10";
   if(type==="tv"){
     u+="&season="+encodeURIComponent(String(season||0));
     u+="&episode="+encodeURIComponent(String(episode||0));
@@ -82,7 +82,9 @@ function getStreams(tmdbId,mediaTypeArg,season,episode){
     rows.forEach(function(x){
       x=x||{};
       var url=clean(x.url);
-      if(!/^https?:\/\//i.test(url)||!transferable(url,x.server)||seen[url])return;
+      if(!/^https?:\/\//i.test(url)||x.portableHint===false||!transferable(url,x.server)||seen[url])return;
+      var mt=mediaType(url,x.type);
+      if(mt==="hls"&&!/\.m3u8(?:$|[?#])/i.test(url)&&clean(x.type)==="unknown")return;
       seen[url]=1;
       var server=clean(x.server)||"Server 1";
       var lang=clean(x.language);
@@ -98,7 +100,7 @@ function getStreams(tmdbId,mediaTypeArg,season,episode){
         title:name,
         url:url,
         quality:"Auto",
-        type:mediaType(url,x.type),
+        type:mt,
         provider:"cinevibe-server1",
         headers:h,
         subtitles:[]
@@ -114,7 +116,7 @@ function getStreams(tmdbId,mediaTypeArg,season,episode){
 function onSettings(){
   return[
     {type:"header",label:"CineVibe Local · Server 1"},
-    {type:"info",label:"当前真实链路：CineVibe → vidsrc.wtf API 1 → Viduki V1。已根据手机实测过滤 Leon / Claire / Rebecca 等不可移交线路，目前优先保留 Jill / Ada 等直连线路。"},
+    {type:"info",label:"当前真实链路：CineVibe → vidsrc.wtf API 1 → Viduki V1。已过滤手机实测失败或 IP/会话绑定线路；当前优先返回 Jill，并继续探测 Ethan / Wesker 等可移交直连线路。"},
     {
       type:"text",
       key:"resolverUrl",

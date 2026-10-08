@@ -20,3 +20,5 @@ jobs:
         run: |
           node --check flixer-local/providers/flixer-local.js
           node flixer-local/local-tests.cjs
+          node --check flixer-local/hls.js
+          node flixer-local/hls-tests.cjs

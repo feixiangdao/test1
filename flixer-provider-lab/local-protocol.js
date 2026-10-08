@@ -113,19 +113,21 @@ function extract(data,server){
 function getStreams(tmdbId,mediaType,season,episode){
  var p=apiPath(tmdbId,mediaType,season,episode);
  if(!p)return Promise.resolve([]);
- try{
+ return Promise.resolve().then(function(){
   if(typeof get_img_key!=="function"||typeof process_img_data!=="function")throw Error("Decoder unavailable");
-  var key=get_img_key();
+  return get_img_key();
+ }).then(function(key){
   if(typeof key!=="string"||key.length!==64)throw Error("Invalid decoder key");
   return syncTime().then(function(offset){
     return fetchCipher(key,p,"",offset).catch(function(){return""}).then(function(){
       return fetchCipher(key,p,"alpha",offset);
     });
   }).then(function(cipher){
-    var decoded=JSON.parse(process_img_data(cipher,key));
-    return extract(decoded,"Alpha");
-  }).catch(function(e){console.log("[Flixer Local] "+String(e).slice(0,120));return[]});
- }catch(e){console.log("[Flixer Local] "+String(e).slice(0,120));return Promise.resolve([]);}
+    return Promise.resolve(process_img_data(cipher,key)).then(function(plaintext){
+      return extract(JSON.parse(plaintext),"Alpha");
+    });
+  });
+ }).catch(function(e){console.log("[Flixer Local] "+String(e).slice(0,120));return[]});
 }
 function onSettings(){return[{type:"header",label:"Flixer Local"},{type:"info",label:"Pure local Alpha HLS decoder. No Vercel or remote resolver. Quality is determined by HLS master playlist."}]}
 if(typeof module!=="undefined"&&module.exports)module.exports={getStreams:getStreams,onSettings:onSettings};

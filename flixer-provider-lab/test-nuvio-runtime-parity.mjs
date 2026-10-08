@@ -22,7 +22,7 @@ if(p0<0||p1<0)throw Error("NUVIO_FETCH_SLICE_MISSING");
 const polyfill=fullPolyfill.slice(p0,p1);
 const call=methodScript("getStaticCallCode");
 const qjs=await getQuickJS();
-const rt=qjs.newRuntime();rt.setMemoryLimit(128*1024*1024);rt.setMaxStackSize(6*1024*1024);
+const rt=qjs.newRuntime();rt.setMemoryLimit(128*1024*1024);rt.setMaxStackSize(4*1024*1024);
 const ctx=rt.newContext();
 const calls=[];
 let captured="__NOT_DONE__";
@@ -48,6 +48,9 @@ try {
    const response={ok:status>=200&&status<300,status,statusText:status===200?"OK":"Not Found",url,body:content,bodyBase64:Buffer.from(content).toString("base64"),headers:{"content-type":"text/plain"},truncated:false};
    return ctx.newString(JSON.stringify(response));
  });
+ const pre=ctx.evalCode('JSON.stringify({ok:3+4,getSettings:__get_scraper_settings()})');
+ if(pre.error){const e=ctx.dump(pre.error);pre.error.dispose();throw Error("QUICKJS_EARLY_HOST_ERROR "+JSON.stringify(e))}
+ console.log("QUICKJS_EARLY_HOST_OK",ctx.dump(pre.value));pre.value.dispose();
  let p=ctx.evalCode("var console={log:function(){},error:function(){},warn:function(){}};\n"+polyfill,"nuvio-polyfill.js",{type:"global"});
  if(p.error){
   const e=ctx.dump(p.error);

@@ -71,3 +71,20 @@ async function sourceFunctions(){
  }
 }
 sourceFunctions().catch(e=>console.log('FUNCTION ERROR',e.message));
+
+async function inspectSourceEngine(){
+  const url='https://flixer.su/assets/js/WatchPartyOverlay-52585954.js';
+  const res=await fetch(url,{signal:AbortSignal.timeout(16000)}),s=await res.text();
+  console.log('ENGINE_HEAD',res.status,s.length,s.slice(0,900));
+  console.log('ENGINE_TAIL',s.slice(-2700));
+  const terms=['poster_sources','/api/','sources','getSources','getStreams','server','provider','decrypt','resolve','watch/','/movie/','tmdbId','axios','https://','fetch(','fetch','function nc','function ac'];
+  for(const term of terms){
+    const re=new RegExp(term.replace(/[.*+?^$()|[\]{}]/g,'\\$&'),'gi');
+    const all=[...s.matchAll(re)];
+    console.log('ENGINE COUNT',term,all.length);
+    for(const m of all.slice(0,term==='poster_sources'?13:5))console.log('ENGINE CTX',term,m.index,s.slice(Math.max(0,m.index-380),m.index+600));
+  }
+  const parts=[...s.matchAll(/https?:\/\/[a-zA-Z0-9.-]+(?:\/[a-zA-Z0-9_./?=&%-]+)?/g)].map(m=>m[0]);
+  console.log('ENGINE URLS',JSON.stringify([...new Set(parts)].slice(0,120)));
+}
+inspectSourceEngine().catch(e=>console.log('ENGINE ERROR',String(e.message)));

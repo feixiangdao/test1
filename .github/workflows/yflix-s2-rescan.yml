@@ -1,42 +1,41 @@
-name: YFlix S2 Rescan
+name: YFlix S2 052 Smoke
 on:
   push:
     paths:
       - '.github/workflows/yflix-s2-rescan.yml'
 jobs:
-  scan:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      - name: Test Quasar alternate path cache keys
+      - name: Verify final S2 behavior
         shell: bash
         run: |
+          set -e
+          curl -fsSL 'https://raw.githubusercontent.com/feixiangdao/test1/main/yflix-nuvio/providers/yflix-server2-v052.js' -o /tmp/s2.js
+          node -c /tmp/s2.js
           node - <<'NODE'
-          const ROOT='https://scraper.vidbolt.xyz/scrape/Quasar/movie/';
-          const UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36';
-          const ids=['tt0816692','tmdb157336','157336'];
-          function expireOf(u){const m=String(u||'').match(/[?&]expire=(\d{10,13})/);return m?Number(m[1]):0;}
           async function probe(x){
-            if(!x)return null;
+            const h=Object.assign({},x.headers||{}, {Range:'bytes=0-0'});
             try{
-              const r=await fetch(x.url,{headers:x.headers||{},signal:AbortSignal.timeout(12000)});
-              const tx=await r.text();
-              return {status:r.status,head:tx.slice(0,100),expire:expireOf(x.url),url:x.url};
-            }catch(e){return {error:String(e?.message||e),expire:expireOf(x.url),url:x.url}}
+              const r=await fetch(x.url,{headers:h,signal:AbortSignal.timeout(15000)});
+              return {name:x.name,status:r.status,ct:r.headers.get('content-type')||'',cr:r.headers.get('content-range')||''};
+            }catch(e){return {name:x.name,error:String(e.message||e)}}
           }
-          async function run(){
-            for(const id of ids){
-              const u=ROOT+encodeURIComponent(id)+'?tmdbId=157336';
-              try{
-                const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':UA,Referer:'https://vidbolt.xyz/'},signal:AbortSignal.timeout(20000)});
-                const tx=await r.text();
-                let j={};try{j=JSON.parse(tx)}catch{}
-                const rows=Array.isArray(j.sources)?j.sources:[];
-                const hls=rows.filter(x=>String(x?.type||'').toLowerCase()==='m3u8'&&String(x?.name||'').includes('Interstellar'));
-                console.log('ID',id,'STATUS',r.status,'COUNT',rows.length,'CACHED',j.cached,'HLS',hls.length,'EXPIRES',JSON.stringify(hls.map(x=>expireOf(x.url))));
-                console.log('FIRST',id,JSON.stringify(await probe(hls[0])));
-              }catch(e){console.log('ERR',id,String(e?.message||e))}
+          async function main(){
+            const p=require('/tmp/s2.js');
+            const m=await p.getStreams('157336','movie');
+            console.log('MOVIE_COUNT',m.length,m.map(x=>x.name));
+            if(m.length!==0)throw new Error('movie should be hidden');
+            const t=await p.getStreams('108978','tv',1,1);
+            console.log('TV_COUNT',t.length,t.map(x=>x.name));
+            if(!t.length)throw new Error('TV expected live Vidlink');
+            for(const x of t){
+              if(!/Vidlink/.test(x.name))throw new Error('unexpected source '+x.name);
+              const q=await probe(x);
+              console.log('PROBE',JSON.stringify(q));
+              if(q.status!==206)throw new Error('range failed '+x.name+' '+q.status);
             }
           }
-          run().catch(e=>{console.error(e);process.exit(1)});
+          main().catch(e=>{console.error(e);process.exit(1)});
           NODE

@@ -1,19 +1,19 @@
 {
   "name": "NOVIPNOAD Local Alpha",
-  "version": "0.2.0",
-  "description": "Independent NOVIPNOAD provider using first-party title/episode discovery, TMDB Chinese aliases, and direct player resolution. Uses verified browser Cookie/User-Agent sessions, fixes encoded player parameters, and reports year mismatches.",
+  "version": "0.2.1",
+  "description": "Independent NOVIPNOAD provider using first-party title/episode discovery, TMDB Chinese aliases, and direct player resolution. Uses verified browser sessions and executes the current PLAYER1 integrity script to capture vkey before legacy parsing fallbacks.",
   "scrapers": [
     {
       "id": "novipnoad-local",
       "name": "NOVIPNOAD Local",
       "description": "NOVIPNOAD .ca/.uk/.net search + strict movie/TV/anime/show/Chinese-season matching + direct player quality extraction.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "author": "NOVIPNOAD Local Lab",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/novipnoad-v020.js",
+      "filename": "providers/novipnoad-v021.js",
       "enabled": true,
       "formats": [
         "m3u8",

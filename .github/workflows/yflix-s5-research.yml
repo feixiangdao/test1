@@ -115,9 +115,22 @@ jobs:
               raise RuntimeError(f"{label} failed {obj}")
             return obj["result"]
 
+          def router_state(kind,tmdb,season=None,episode=None):
+            def seg(name,value): return [name,str(value),"d"]
+            page={"children":["__PAGE__",{},None,None]}
+            parts=[seg("type","show" if kind=="tv" else "movie"),seg("id",tmdb)]
+            if kind=="tv":
+              parts += [seg("season",season or 1),seg("episode",episode or 1)]
+            node=page
+            for s in reversed(parts):
+              node={"children":[s,node,None,None]}
+            tree=["",{"children":["embed",node,None,None]},None,None,True]
+            from urllib.parse import quote
+            return quote(json.dumps(tree,separators=(",",":")),safe="")
+
           def run(kind,tmdb,imdb,season=None,episode=None):
             is_tv=kind=="tv"
-            embed=f"{ORIGIN}/embed/tv/{imdb}?s={season}&e={episode}" if is_tv else f"{ORIGIN}/embed/movie/{imdb}"
+            embed=f"{ORIGIN}/embed/tv/{tmdb}/{season}/{episode}" if is_tv else f"{ORIGIN}/embed/movie/{tmdb}"
             fields=[kind,str(tmdb),str(season) if is_tv else None,str(episode) if is_tv else None]
             encoded=base64.urlsafe_b64encode(json.dumps(fields,separators=(",",":")).encode()).decode().rstrip("=")
             sess=requests.Session()
@@ -143,7 +156,7 @@ jobs:
             fulltoken=f"{enc['token']}::c3::{bj['r']}"
             actions=enc["headers"]
 
-            hp={**BASE,"Next-Action":actions["getProviderList"]}
+            hp={**BASE,"Next-Action":actions["getProviderList"],"Next-Router-State-Tree":router_state(kind,tmdb,season,episode)}
             pr=sess.post(embed,headers=hp,data="[]",timeout=30)
             print(kind,"providers HTTP",pr.status_code,"len",len(pr.text),"head",pr.text[:700].replace("\n","\\n"))
             if pr.status_code != 200: return
@@ -159,7 +172,7 @@ jobs:
 
             for p in plist[:8]:
               pid=p.get("id")
-              hs={**BASE,"Next-Action":actions["getStream"]}
+              hs={**BASE,"Next-Action":actions["getStream"],"Next-Router-State-Tree":router_state(kind,tmdb,season,episode)}
               args=[str(tmdb),"show" if is_tv else "movie",str(season) if is_tv else "$undefined",str(episode) if is_tv else "$undefined",fulltoken,pid]
               sr=sess.post(embed,headers=hs,data=json.dumps(args,separators=(",",":")),timeout=30)
               print(kind,"provider",pid,"HTTP",sr.status_code,"len",len(sr.text),"head",sr.text[:220].replace("\n","\\n"))

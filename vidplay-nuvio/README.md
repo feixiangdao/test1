@@ -1,3 +1,19 @@
+# VidPlay V1 Lab — CURRENT STATUS (2026-10-08, v0.1.3)
+
+**Install/refresh the existing URL**: `https://raw.githubusercontent.com/feixiangdao/test1/main/vidplay-nuvio/manifest.json`. There is no new address and the stable scraper ID remains `vidplay-direct-lab`.
+
+**Only V1 is queried**. Movie flow: public keyless metadata `https://data.vidsrc.sh/api.php?type=movie&tmdb=<TMDB_ID>` → valid IMDb ID → `https://ythd.org/embed/<IMDb_ID>` → `ythd.org/vs_src.php?type=movie&id=<IMDb_ID>` → nested player URL from signed JSON → parse player configuration and **legitimately available, server-issued one-use API token** → if permitted, obtain stream data, decrypt the provider-supplied media URL list as required, verify media playlist, and return real Nuvio stream objects. If not permitted by the upstream browser verification / missing token, return zero, *never a fake playable iframe*. Old first-party **V1 only** AJAX is a fail-closed fallback; V2 and V3 are disabled entirely. TV V1 currently only uses the AJAX fallback and **is not confirmed playable**.
+
+**TMDB key is no longer required** for typical movie V1 lookup. The optional key in settings is retained strictly as fallback if the public metadata lookup fails. No API keys are committed to this provider.
+
+**Verified simulated tests:** https://github.com/feixiangdao/test1/actions/runs/37785313475 — covers 360p/720p/1080p HLS master parsing, signed API-token flow, challenge rejection, missing/invalid token, V1 AJAX fallback, keyless TMDB-to-IMDb metadata mapping, and invalid/private URL rejection. Test fixtures are not proof of live playback.
+
+**Verified live test:** https://github.com/feixiangdao/test1/actions/runs/37785368909 — actual cloud requests succeeded: keyless `data.vidsrc.sh` 200, YTHD embed 200, YTHD `vs_src.php` 200, both `stellarconductornexus.com` player layers 200. Inner player declared **browser verification required**; the direct fallback VidPlay AJAX returned HTTP 403, so **zero real HLS streams** on GitHub CI. Android Nuvio playback remains unverified. No claim that V1 plays on-device yet.
+
+Next gate: determine whether Nuvio device networking receives authorized, signed direct media responses in its runtime. Browser-only verified playback cannot automatically be translated to Nuvio without a separate compatible public media response. Do not copy or reuse short-lived browser verification tokens.
+
+---
+
 # VidPlay Local Lab (Nuvio)
 
 **Status: experimental, playback NOT verified.** This is a standalone Nuvio provider and does not modify any other providers.

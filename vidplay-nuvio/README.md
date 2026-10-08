@@ -1,3 +1,17 @@
+# VidPlay V1 Local Lab — v0.1.4 fix (2026-10-08)
+
+**Symptom:** On Android Nuvio the VidPlay Provider capsule disappeared after searching. Live v0.1.3 returned `[]` whenever the nested YTHD player required browser verification (or the VidPlay AJAX returned HTTP 403). The client can hide a provider with no results. Actual on-device UI behavior still requires user confirmation.
+
+**Fix:** Keep the **same manifest/install URL** and scraper ID, now version **0.1.4**. `getStreams()` returns verified playable HLS/MP4/DASH rows if any; otherwise it returns exactly **one clearly labeled NON-PLAYABLE diagnostic Status row** with a tiny empty data HLS playlist, following our successful YesMovies/NOVIPNOAD diagnostic pattern. It must not be described as real movie playback; clicking this Status item will not play a video. A 7-second overall search budget prevents indefinite wait. No V2/V3 routes.
+
+**Mocked regression run:** https://github.com/feixiangdao/test1/actions/runs/37786375781 ; covers positive verified HLS 360p/720p/1080p, authorization/challenge failures, no token, network failure, safe URLs, no-key metadata, and V1-only fallback.
+
+**Real external-network smoke:** https://github.com/feixiangdao/test1/actions/runs/37786459463. Real `Life (2017)` queries completed in ~2 seconds on CI; returned 0 playable media, 1 explicit nonplayable diagnostic (`V1 requires browser verification; AJAX HTTP 403`), called no V2/V3 endpoints.
+
+**Next step:** On Android refresh the **existing** URL `https://raw.githubusercontent.com/feixiangdao/test1/main/vidplay-nuvio/manifest.json`, check manifest v0.1.4; search Life (2017) or another movie and see if the VidPlay · V1 pill persists with a visible Status diagnostic. This is a **visibility repair, not a V1 playback breakthrough**. Upstream video authorization must be solved separately.
+
+---
+
 # VidPlay V1 Lab — CURRENT STATUS (2026-10-08, v0.1.3)
 
 **Install/refresh the existing URL**: `https://raw.githubusercontent.com/feixiangdao/test1/main/vidplay-nuvio/manifest.json`. There is no new address and the stable scraper ID remains `vidplay-direct-lab`.

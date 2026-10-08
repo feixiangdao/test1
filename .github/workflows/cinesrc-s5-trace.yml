@@ -6,9 +6,9 @@ on:
 jobs:
   trace:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 5
     steps:
-      - name: Capture CineSrc valid challenge in fresh Chrome tab
+      - name: Capture only valid getStream request
         shell: bash
         run: |
           set -e
@@ -24,6 +24,7 @@ jobs:
           node - <<'NODE'
           const http=require('http');
           const TARGET='https://cinesrc.st/embed/movie/157336';
+          const STREAM_ACTION='7e278c7b1a4440a99a81b5c121b5f93193ce0a3f64';
           function api(path,method='GET'){
             return new Promise((resolve,reject)=>{
               const req=http.request({host:'127.0.0.1',port:9222,path,method},r=>{let s='';r.on('data',d=>s+=d);r.on('end',()=>{try{resolve(JSON.parse(s))}catch(e){reject(new Error(s))}})});
@@ -32,10 +33,9 @@ jobs:
           }
           async function main(){
             const page=await api('/json/new?about%3Ablank','PUT');
-            console.log('NEW_TARGET',JSON.stringify({id:page.id,url:page.url,type:page.type}));
             const ws=new WebSocket(page.webSocketDebuggerUrl);
             await new Promise((res,rej)=>{ws.onopen=res;ws.onerror=rej});
-            let seq=0,pending=new Map(),rel=new Map();
+            let seq=0,pending=new Map(),capture={getStream:[],playlists:[],media:[]},reqs=new Map();
             function send(method,params={}){
               const id=++seq;return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}))});
             }
@@ -44,59 +44,35 @@ jobs:
               if(m.id&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.error?p.reject(new Error(JSON.stringify(m.error))):p.resolve(m.result);return}
               if(m.method==='Network.requestWillBeSent'){
                 const p=m.params,req=p.request,h=req.headers||{},na=h['Next-Action']||h['next-action']||'';
-                if(na||/\/api\/c\//.test(req.url)||/api\/playlist|\.m3u8|\.mp4|\.mpd/i.test(req.url)){
-                  rel.set(p.requestId,{url:req.url,na});
-                  console.log('REQ',JSON.stringify({url:req.url,na,type:p.type,postData:(req.postData||'').slice(0,10000)}));
+                if(na===STREAM_ACTION){
+                  reqs.set(p.requestId,{kind:'stream',url:req.url,postData:req.postData||'',headers:h});
+                  capture.getStream.push({requestId:p.requestId,url:req.url,postData:req.postData||''});
+                }else if(/\/api\/playlist\/.*\.m3u8/i.test(req.url)){
+                  capture.playlists.push(req.url);
+                }else if(/bright67\.online/i.test(req.url)&&/(\.m3u8|\.mp4|playlist_|init\.mp4)/i.test(req.url)){
+                  capture.media.push(req.url);
                 }
               }else if(m.method==='Network.responseReceived'){
-                const x=rel.get(m.params.requestId);
-                if(x)console.log('RESP',JSON.stringify({url:x.url,na:x.na,status:m.params.response.status,mime:m.params.response.mimeType}));
+                const x=reqs.get(m.params.requestId);
+                if(x){x.status=m.params.response.status;x.mime=m.params.response.mimeType;}
               }else if(m.method==='Network.loadingFinished'){
-                const x=rel.get(m.params.requestId);
-                if(x&&(x.na||/\/api\/c\//.test(x.url))){
-                  try{const b=await send('Network.getResponseBody',{requestId:m.params.requestId});console.log('BODY',JSON.stringify({url:x.url,na:x.na,body:(b.body||'').slice(0,15000)}))}catch{}
+                const x=reqs.get(m.params.requestId);
+                if(x){
+                  try{const b=await send('Network.getResponseBody',{requestId:m.params.requestId});x.response=b.body||'';}catch{}
                 }
               }
             };
-            await send('Page.enable');await send('Runtime.enable');await send('Network.enable',{maxTotalBufferSize:100000000,maxResourceBufferSize:10000000});
-            const inject=`
-            (()=>{
-              const cap=window.__cap={gc1:[],gc2:[],dr:[],fetches:[],errors:[]};
-              addEventListener('_cs',ev=>setTimeout(()=>{
-                try{const a=window[ev.detail];if(a&&!a.__w){a.__w=1;
-                  if(typeof a.gc==='function'){const f=a.gc.bind(a);a.gc=async(...z)=>{const v=await f(...z);cap.gc1.push(String(v));return v}}
-                  if(typeof a.dr==='function'){const f=a.dr.bind(a);a.dr=async(...z)=>{const v=await f(...z);cap.dr.push({input:String(z[0]).slice(0,500),output:v});return v}}
-                }}catch(e){cap.errors.push('wrap1:'+e.message)}
-              },0),true);
-              setInterval(()=>{try{const a=window.__ss2_challenge;if(a&&typeof a.gc==='function'&&!a.__w){a.__w=1;const f=a.gc.bind(a);a.gc=async(...z)=>{const v=await f(...z);cap.gc2.push(String(v));return v}}}catch{}},10);
-              const old=window.fetch.bind(window);
-              window.fetch=async function(input,init){
-                let url='';try{url=typeof input==='string'?input:input.url}catch{}
-                let na='';try{na=new Headers((init&&init.headers)||(input&&input.headers)).get('Next-Action')||''}catch{}
-                let body='';try{body=init&&typeof init.body==='string'?init.body:''}catch{}
-                const x={url,na,body:body.slice(0,12000)};cap.fetches.push(x);
-                const r=await old(input,init);
-                if(na||/\/api\/c\//.test(url)){try{x.status=r.status;x.response=(await r.clone().text()).slice(0,12000)}catch(e){}}
-                return r
-              };
-              addEventListener('error',e=>cap.errors.push('err:'+e.message),true);
-              addEventListener('unhandledrejection',e=>cap.errors.push('rej:'+String(e.reason&&e.reason.message||e.reason)),true);
-            })();`;
-            await send('Page.addScriptToEvaluateOnNewDocument',{source:inject});
-            const nav=await send('Page.navigate',{url:TARGET});
-            console.log('NAV',JSON.stringify(nav));
-            await new Promise(r=>setTimeout(r,30000));
-            const r=await send('Runtime.evaluate',{expression:`JSON.stringify({
-              href:location.href,title:document.title,html:document.documentElement&&document.documentElement.outerHTML.slice(0,500),
-              cap:window.__cap||null,
-              video:[...document.querySelectorAll('video')].map(v=>({src:v.src,currentSrc:v.currentSrc,readyState:v.readyState,duration:v.duration})),
-              perf:performance.getEntriesByType('resource').map(x=>x.name).filter(x=>/m3u8|mp4|mpd|api\\/playlist|bright67|api\\/c\\//i.test(x)),
-              body:(document.body&&document.body.innerText||'').slice(0,2000)
-            })`,returnByValue:true});
-            console.log('FINAL',r.result.value);
+            await send('Page.enable');await send('Runtime.enable');await send('Network.enable',{maxTotalBufferSize:50000000,maxResourceBufferSize:5000000});
+            await send('Page.navigate',{url:TARGET});
+            await new Promise(r=>setTimeout(r,14000));
+            const expr="JSON.stringify({href:location.href,title:document.title,duration:[...document.querySelectorAll('video')].map(v=>v.duration),text:(document.body&&document.body.innerText||'').slice(0,500)})";
+            const state=await send('Runtime.evaluate',{expression:expr,returnByValue:true});
+            capture.state=JSON.parse(state.result.value||'{}');
+            capture.getStreamDetails=[...reqs.values()].map(x=>({url:x.url,status:x.status,mime:x.mime,postData:x.postData,response:(x.response||'').slice(0,1200)}));
+            capture.playlists=[...new Set(capture.playlists)];
+            capture.media=[...new Set(capture.media)].slice(0,20);
+            console.log('CAPTURE_JSON='+JSON.stringify(capture));
             ws.close();
           }
-          main().catch(e=>{console.error('FATAL',e.stack||e);process.exit(1)});
+          main().catch(e=>{console.error(e.stack||e);process.exit(1)});
           NODE
-          echo '=== CHROME TAIL ==='
-          tail -80 /tmp/chrome.log || true

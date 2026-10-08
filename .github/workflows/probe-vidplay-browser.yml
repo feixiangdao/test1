@@ -1,0 +1,21 @@
+name: Probe VidPlay Browser
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-vidplay-browser.yml'
+      - 'vidplay-nuvio/probe-browser.cjs'
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save playwright@1.56.1
+      - run: npx playwright install --with-deps chromium
+      - run: node vidplay-nuvio/probe-browser.cjs

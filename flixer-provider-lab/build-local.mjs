@@ -80,9 +80,10 @@ try{
      const values=Array.isArray(parsed?.sources) ? parsed.sources : Array.isArray(parsed?.sources?.sources) ? parsed.sources.sources : [];
      let expected=null;try{expected=JSON.parse(await readFile("/tmp/flixer-fixture-expected.json","utf8"))}catch(_){}
      const matched=expected?Array.isArray(expected.sources) && values.length===expected.sources.length && values.every((v,i)=>v.server===expected.sources[i].server && v.url===expected.sources[i].url):null;
-     const urlValues=values.map(x=>x?.url).filter(x=>typeof x==="string"&&/^https?:\\/\\//.test(x));
-     if(typeof parsed?.sources?.file==="string" && /^https?:\\/\\//.test(parsed.sources.file))urlValues.push(parsed.sources.file);
-     if(typeof parsed?.sources?.url==="string" && /^https?:\\/\\//.test(parsed.sources.url))urlValues.push(parsed.sources.url);
+     const isHttp=u=>typeof u==="string"&&(u.startsWith("https://")||u.startsWith("http://"));
+     const urlValues=values.map(x=>x?.url).filter(isHttp);
+     if(isHttp(parsed?.sources?.file))urlValues.push(parsed.sources.file);
+     if(isHttp(parsed?.sources?.url))urlValues.push(parsed.sources.url);
      console.log("LOCAL_DECRYPT_FIXTURE_RESULT",JSON.stringify({decodedJson:true,hasSources:values.length>0,sourceCount:values.length,expectedSources:expected?.sources?.length||null,exactMatch:matched,mediaUrlCount:urlValues.length}));
      if(expected && !matched)process.exitCode=1;
      if(!expected && !urlValues.length)console.log("LOCAL_DECRYPT_NO_MEDIA_URL_YET");

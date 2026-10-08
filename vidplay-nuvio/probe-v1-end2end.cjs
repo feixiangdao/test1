@@ -24,11 +24,28 @@ globalThis.fetch=async (url,options)=>{
  const start=Date.now();
  const rows=await plugin.exports.getStreams(395992,"movie");
  const playable=rows.filter(r=>r.quality!=="Status"&&!/^data:/i.test(r.url||""));
+
+  const variantChecks=[];
+  for (const row of playable.slice(0,3)) {
+    try {
+      const u=new URL(row.url);
+      const r=await original(row.url,{
+        signal:AbortSignal.timeout(9000),
+        headers:{"User-Agent":"Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/139.0.0.0","Referer":row.headers?.Referer||"https://stellarconductornexus.com/"}
+      });
+      const t=r.status>=200&&r.status<300?await r.text():"";
+      const lines=t.split(/\r?\n/);
+      const first=lines.find(x=>x&&!x.startsWith("#")&&x.trim())||"";
+      let child=null;
+      if(first){try{child=new URL(first.trim(),row.url)}catch(e){}}
+      variantChecks.push({quality:row.quality,host:u.hostname,status:r.status,validHLS:t.startsWith("#EXTM3U"),isChildPlaylist:/#EXT-X-TARGETDURATION|#EXT-X-MAP|#EXTINF/.test(t),segmentHost:child?.host||null,segmentPathSuffix:child?child.pathname.split("/").pop()?.slice(-15):null,playlistLineCount:lines.length});
+    }catch(e){variantChecks.push({quality:row.quality,error:e.name+":"+e.message.slice(0,75)})}
+  }
  console.log("V1_END_TO_END",JSON.stringify({
   ms:Date.now()-start,returned:rows.length,playable:playable.length,
   qualities:playable.map(x=>x.quality),types:playable.map(x=>x.type),
-  targets:playable.map(x=>{let u=new URL(x.url);return{host:u.host,path:u.pathname}}),
-  calls:reqs,
+  targets:playable.map(x=>{let u=new URL(x.url);return{host:u.host,pathTail:u.pathname.split("/").pop()}}),
+  calls:reqs.map(x=>({host:x.host,pathTail:x.path?.split("/").pop(),status:x.status,ms:x.ms,error:x.error})),variantChecks,
   statusNames:rows.filter(r=>r.quality==="Status").map(x=>x.name),
   caveat:"No Android playback claim; confirms server-side HLS HTTP only"
  }));

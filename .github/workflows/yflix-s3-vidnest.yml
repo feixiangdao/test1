@@ -1,0 +1,130 @@
+name: YFlix S3 VidNest Research
+on:
+  push:
+    paths:
+      - '.github/workflows/yflix-s3-vidnest.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe native VidNest / GoodStream chain
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const API='https://new.vidnest.fun';
+          const BASE='https://vidnest.fun';
+          const UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36';
+          const ALPH='RB0fpH8ZEyVLkv7c2i6MAJ5u3IKFDxlS1NTsnGaqmXYdUrtzjwObCgQP94hoeW+/=';
+          const REV={}; for(let i=0;i<ALPH.length;i++) REV[ALPH[i]]=i;
+          const servers=['hollymoviehd','videasy','vidzee','nextgencloudfabric','vidlink','onehd','allmovies','moviebox'];
+
+          function decodeCustom(input){
+            let p=String(input||'');
+            while(p.length%4)p+='=';
+            const bytes=[];
+            for(let i=0;i<p.length;i+=4){
+              const c0=REV[p[i]] ?? 64, c1=REV[p[i+1]] ?? 64;
+              const c2=p[i+2]==='='?64:(REV[p[i+2]]??64);
+              const c3=p[i+3]==='='?64:(REV[p[i+3]]??64);
+              if(c0===64||c1===64)break;
+              bytes.push(((c0<<2)|(c1>>4))&255);
+              if(c2!==64)bytes.push((((c1&15)<<4)|(c2>>2))&255);
+              if(c3!==64)bytes.push((((c2&3)<<6)|c3)&255);
+            }
+            return Buffer.from(bytes).toString('utf8');
+          }
+          function abs(base,ref){try{return new URL(ref,base).toString()}catch{return ref}}
+          function sumDuration(txt){
+            let total=0,count=0,m,re=/#EXTINF:([0-9.]+)/g;
+            while((m=re.exec(String(txt||'')))){total+=Number(m[1])||0;count++;}
+            return count?total:0;
+          }
+          async function hlsDuration(url,headers,depth=0){
+            if(depth>4)return{ok:false,error:'depth'};
+            try{
+              const r=await fetch(url,{headers:headers||{},signal:AbortSignal.timeout(15000)});
+              const tx=await r.text();
+              if(!r.ok||!tx.startsWith('#EXTM3U'))return{ok:false,status:r.status,head:tx.slice(0,100)};
+              const sec=sumDuration(tx);
+              if(sec)return{ok:true,status:r.status,seconds:sec,minutes:sec/60,url};
+              const lines=tx.replace(/\r/g,'').split('\n');
+              let next='';
+              for(const line of lines){const s=line.trim();if(s&&!s.startsWith('#')){next=abs(url,s);break;}}
+              if(!next)return{ok:false,error:'no-child'};
+              return hlsDuration(next,headers,depth+1);
+            }catch(e){return{ok:false,error:String(e?.message||e)}}
+          }
+          function collectStreams(server,root){
+            const out=[];
+            if(!root||typeof root!=='object')return out;
+            if(Array.isArray(root.streams)){
+              for(const s of root.streams){
+                if(s&&s.url)out.push({url:s.url,type:s.type||'',quality:s.quality||'',language:s.language||'',headers:s.headers||root.headers||{}});
+              }
+            }
+            if(Array.isArray(root.sources)){
+              for(const s of root.sources){
+                const u=s?.url||s?.file;
+                if(u)out.push({url:u,type:s.type||'',quality:s.quality||'',language:s.language||'',headers:s.headers||root.headers||{}});
+              }
+            }
+            if(root.url&&typeof root.url==='string')out.push({url:root.url,type:root.type||'',quality:root.quality||'',headers:root.headers||{}});
+            if(Array.isArray(root.url)){
+              for(const s of root.url){if(s?.link)out.push({url:s.link,type:s.type||'',quality:s.quality||'',headers:s.headers||root.headers||{}});}
+            }
+            if(root.data?.stream?.playlist){
+              let u=root.data.stream.playlist;
+              try{
+                const o=new URL(u), eh=o.searchParams.get('headers');
+                o.searchParams.delete('headers'); o.searchParams.delete('host');
+                let h=root.headers||{};
+                if(eh){try{h=JSON.parse(eh)}catch{}}
+                out.push({url:o.toString(),type:'hls',quality:'Auto',headers:h});
+              }catch{out.push({url:u,type:'hls',quality:'Auto',headers:root.headers||{}})}
+            }
+            return out;
+          }
+          async function fetchDecoded(server,path){
+            const u=API+'/'+server+'/'+path;
+            try{
+              const r=await fetch(u,{headers:{
+                'User-Agent':UA,
+                'Accept':'application/json, text/javascript, */*; q=0.01',
+                'Accept-Language':'en-US,en;q=0.9',
+                'Referer':BASE+'/',
+                'Origin':BASE
+              },signal:AbortSignal.timeout(15000)});
+              const tx=await r.text();
+              if(!r.ok)return{server,status:r.status,error:tx.slice(0,120)};
+              let outer;try{outer=JSON.parse(tx)}catch{return{server,status:r.status,error:'non-json '+tx.slice(0,100)}}
+              let root=outer.data;
+              if(outer.encrypted&&typeof root==='string'){
+                const plain=decodeCustom(root);
+                try{root=JSON.parse(plain)}catch{return{server,status:r.status,error:'decode-json '+plain.slice(0,140)}}
+              }
+              return{server,status:r.status,root};
+            }catch(e){return{server,error:String(e?.message||e)}}
+          }
+          async function runCase(label,path,expected){
+            console.log('=== CASE',label,path,'expected',expected,'===');
+            const results=await Promise.all(servers.map(s=>fetchDecoded(s,path)));
+            for(const rr of results){
+              if(!rr.root){console.log('SERVER',rr.server,'ERR',rr.status||'',rr.error||'');continue;}
+              const streams=collectStreams(rr.server,rr.root);
+              console.log('SERVER',rr.server,'STATUS',rr.status,'STREAMS',streams.length,'ROOT_KEYS',Object.keys(rr.root).join(','));
+              for(let i=0;i<streams.length;i++){
+                const s=streams[i], u=String(s.url||'');
+                const h=Object.assign({'User-Agent':UA},s.headers||{});
+                const isHls=String(s.type||'').toLowerCase().includes('hls')||u.includes('.m3u8')||u.includes('goodstream');
+                if(!isHls)continue;
+                const p=await hlsDuration(u,h);
+                console.log('PROBE',label,rr.server,i,JSON.stringify({url:u,quality:s.quality,language:s.language,headers:h,probe:p,expected}));
+              }
+            }
+          }
+          (async()=>{
+            await runCase('MOVIE','movie/157336',169);
+            await runCase('TV','tv/108978/1/1',54);
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE

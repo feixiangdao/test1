@@ -23,3 +23,34 @@ async function main(){
  }
 }
 main().catch(e=>{console.log('FATAL',e.message);process.exitCode=1});
+
+async function detailed(){
+  const base='https://flixer.su/assets/js/';
+  for(const asset of ['VideoPlayer-52585954.js','PlayerEmbedPage-52585954.js','SearchPage-52585954.js']){
+    let r=await fetch(base+asset,{signal:AbortSignal.timeout(16000)}),s=await r.text();
+    console.log('DEEP ASSET',asset,r.status,s.length);
+    const vocab=['/api/','server','sources','streamUrl','videoUrl','streaming','url:','m3u8','vidsrc','vidfast','vidlink','vidnest','videasy','vixsrc','getServers','fetchSources','getSources','playerConfig','streamSources','hlsUrl','sourceType','sourceId','plsdontscrapemelove','iframe','tmdbId','embed'];
+    const skip=p=>/hls.js|Hls|FragmentTracker|handshake/i.test(s.slice(Math.max(0,p-40),p+60));
+    for(const word of vocab){
+      let re=new RegExp(word.replace(/[.*+?^$()|[\]{}]/g,'\\$&'),'gi'),ms=[...s.matchAll(re)];
+      const a=ms.filter(x=>x.index>480000 && !skip(x.index)).slice(0,4);
+      if(a.length)console.log('DEEP MATCH',asset,word,ms.length,JSON.stringify(a.map(x=>({offset:x.index,excerpt:s.slice(Math.max(0,x.index-170),x.index+230)}))));
+    }
+    const hosts=[...s.matchAll(/https?:\/\/([A-Za-z0-9_.-]+\.[A-Za-z]{2,})(?:\/[A-Za-z0-9_./?=&%-]+)?/g)]
+      .filter(m=>m.index>460000)
+      .map(m=>m[0]);
+    console.log('DEEP URLs',asset,JSON.stringify([...new Set(hosts)].slice(0,100)));
+    const end=s.slice(Math.max(0,s.length-8000));
+    if(asset.includes('VideoPlayer'))console.log('VIDEO_PLAYER_TAIL',end);
+  }
+  for(const u of [
+    'https://plsdontscrapemelove.flixer.su/api/tmdb/movie/550?language=en-US',
+    'https://api.flixer.su/api/tmdb/movie/550?language=en-US'
+  ]){
+   try{
+    let r=await fetch(u,{signal:AbortSignal.timeout(9000)}),t=await r.text();
+    console.log('API CHECK',u,r.status,r.headers.get('content-type'),t.slice(0,500));
+   }catch(e){console.log('API CHECK',u,String(e.message))}
+  }
+}
+detailed().catch(e=>console.log('DEEP ERROR',String(e.message)));

@@ -63,3 +63,11 @@ With an optional TMDB API key, the experimental Nuvio provider now fetches film/
 **Live comparison** https://github.com/feixiangdao/test1/actions/runs/37773058341: GitHub Cloudflare enforcement returned HTTP 403 both for the first-party search and the AJAX with the correct actual movie/episode `Referer`. This means the corrected context alone does NOT make GitHub cloud-hosted requests work; on-device Nuvio playback is also not verified.
 
 **Safety note:** A public AdGuard issue from June 2025 reported malicious advertising tabs on VidPlay V2: https://github.com/AdguardTeam/AdguardFilters/issues/206770. Do not install unknown VidPlay browser extensions or treat advertising popups as media. The lab never renders web pages as Nuvio playback or returns imaginary MP4/HLS sources.
+
+## 2026-10-08 Opera-assisted visual playback research
+
+- Opera Browser Connector can now list tabs, read the VidPlay Life (2017) accessibility page, and return a page screenshot. The visual screenshot shows the poster hero overlay (blue play circle) and three server selectors.
+- Using isolated GitHub Actions Playwright we inspected the exact DOM under the central button: `<div class="video-play-button">` inside `<span class="ajaxlink_vplay">`. Clicking the central play circle triggers the **same V1 jQuery request** as clicking the V1 tab: `/ajax/mov_vplay.php?embed=tt5442430`. It produced HTTP 403 Cloudflare on GitHub's runner. Therefore, clicking this overlay does not reveal a *different* backend API.
+- Proof: https://github.com/feixiangdao/test1/actions/runs/37775709582
+- The Opera connector supports tab reading, navigation and screenshots, but exposes no click/DevTools/network-capture action. To investigate media only visible after human interaction in residential Opera, the site must be clicked in Opera before the connector captures subsequent state, or an expressly connected browser interaction capability must be used.
+- No video URL was identified, no provider streams added, no playback claim. Retain v0.1.2 pending live playable media evidence.

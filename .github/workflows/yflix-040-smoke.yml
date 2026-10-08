@@ -1,4 +1,4 @@
-name: YFlix 040 Smoke
+name: YFlix 041 Smoke
 on:
   push:
     paths:
@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe every S2/S4 HLS
+      - name: Validate final S2 filtering and S4 expanded HLS
         shell: bash
         run: |
           set -e
@@ -18,45 +18,26 @@ jobs:
           node -c /tmp/s2.js
           node -c /tmp/s4.js
           node - <<'NODE'
-          function abs(base, ref){ try{return new URL(ref,base).toString()}catch(e){return ref} }
           async function probe(row){
-            try{
-              const h=row.headers||{};
-              const r=await fetch(row.url,{headers:h,signal:AbortSignal.timeout(15000)});
-              const text=await r.text();
-              let result={name:row.name,url:row.url,status:r.status,ct:r.headers.get('content-type')||'',head:text.slice(0,80).replace(/\n/g,'\\n')};
-              if(r.ok&&text.includes('#EXTM3U')){
-                const lines=text.replace(/\r/g,'').split('\n');
-                let next='';
-                for(const line0 of lines){
-                  const line=line0.trim();
-                  if(line&&!line.startsWith('#')){next=abs(row.url,line);break;}
-                }
-                if(next){
-                  try{
-                    const r2=await fetch(next,{headers:h,signal:AbortSignal.timeout(12000)});
-                    result.nextStatus=r2.status;
-                    result.nextCt=r2.headers.get('content-type')||'';
-                  }catch(e){result.nextError=String(e.message||e)}
-                }
-              }
-              return result;
-            }catch(e){return{name:row.name,url:row.url,error:String(e.message||e)}}
+            const r=await fetch(row.url,{headers:row.headers||{},signal:AbortSignal.timeout(15000)});
+            const t=await r.text();
+            console.log('PROBE',row.name,r.status,r.headers.get('content-type'),t.slice(0,100).replace(/\n/g,'\\n'));
+            if(!r.ok||!t.includes('#EXTM3U')) throw new Error('bad HLS '+r.status);
           }
           async function run(){
             const s2=require('/tmp/s2.js'),s4=require('/tmp/s4.js');
             const m2=await s2.getStreams('157336','movie');
-            console.log('S2_MOVIE_COUNT',m2.length);
-            for(const x of m2) console.log('S2_MOVIE_PROBE',JSON.stringify(await probe(x)));
             const t2=await s2.getStreams('108978','tv',1,1);
-            console.log('S2_TV_COUNT',t2.length);
-            for(const x of t2.slice(0,12)) console.log('S2_TV_PROBE',JSON.stringify(await probe(x)));
+            console.log('S2_MOVIE',m2.map(x=>x.name));
+            console.log('S2_TV',t2.map(x=>x.name));
             const m4=await s4.getStreams('157336','movie');
-            console.log('S4_MOVIE_COUNT',m4.length);
-            for(const x of m4) console.log('S4_MOVIE_PROBE',JSON.stringify(await probe(x)));
             const t4=await s4.getStreams('108978','tv',1,1);
-            console.log('S4_TV_COUNT',t4.length);
-            for(const x of t4) console.log('S4_TV_PROBE',JSON.stringify(await probe(x)));
+            console.log('S4_MOVIE',m4.map(x=>x.name));
+            console.log('S4_TV',t4.map(x=>x.name));
+            if(!m4.length||m4[0].type==='diagnostic') throw new Error('S4 movie no playable row');
+            if(!t4.length||t4[0].type==='diagnostic') throw new Error('S4 tv no playable row');
+            await probe(m4[0]);
+            await probe(t4[0]);
           }
           run().catch(e=>{console.error(e);process.exit(1)});
           NODE

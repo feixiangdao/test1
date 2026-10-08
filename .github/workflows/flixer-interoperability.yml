@@ -24,7 +24,7 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Capture response via ordinary Flixer browser playback
         run: |
-          node flixer-provider-lab/capture-fixture.mjs
+          xvfb-run -a env FLIXER_HEADED=1 node flixer-provider-lab/capture-fixture.mjs
           test -s /tmp/flixer-fixture.json
       - name: Retrieve public code and build local translation
         run: |

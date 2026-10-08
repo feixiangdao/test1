@@ -302,8 +302,24 @@ function safeMediaURLs(data,referer){
   var wasm=asHttpUrl(data.vs.wasm_url,referer);
   if(!wasm)return Promise.resolve([]);
   return fetch(wasm,{method:"GET",headers:{"User-Agent":UA,"Referer":referer,"Accept":"application/wasm"}})
-    .then(function(r){if(!r||!r.ok)throw new Error("WASM HTTP "+(r&&r.status));return r.arrayBuffer();})
-    .then(function(buffer){return s2DecryptUrls(su,new Uint8Array(buffer)).map(function(u){return asHttpUrl(u,referer);}).filter(function(u){return !!extType(u);});});
+    .then(function(r){
+      if(!r||!r.ok)throw new Error("WASM HTTP "+(r&&r.status));
+      if(typeof r.arrayBuffer!=="function")throw new Error("WASM: Nuvio fetch.arrayBuffer unavailable");
+      return r.arrayBuffer();
+    }).then(function(buffer){
+      if(!buffer||typeof Uint8Array!=="function")throw new Error("WASM: Uint8Array unsupported");
+      var bytes;
+      try{bytes=new Uint8Array(buffer);}catch(e){throw new Error("WASM bytes: "+(e&&e.message||e));}
+      if(!bytes||!bytes.length)throw new Error("WASM bytes: empty");
+      try{
+        var urls=s2DecryptUrls(su,bytes);
+        return urls.map(function(u){return asHttpUrl(u,referer);}).filter(function(u){return !!extType(u);});
+      }catch(e){throw new Error("WASM decrypt: "+(e&&e.message||e));}
+    }).catch(function(e){
+      var msg=clean(e&&e.message||e);
+      if(msg.indexOf("WASM")===0)throw e;
+      throw new Error("WASM transport: "+msg);
+    });
 }
 function qualifiedMedia(u,ref){
   // Stream server may publicly issue a per-host media token. This is separate
@@ -365,24 +381,30 @@ function verifyMedia(u,ref){
 function resolveYthd(imdb,siteReferer){
   if(!/^tt\d+$/.test(imdb))return Promise.resolve([]);
   var embed=YTHD+"/embed/"+encodeURIComponent(imdb);
+  var stage="YTHD 页面";
   return fetchText(embed,requestHeaders(siteReferer||BASE+"/",false))
     .then(function(){
+      stage="YTHD 播放源 API";
       return fetchJSON(YTHD+"/vs_src.php?type=movie&id="+encodeURIComponent(imdb),
         {"User-Agent":UA,"Referer":embed,"Accept":"application/json","X-Requested-With":"XMLHttpRequest"});
     })
     .then(function(j){
+      stage="外部播放器入口";
       var landing=asHttpUrl(j&&j.src,embed);
       if(!landing)throw new Error("YTHD no public player URL");
       return fetchText(landing,requestHeaders(embed,false)).then(function(html){
+        stage="播放器入口配置";
         var cfg=parseInlineConfig(html,"CFG");
         if(!cfg||!cfg.playerUrl)throw new Error("no public V1 player config");
         var playerUrl=asHttpUrl(cfg.playerUrl,landing);
         if(!playerUrl)throw new Error("invalid V1 player URL");
+        stage="内层播放器页面";
         return fetchText(playerUrl,requestHeaders(landing,false))
           .then(function(innerHtml){return {html:innerHtml,ref:playerUrl};});
       });
     })
     .then(function(inner){
+      stage="签名媒体接口配置";
       var c=parseInlineConfig(inner.html,"CONFIG");
       if(!c)throw new Error("V1 player config unavailable");
       if(c.turnstile)log("V1 browser verification advertised; using only current server-issued signed API token");
@@ -390,11 +412,14 @@ function resolveYthd(imdb,siteReferer){
       if(c.imdb&&c.imdb!==imdb)throw new Error("V1 wrong IMDb ID");
       var api=playerAPIURL(c.api,clean(c.apiToken),inner.ref);
       if(!api)throw new Error("V1 stream requires valid player-issued API token");
+      stage="签名媒体 API";
       return fetchJSON(api,{"User-Agent":UA,"Referer":inner.ref,"Accept":"application/json"})
         .then(function(j){
           if(String(j&&j.status_code)!=="200")throw new Error("V1 stream API "+(j&&j.status_code));
+          stage="WASM 解密媒体地址";
           return safeMediaURLs(j,inner.ref);
         }).then(function(urls){
+          stage="CDN HLS 解析";
           if(!urls.length)throw new Error("V1 API returned no supported media");
           // CDN /generate.php is rate-limited (429) when called in parallel.
           // A successfully verified master playlist supplies quality variants;
@@ -413,6 +438,10 @@ function resolveYthd(imdb,siteReferer){
           });
           return out;
         });
+    }).catch(function(e){
+      var message=clean(e&&e.message||e);
+      if(message.indexOf("播放器阶段[")===0)throw e;
+      throw new Error("播放器阶段["+stage+"]: "+message);
     });
 }
 function resolveAjaxV1(tmdb,type,season,episode,meta){

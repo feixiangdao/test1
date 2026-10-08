@@ -110,8 +110,8 @@ function common(u,opts){
   });
   const noBinary=await getStreams(395992,"movie");
   assertDiagnostics(noBinary,"No binary response reader");
-  assert.match(noBinary[0].name,/WASM.*native binary bridge unavailable/);
-  console.log("PASS: when neither fetch.arrayBuffer nor native bridge exists, report exact WASM-stage incompatibility");
+  assert.match(noBinary[0].name,/WASM.*cached decoding parameters expired/);
+  console.log("PASS: missing binary fetch plus incompatible offline key reports expiry without fake streams");
 
 
 

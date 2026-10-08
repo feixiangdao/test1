@@ -52,6 +52,20 @@ try {
    ciphertextLengths:cases.map(c=>c.body.length),headerNames:[...new Set(cases.flatMap(c=>c.headerNames))]
  }));
  if(matches.length){
+  const audited=[];
+  for(const c of matches){
+   const result=await page.evaluate(async(arg)=>{
+     const wasm=window.wasmImgData;
+     if(!wasm||typeof wasm.process_img_data!=="function")return {available:false,decoded:false};
+     try{
+       const data=JSON.parse(await wasm.process_img_data(arg.body,arg.key));
+       const arr=Array.isArray(data?.sources)?data.sources:[];
+       return {available:true,decoded:true,entries:arr.length,media:arr.filter(x=>typeof x?.url==="string"&&x.url.startsWith("http")).length};
+     }catch(e){return {available:true,decoded:false,error:String(e).slice(0,45)}}
+   },{body:c.body,key:c.suppliedKey});
+   audited.push({server:c.source||"list",mediaRequest:c.onlySources==="1",...result});
+  }
+  console.log("BROWSER_WASM_SELFTEST",JSON.stringify(audited));
   const picked=matches.find(c=>c.onlySources==="1" && c.source==="alpha") || matches.find(c=>c.onlySources==="1") || matches[0];
   await writeFile("/tmp/flixer-fixture.json",JSON.stringify(picked));
   console.log("BROWSER_SELECTED_SOURCE_KIND",JSON.stringify({server:picked.source||null,isMediaRequest:picked.onlySources==="1",ciphertextBytes:picked.body.length}));

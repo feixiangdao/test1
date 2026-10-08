@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'flixer-nuvio/probe-flixer.js'
+      - 'flixer-nuvio/probe-flixer-deep.js'
       - '.github/workflows/probe-flixer.yml'
 jobs:
   probe:
@@ -16,3 +17,5 @@ jobs:
           node-version: '22'
       - name: Inspect Flixer public site
         run: node flixer-nuvio/probe-flixer.js
+      - name: Inspect Flixer published frontend scripts
+        run: node flixer-nuvio/probe-flixer-deep.js

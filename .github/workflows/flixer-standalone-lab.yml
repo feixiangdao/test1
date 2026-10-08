@@ -30,8 +30,10 @@ jobs:
           wc -c /tmp/flixer-img-data.wasm /tmp/flixer-img-data.js
       - name: Translate WASM and run browser-free JavaScript module
         run: |
-          npm install --no-save binaryen@132.0.0
+          npm install --no-save binaryen@132.0.0 hermes-parser
           node node_modules/binaryen/bin/wasm-opt /tmp/flixer-img-data.wasm --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --llvm-nontrapping-fptoint-lowering --llvm-memory-copy-fill-lowering -o /tmp/flixer-lowered.wasm
           node node_modules/binaryen/bin/wasm2js /tmp/flixer-lowered.wasm --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext -o /tmp/flixer-wasm-translation.mjs
           node flixer-provider-lab/build-local.mjs
           node --check /tmp/flixer-standalone.mjs
+          node --check /tmp/flixer-hermes-syntax-preview.js
+          node -e 'const {parse}=require("hermes-parser");const fs=require("fs");let s=fs.readFileSync("/tmp/flixer-hermes-syntax-preview.js","utf8");let ast=parse(s,{sourceType:"script"});console.log("HERMES_SYNTAX_PASS",ast.type,"script size",s.length);'

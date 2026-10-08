@@ -124,3 +124,13 @@ The research is comparing decryption of the *same* captured ciphertext inside th
 - Evidence: https://github.com/feixiangdao/test1/actions/runs/37778080221 .
 
 **Release gate remains closed:** no same-version live ciphertext parity, no tested Nuvio playback.
+
+## Nuvio source-chip disappearing after refresh (2026-10-08)
+
+Observed in Android Nuvio: the Flixer source capsule appears briefly during a refresh and then disappears.
+
+The public NuvioTV `StreamScreenViewModel` implementation pre-creates source chips for **enabled** scrapers at fetch start, marks unresolved chips `ERROR` when source searching finishes, and removes `ERROR` chips after **1600 milliseconds**. This symptom is therefore consistent with a plugin returning zero usable streams or an execution failure. It does **not** prove that the manifest is missing or that the script failed to download.
+
+A new same-version media fixture was used for an end-to-end **QuickJS** decryption test, correctly awaiting the async wasm-bindgen result. The 2026-10-08 CI run succeeded with **one decrypted media URL** in QuickJS and passed the browser-free direct network retrieval test. Evidence: https://github.com/feixiangdao/test1/actions/runs/37791496241 .
+
+Remaining uncertainty is Android device-specific execution/networking (including availability of `plsdontscrapemelove.flixer.su` under the device's VPN/DNS route). The public Nuvio Plugin screen provides a **Test** action for each enabled scraper and a collapsible **Diagnostics** area; its test film is TMDB 603 (The Matrix), not 9502. Request an in-app Test/Diagnostics screenshot before concluding whether device-side JS failed or the site returned no sources. No fake diagnostic playback URLs should be added simply to preserve a chip.

@@ -86,7 +86,7 @@ try{
      if(isHttp(parsed?.sources?.url))urlValues.push(parsed.sources.url);
      console.log("LOCAL_DECRYPT_FIXTURE_RESULT",JSON.stringify({decodedJson:true,hasSources:values.length>0,sourceCount:values.length,expectedSources:expected?.sources?.length||null,exactMatch:matched,mediaUrlCount:urlValues.length}));
      if(expected && !matched)process.exitCode=1;
-     if(!expected && !urlValues.length)console.log("LOCAL_DECRYPT_NO_MEDIA_URL_YET");
+     if(!expected && !urlValues.length){console.log("LOCAL_DECRYPT_NO_MEDIA_URL_YET");process.exitCode=1;}
     }catch(e){ console.log("LOCAL_DECRYPT_FIXTURE_ERROR",String(e).slice(0,180));
       try{
        await writeFile("/tmp/flixer-native-glue.mjs",glue);

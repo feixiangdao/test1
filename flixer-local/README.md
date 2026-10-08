@@ -114,3 +114,13 @@ The research is comparing decryption of the *same* captured ciphertext inside th
 - Evidence: [native/JS E57 comparison](https://github.com/feixiangdao/test1/actions/runs/37777166554), [same-version capture diagnostic](https://github.com/feixiangdao/test1/actions/runs/37777644426).
 
 **No end-to-end Nuvio playback** and **no complete Local decryptor** have been proven. The disabled experimental manifest must stay disabled until a same-version media source can be decoded locally and tested in Nuvio.
+
+## Headless player init root cause (2026-10-08)
+
+- An instrumented Playwright load for `/watch/movie/9502` returned HTTP 200 for the TMDB metadata route, but the video continued to show `Loading video...`.
+- Browser console produced `[WASM] Error getting image key: E20`, followed by `Failed to initialize TMDB image enhancement` and `No poster_sources returned`; the encrypted `/images` endpoint was never requested.
+- A separate `ERR_BLOCKED_BY_ORB` resource appeared but is not demonstrated to be the root cause of the media failure.
+- This directs research toward identifying the browser-context difference between E20 in headless Chromium and successful 64-character key generation in the pure-JS harness; a valid live encrypted response has still not been obtained.
+- Evidence: https://github.com/feixiangdao/test1/actions/runs/37778080221 .
+
+**Release gate remains closed:** no same-version live ciphertext parity, no tested Nuvio playback.

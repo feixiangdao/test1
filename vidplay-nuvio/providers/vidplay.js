@@ -136,9 +136,260 @@ function discoverReferer(meta,type,season,episode){
     return ref;
   }).catch(function(e){log("site search unavailable: "+(e&&e.message||e));return"";});
 }
-function row(name,u,ref){
-  var type=extType(u);if(!type)return null;
-  return {name:name,title:name,url:u,quality:"Auto",type:type,provider:"vidplay-direct-lab",headers:requestHeaders(ref,false),subtitles:[]};
+function s2Rd32(b,o){return ((b[o]|(b[o+1]<<8)|(b[o+2]<<16)|(b[o+3]<<24))>>>0);}
+function s2Rotl(x,n){return ((x<<n)|(x>>>(32-n)))>>>0;}
+function s2ChaChaBlock(k,c,n){
+  var st=[1634760805,857760878,2036477234,1797285236,k[0],k[1],k[2],k[3],k[4],k[5],k[6],k[7],c>>>0,n[0]>>>0,n[1]>>>0,n[2]>>>0];
+  var x=st.slice();
+  function q(a,b,c0,d){
+    x[a]=(x[a]+x[b])>>>0;x[d]=s2Rotl(x[d]^x[a],16);
+    x[c0]=(x[c0]+x[d])>>>0;x[b]=s2Rotl(x[b]^x[c0],12);
+    x[a]=(x[a]+x[b])>>>0;x[d]=s2Rotl(x[d]^x[a],8);
+    x[c0]=(x[c0]+x[d])>>>0;x[b]=s2Rotl(x[b]^x[c0],7);
+  }
+  for(var i=0;i<10;i++){
+    q(0,4,8,12);q(1,5,9,13);q(2,6,10,14);q(3,7,11,15);
+    q(0,5,10,15);q(1,6,11,12);q(2,7,8,13);q(3,4,9,14);
+  }
+  var out=new Uint8Array(64);
+  for(var j=0;j<16;j++){
+    var w=(x[j]+st[j])>>>0;
+    out[j*4]=w&255;out[j*4+1]=(w>>>8)&255;out[j*4+2]=(w>>>16)&255;out[j*4+3]=(w>>>24)&255;
+  }
+  return out;
+}
+function s2Leb(b,p){
+  var r=0,shift=0,v=0;
+  do{
+    if(p>=b.length)throw new Error("WASM leb overflow");
+    v=b[p++];r|=(v&127)<<shift;
+    if((v&128)===0)break;
+    shift+=7;
+  }while(shift<35);
+  return[r>>>0,p];
+}
+function s2WasmSegments(b){
+  if(!b||b.length<8||b[0]!==0||b[1]!==97||b[2]!==115||b[3]!==109)throw new Error("bad WASM");
+  var out=[],p=8;
+  while(p<b.length){
+    var id=b[p++],r=s2Leb(b,p),len=r[0];p=r[1];
+    var end=p+len;if(end>b.length)throw new Error("WASM section overflow");
+    if(id===11){
+      r=s2Leb(b,p);var cnt=r[0];p=r[1];
+      for(var i=0;i<cnt;i++){
+        r=s2Leb(b,p);var flags=r[0];p=r[1];var off=-1;
+        if(flags===0||flags===1){
+          if(flags===1){r=s2Leb(b,p);p=r[1];}
+          if(b[p]===0x41){p++;r=s2Leb(b,p);off=r[0];p=r[1];}
+          if(b[p]===0x0b)p++;
+        }else if(flags===2){
+          r=s2Leb(b,p);p=r[1];
+          if(b[p]===0x41){p++;r=s2Leb(b,p);off=r[0];p=r[1];}
+          if(b[p]===0x0b)p++;
+        }
+        r=s2Leb(b,p);var dl=r[0];p=r[1];
+        var data=b.slice(p,p+dl);p+=dl;
+        if(off>=0)out.push({off:off,data:data});
+      }
+    }
+    p=end;
+  }
+  return out;
+}
+function s2RecoverKey(wasm,enc){
+  var segs=s2WasmSegments(wasm),base=null;
+  for(var i=0;i<segs.length;i++){
+    if(segs[i].off===0&&segs[i].data.length>=32){base=segs[i];break;}
+  }
+  if(!base)throw new Error("WASM base key segment missing");
+  var nonce=[s2Rd32(enc,0),s2Rd32(enc,4),s2Rd32(enc,8)];
+  for(var c=0;c<segs.length;c++){
+    var d=segs[c];
+    if(d.off<256||d.data.length<32)continue;
+    var kw=[];
+    for(var j=0;j<8;j++)kw.push((s2Rd32(base.data,j*4)^s2Rd32(d.data,j*4))>>>0);
+    var ks=s2ChaChaBlock(kw,0,nonce);
+    if(((enc[12]^ks[0])&255)===104&&((enc[13]^ks[1])&255)===116&&((enc[14]^ks[2])&255)===116&&((enc[15]^ks[3])&255)===112)return kw;
+  }
+  throw new Error("ChaCha key recovery failed");
+}
+function s2Base64Bytes(s){
+  s=clean(s).replace(/\s+/g,"");
+  var abc="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  var out=[],buf=0,bits=0;
+  for(var i=0;i<s.length;i++){
+    var ch=s.charAt(i);if(ch==="=")break;
+    var v=abc.indexOf(ch);if(v<0)continue;
+    buf=(buf<<6)|v;bits+=6;
+    if(bits>=8){bits-=8;out.push((buf>>bits)&255);}
+  }
+  return new Uint8Array(out);
+}
+function s2Utf8(b){
+  var str="",i;
+  for(i=0;i<b.length;i++)str+=String.fromCharCode(b[i]);
+  try{return decodeURIComponent(escape(str));}catch(_){return str;}
+}
+function s2DecryptUrls(encB64,wasm){
+  var enc=s2Base64Bytes(encB64);
+  if(enc.length<16)throw new Error("encrypted stream_urls too short");
+  var key=s2RecoverKey(wasm,enc);
+  var nonce=[s2Rd32(enc,0),s2Rd32(enc,4),s2Rd32(enc,8)];
+  var ct=enc.slice(12),out=new Uint8Array(ct.length);
+  for(var b=0;b<Math.ceil(ct.length/64);b++){
+    var ks=s2ChaChaBlock(key,b,nonce);
+    for(var j=0;j<64&&b*64+j<ct.length;j++)out[b*64+j]=ct[b*64+j]^ks[j];
+  }
+  return s2Utf8(out).split(/\r?\n/).map(clean).filter(function(x){return /^https?:\/\//i.test(x);});
+}
+
+/* VidPlay V1 path confirmed using Opera: VidPlay -> ythd.org -> player host.
+ * No browser challenges bypassed; only authorized public response data used.
+ * The stream API may require a server-signed single-use token.
+ * Never emit an iframe or a fake stream; validate all HLS playlists. */
+var YTHD="https://ythd.org";
+function asHttpUrl(value,base){
+  value=clean(value).replace(/&amp;/gi,"&");
+  if(!value)return"";
+  if(value.indexOf("//")===0)value="https:"+value;
+  try{
+    if(typeof URL!=="undefined")value=new URL(value,base).href;
+  }catch(e){}
+  if(value.charAt(0)==="/"&&base){
+    var origin=base.match(/^(https?:\/\/[^/]+)/);
+    if(origin)value=origin[1]+value;
+  }
+  return /^https:\/\//.test(value)&&safeUrl(value)?value:"";
+}
+function parseInlineConfig(html,label){
+  // Config objects in the actual player are JSON written on a single line.
+  var re=new RegExp("window\\."+label+"\\s*=\\s*(\\{[^\\r\\n]*?\\})\\s*;","i");
+  var m=clean(html).match(re);
+  if(!m)return null;
+  try{return JSON.parse(m[1]);}catch(e){return null;}
+}
+function fetchJSON(url,headers){
+  return fetchText(url,headers).then(function(t){return JSON.parse(t);});
+}
+function playerAPIURL(url,token,ref){
+  var u=asHttpUrl(url,ref);
+  if(!u||!/^https:\/\/data\.vidsrc(?:me\.ru|\.sh)\//i.test(u))return"";
+  if(!/(?:[?&])stream_urls(?:[=&]|$)/.test(u))
+    u+=(u.indexOf("?")<0?"?":"&")+"stream_urls";
+  // A missing token is not treated as authorization; never invent one.
+  if(!token)return"";
+  u+=(u.indexOf("?")<0?"?":"&")+"api_token="+encodeURIComponent(token);
+  return safeUrl(u)?u:"";
+}
+function safeMediaURLs(data,referer){
+  if(!data||!data.data||String(data.status_code)!=="200")return Promise.resolve([]);
+  var su=data.data.stream_urls;
+  if(Array.isArray(su))return Promise.resolve(su.map(function(u){return asHttpUrl(u,referer);}).filter(function(u){return !!extType(u);}));
+  if(typeof su!=="string"||!su||!data.vs||!data.vs.wasm_url)return Promise.resolve([]);
+  var wasm=asHttpUrl(data.vs.wasm_url,referer);
+  if(!wasm)return Promise.resolve([]);
+  return fetch(wasm,{method:"GET",headers:{"User-Agent":UA,"Referer":referer,"Accept":"application/wasm"}})
+    .then(function(r){if(!r||!r.ok)throw new Error("WASM HTTP "+(r&&r.status));return r.arrayBuffer();})
+    .then(function(buffer){return s2DecryptUrls(su,new Uint8Array(buffer)).map(function(u){return asHttpUrl(u,referer);}).filter(function(u){return !!extType(u);});});
+}
+function qualifiedMedia(u,ref){
+  // Stream server may publicly issue a per-host media token. This is separate
+  // from the protected player API token and never substitutes for authorization.
+  var m=u.match(/^(https:\/\/[^/]+)/);
+  if(!m)return Promise.resolve(u);
+  return fetchText(m[1]+"/generate.php",{"User-Agent":UA,"Accept":"*/*","Referer":ref})
+    .then(function(t){t=clean(t);try{var j=JSON.parse(t);t=clean(j.token||j.result||"");}catch(e){}
+      if(!/^[a-zA-Z0-9._~-]{6,512}$/.test(t))return u;
+      return u+(u.indexOf("?")>=0?"&":"?")+"token="+encodeURIComponent(t);
+    }).catch(function(){return u;});
+}
+function variantsFromMaster(t,u,ref){
+  if(t.slice(0,7)!=="#EXTM3U")return[];
+  var lines=t.split(/\r?\n/),a=[],seen={};
+  for(var i=0;i<lines.length-1;i++){
+    if(lines[i].indexOf("#EXT-X-STREAM-INF:")!==0)continue;
+    var next=clean(lines[i+1]);
+    if(!next||next.charAt(0)==="#")continue;
+    var candidate=asHttpUrl(next,u);
+    if(!candidate||!extType(candidate)||seen[candidate])continue;
+    var qm=lines[i].match(/RESOLUTION=\d+x(\d+)/i);
+    var quality=qm?qm[1]+"p":"Auto";
+    a.push(makeRow(candidate,quality,ref));seen[candidate]=true;
+  }
+  if(!a.length)a.push(makeRow(u,"Auto",ref));
+  return a.filter(Boolean);
+}
+function makeRow(url,quality,referer){
+  var type=extType(url);if(!type)return null;
+  var name="VidPlay · V1"+(quality&&quality!=="Auto"?" · "+quality:"");
+  return {name:name,title:name,url:url,quality:quality||"Auto",type:type,provider:"vidplay-direct-lab",
+    headers:{"User-Agent":UA,"Referer":referer},subtitles:[]};
+}
+function verifyMedia(u,ref){
+  return qualifiedMedia(u,ref).then(function(candidate){
+    return fetchText(candidate,{"User-Agent":UA,"Referer":ref,"Accept":"application/vnd.apple.mpegurl,application/x-mpegURL,*/*"})
+      .then(function(t){return extType(candidate)==="hls"?variantsFromMaster(t,candidate,ref):
+        extType(candidate)==="mp4"||extType(candidate)==="dash"?[makeRow(candidate,"Auto",ref)]:[];});
+  }).catch(function(e){log("V1 media rejected: "+(e&&e.message||e));return[];});
+}
+function resolveYthd(imdb,siteReferer){
+  if(!/^tt\d+$/.test(imdb))return Promise.resolve([]);
+  var embed=YTHD+"/embed/"+encodeURIComponent(imdb);
+  return fetchText(embed,requestHeaders(siteReferer||BASE+"/",false))
+    .then(function(){
+      return fetchJSON(YTHD+"/vs_src.php?type=movie&id="+encodeURIComponent(imdb),
+        {"User-Agent":UA,"Referer":embed,"Accept":"application/json","X-Requested-With":"XMLHttpRequest"});
+    })
+    .then(function(j){
+      var landing=asHttpUrl(j&&j.src,embed);
+      if(!landing)throw new Error("YTHD no public player URL");
+      return fetchText(landing,requestHeaders(embed,false)).then(function(html){
+        var cfg=parseInlineConfig(html,"CFG");
+        if(!cfg||!cfg.playerUrl)throw new Error("no public V1 player config");
+        var playerUrl=asHttpUrl(cfg.playerUrl,landing);
+        if(!playerUrl)throw new Error("invalid V1 player URL");
+        return fetchText(playerUrl,requestHeaders(landing,false))
+          .then(function(innerHtml){return {html:innerHtml,ref:playerUrl};});
+      });
+    })
+    .then(function(inner){
+      var c=parseInlineConfig(inner.html,"CONFIG");
+      if(!c)throw new Error("V1 player config unavailable");
+      if(c.turnstile)throw new Error("V1 requires browser verification");
+      if(c.mediaType&&c.mediaType!=="movie")throw new Error("V1 wrong media type");
+      if(c.imdb&&c.imdb!==imdb)throw new Error("V1 wrong IMDb ID");
+      var api=playerAPIURL(c.api,clean(c.apiToken),inner.ref);
+      if(!api)throw new Error("V1 stream requires valid player-issued API token");
+      return fetchJSON(api,{"User-Agent":UA,"Referer":inner.ref,"Accept":"application/json"})
+        .then(function(j){
+          if(String(j&&j.status_code)!=="200")throw new Error("V1 stream API "+(j&&j.status_code));
+          return safeMediaURLs(j,inner.ref);
+        }).then(function(urls){
+          if(!urls.length)throw new Error("V1 API returned no supported media");
+          return Promise.all(urls.slice(0,3).map(function(u){return verifyMedia(u,inner.ref);}));
+        }).then(function(parts){
+          var rows=[],seen={};
+          [].concat.apply([],parts).forEach(function(r){if(r&&!seen[r.url]){seen[r.url]=1;rows.push(r);}});
+          return rows;
+        });
+    });
+}
+function resolveAjaxV1(tmdb,type,season,episode,meta){
+  var embed=type==="tv"?tmdb:(meta&&meta.imdb||"");
+  if(!embed)return Promise.resolve([]);
+  return discoverReferer(meta,type,season,episode).then(function(detailRef){
+    var referer=detailRef||BASE+"/";
+    var action=type==="tv"?"tv_vplay":"mov_vplay";
+    var endpoint=BASE+"/ajax/"+action+".php?embed="+encodeURIComponent(embed);
+    if(type==="tv")endpoint+="&season="+season+"&episode="+episode;
+    return fetchText(endpoint,requestHeaders(referer,true)).then(function(html){
+      if(/Just a moment|challenge-platform/i.test(html))throw new Error("VidPlay AJAX challenge");
+      return streamRows(html,endpoint,"V1",3).then(function(entries){
+        return Promise.all(entries.slice(0,3).map(function(e){return verifyMedia(e.url,e.ref);}))
+          .then(function(groups){return [].concat.apply([],groups);});
+      });
+    });
+  });
 }
 function getStreams(id,mediaType,season,episode){
   var type=mediaType==="tv"?"tv":"movie",tmdb=clean(id);
@@ -146,41 +397,28 @@ function getStreams(id,mediaType,season,episode){
   season=parseInt(season,10)||0;episode=parseInt(episode,10)||0;
   if(type==="tv"&&(!season||!episode))return Promise.resolve([]);
   return tmdbMeta(tmdb,type).then(function(meta){
-    return discoverReferer(meta,type,season,episode).then(function(detailRef){
-      var referer=detailRef||BASE+"/";
-      var imdb=meta&&meta.imdb||"",routes=[];
-      for(var i=1;i<=3;i++){
-        var v=i===1?"":String(i),source="VidPlay · V"+i;
-        var embed=type==="tv"?tmdb:(i===3?tmdb:imdb);
-        if(!embed)continue;
-        var action=type==="tv"?"tv_vplay":"mov_vplay";
-        var u=BASE+"/ajax/"+action+v+".php?embed="+encodeURIComponent(embed);
-        if(type==="tv")u+="&season="+season+"&episode="+episode;
-        routes.push({name:source,url:u});
-      }
-      return Promise.all(routes.map(function(rt){
-        return fetchText(rt.url,requestHeaders(referer,true)).then(function(html){
-          if(/Just a moment|<title>Access denied|challenge-platform/i.test(html))throw new Error("Cloudflare challenge");
-          return streamRows(html,rt.url,rt.name,2).then(function(entries){
-            return entries.map(function(e){return row(rt.name,e.url,e.ref);}).filter(Boolean);
-          });
-        }).catch(function(err){log(rt.name+" unavailable: "+(err&&err.message||err));return[];});
-      })).then(function(arr){
-        var out=[],seen={};
-        [].concat.apply([],arr).forEach(function(r){
-          if(!r||seen[r.url])return;seen[r.url]=1;out.push(r);
-        });
-        log(type+" "+tmdb+" streams="+out.length+(detailRef?" matched-page-referer":" fallback-referer"));
-        return out;
+    if(type!=="movie"||!meta||!meta.imdb)return Promise.resolve([]);
+    return resolveYthd(meta.imdb,BASE+"/").catch(function(e){
+      log("V1 YTHD: "+(e&&e.message||e));return[];
+    });
+  }).then(function(rows){
+    if(rows.length)return rows;
+    return tmdbMeta(tmdb,type).then(function(meta){
+      return resolveAjaxV1(tmdb,type,season,episode,meta).catch(function(e){
+        log("V1 AJAX: "+(e&&e.message||e));return[];
       });
     });
+  }).then(function(rows){
+    var all=[],seen={};rows.forEach(function(r){if(r&&!seen[r.url]){seen[r.url]=1;all.push(r);}});
+    log("V1 "+type+" "+tmdb+" verified streams="+all.length);
+    return all;
   });
 }
 function onSettings(){
   return [
-    {type:"header",label:"VidPlay Local · experimental"},
-    {type:"info",label:"Only explicitly identified direct HLS/MP4/DASH URL fields are returned (availability not guaranteed). HTTP 403 / challenge / HTML embeds without media produce zero streams. No bypass. Movie V1/V2 require TMDB API key for IMDb ID; movie V3 and TV V1/V2/V3 use TMDB ID."},
-    {type:"text",key:"tmdbApiKey",label:"TMDB API key (optional; required for movie V1/V2)",defaultValue:"",isPassword:true}
+    {type:"header",label:"VidPlay · V1 only (experimental)"},
+    {type:"info",label:"Movie V1 uses TMDB → IMDb → ythd.org → its authorized player API, validates direct media. If API requires browser-only verification or no valid signed token, no stream is returned. TV V1 retains first-party AJAX fallback. No V2 or V3 routes."},
+    {type:"text",key:"tmdbApiKey",label:"TMDB API key for movie V1 (required)",defaultValue:"",isPassword:true}
   ];
 }
 module.exports={getStreams:getStreams,onSettings:onSettings};

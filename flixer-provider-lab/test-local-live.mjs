@@ -1,4 +1,4 @@
-import {readFile} from "node:fs/promises";
+import {readFile,writeFile} from "node:fs/promises";
 import vm from "node:vm";
 import https from "node:https";
 
@@ -9,6 +9,7 @@ const ip=(dns.Answer||[]).find(a=>a.type===1)?.data;
 if(!ip)throw Error("LIVE_NODE_NO_DNS");
 
 const statuses=[];
+let capturedFixture=null;
 let variant="local";
 let publicContext={};try{publicContext=JSON.parse(await readFile("/tmp/flixer-browser-public-headers.json","utf8"))}catch(_){}
 function pinnedFetch(address,opts={}){
@@ -26,6 +27,9 @@ function pinnedFetch(address,opts={}){
   },res=>{
    const chunks=[];res.on("data",c=>chunks.push(c));res.on("end",()=>{
     const body=Buffer.concat(chunks).toString("utf8");
+    if(res.statusCode===200&&u.pathname.endsWith("/images")&&String(outHeaders["X-Server"]||"").toLowerCase()==="alpha"&&typeof outHeaders["X-Api-Key"]==="string"){
+      capturedFixture={body,suppliedKey:outHeaders["X-Api-Key"]};
+    }
     statuses.push({variant,path:u.pathname,status:res.statusCode,bytes:body.length,
      error:res.statusCode>=400?body.slice(0,120).replace(/[0-9a-f]{20,}/ig,"[redacted]"):undefined,
      headerLengths:u.pathname.endsWith("/images")?Object.fromEntries(Object.entries(outHeaders).filter(([k])=>k.toLowerCase().startsWith("x-")).map(([k,v])=>[k,String(v).length])):undefined});
@@ -54,4 +58,5 @@ if((!streams||!streams.length)&&publicContext.fingerprintLite){
 }
 console.log("NATIVELESS_LIVE_LOCAL_REQUEST",JSON.stringify({statuses,streamCount:streams?.length||0,types:(streams||[]).map(x=>x.type)}));
 if(!Array.isArray(streams)||!streams.some(x=>/^https:/.test(x.url)))throw Error("LOCAL_HTTP_LIVE_NO_PLAYABLE_STREAM");
+if(capturedFixture&&capturedFixture.body.length>60){await writeFile("/tmp/flixer-fixture.json",JSON.stringify(capturedFixture));console.log("DIRECT_LOCAL_FIXTURE_CAPTURED",{bytes:capturedFixture.body.length});}
 console.log("NATIVELESS_LIVE_LOCAL_PASS");

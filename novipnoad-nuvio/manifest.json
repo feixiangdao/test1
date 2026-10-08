@@ -1,13 +1,13 @@
 {
   "name": "NOVIPNOAD Local Alpha",
-  "version": "0.1.7",
-  "description": "Independent NOVIPNOAD provider using first-party title/episode discovery, TMDB Chinese aliases, and direct player resolution. Uses multi-profile WordPress REST requests and www/non-www mirror fallbacks to work around 403 responses, with persistent diagnostics.",
+  "version": "0.1.8",
+  "description": "Independent NOVIPNOAD provider using first-party title/episode discovery, TMDB Chinese aliases, and direct player resolution. Fails fast on blocked WordPress REST requests to avoid Nuvio query timeouts, with persistent diagnostics.",
   "scrapers": [
     {
       "id": "novipnoad-local",
       "name": "NOVIPNOAD Local",
       "description": "NOVIPNOAD .ca/.uk/.net search + strict movie/TV/anime/show/Chinese-season matching + direct player quality extraction.",
-      "version": "0.1.7",
+      "version": "0.1.8",
       "author": "NOVIPNOAD Local Lab",
       "supportedTypes": [
         "movie",

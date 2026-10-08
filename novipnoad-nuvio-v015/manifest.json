@@ -1,0 +1,21 @@
+{
+  "name": "NOVIPNOAD Local v0.1.5",
+  "version": "0.1.5",
+  "description": "Cache-busted NOVIPNOAD diagnostic build with TMDB Chinese aliases, site transport diagnostics and direct player resolution.",
+  "scrapers": [
+    {
+      "id": "novipnoad-local-v015",
+      "name": "NOVIPNOAD Local v0.1.5",
+      "description": "NOVIPNOAD .ca/.uk/.net search + strict movie/TV/anime/show matching + transport/player diagnostics.",
+      "version": "0.1.5",
+      "author": "NOVIPNOAD Local Lab",
+      "supportedTypes": ["movie", "tv"],
+      "filename": "providers/novipnoad-v015.js",
+      "enabled": true,
+      "formats": ["m3u8", "mp4", "mpd"],
+      "contentLanguage": ["zh", "en", "multi"],
+      "limited": true,
+      "hasSettings": true
+    }
+  ]
+}

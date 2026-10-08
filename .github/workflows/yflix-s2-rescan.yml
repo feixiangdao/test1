@@ -6,60 +6,42 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 4
     steps:
-      - name: Probe hidden VidBolt local scrapers
+      - name: Test Quasar cache busting
         shell: bash
         run: |
           node - <<'NODE'
+          const BASE='https://scraper.vidbolt.xyz/scrape/Quasar/movie/tt0816692';
           const UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36';
-          const base='https://vidbolt.xyz/api/proxy?path=';
-          const defs=[
-            ['Halo','Flaxmovies',true],
-            ['VidFastFirst','VidFastFirst',true],
-            ['Vault4K','VidFastPro',true],
-            ['Vidflix','Vidflix',true],
-            ['ShowBox','ShowBox',true],
-            ['Vertex','Peachify',false],
-            ['Blaze','VidRift',true],
-            ['Ember','FSonic',true],
-            ['Omega','CineStream',true]
+          const variants=[
+            ['base','tmdbId=157336'],
+            ['cb','tmdbId=157336&cb=202610080300'],
+            ['fresh','tmdbId=157336&fresh=1'],
+            ['nocache','tmdbId=157336&nocache=202610080300'],
+            ['title','tmdbId=157336&title=Interstellar&year=2014']
           ];
-          function pathFor(scraper,type){
-            const id=type==='movie'?'tt0816692':'tt9288030';
-            const tmdb=type==='movie'?'157336':'108978';
-            const title=type==='movie'?'Interstellar':'Reacher';
-            const year=type==='movie'?'2014':'2022';
-            let q='tmdbId='+tmdb;
-            if(scraper!=='Peachify'){q+='&title='+encodeURIComponent(title)+'&year='+year;}
-            if(type==='tv')q+='&season=1&episode=1';
-            return '/scrape/'+scraper+'/'+type+'/'+id+'?'+q;
-          }
-          async function probe(label,scraper,type){
-            const p=pathFor(scraper,type);
-            const url=base+encodeURIComponent(p);
-            const started=Date.now();
+          function expireOf(u){const m=String(u||'').match(/[?&]expire=(\d{10,13})/);return m?Number(m[1]):0;}
+          async function firstProbe(rows){
+            const x=rows.find(r=>String(r?.type||'').toLowerCase()==='m3u8'&&String(r?.name||'').includes('Interstellar'));
+            if(!x)return {found:false};
             try{
-              const r=await fetch(url,{headers:{Accept:'application/json','User-Agent':UA,Referer:'https://vidbolt.xyz/'},signal:AbortSignal.timeout(12000)});
+              const r=await fetch(x.url,{headers:x.headers||{},signal:AbortSignal.timeout(12000)});
               const tx=await r.text();
-              let summary={label,scraper,type,status:r.status,ms:Date.now()-started,len:tx.length};
-              try{
-                const j=JSON.parse(tx);
-                summary.count=Array.isArray(j.sources)?j.sources.length:0;
-                summary.rows=(j.sources||[]).slice(0,6).map(x=>({name:x.name,quality:x.quality,type:x.type,url:String(x.url||'').slice(0,220),workerProxyUrl:String(x.workerProxyUrl||'').slice(0,220),headers:x.headers}));
-              }catch{summary.head=tx.slice(0,160)}
-              console.log('RESULT',JSON.stringify(summary));
-            }catch(e){
-              console.log('RESULT',JSON.stringify({label,scraper,type,error:String(e.message||e),ms:Date.now()-started}));
-            }
+              return {found:true,status:r.status,head:tx.slice(0,100),expire:expireOf(x.url),url:x.url};
+            }catch(e){return {found:true,error:String(e?.message||e),expire:expireOf(x.url),url:x.url}}
           }
-          async function main(){
-            const jobs=[];
-            for(const [label,scraper,hasTv] of defs){
-              jobs.push(probe(label,scraper,'movie'));
-              if(hasTv&&scraper!=='FSonic')jobs.push(probe(label,scraper,'tv'));
-            }
-            await Promise.all(jobs);
+          async function one(label,q){
+            try{
+              const u=BASE+'?'+q;
+              const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':UA,Referer:'https://vidbolt.xyz/'},signal:AbortSignal.timeout(20000)});
+              const tx=await r.text();
+              let j={};try{j=JSON.parse(tx)}catch{}
+              const rows=Array.isArray(j.sources)?j.sources:[];
+              const ex=rows.filter(x=>String(x?.type||'').toLowerCase()==='m3u8').map(x=>expireOf(x.url)).filter(Boolean);
+              console.log('VARIANT',label,'STATUS',r.status,'COUNT',rows.length,'EXPIRES',JSON.stringify(ex.slice(0,6)),'CACHED',j.cached);
+              console.log('PROBE',label,JSON.stringify(await firstProbe(rows)));
+            }catch(e){console.log('ERR',label,String(e?.message||e))}
           }
-          main().catch(e=>{console.error(e);process.exit(1)});
+          (async()=>{for(const v of variants)await one(v[0],v[1]);})().catch(e=>{console.error(e);process.exit(1)});
           NODE

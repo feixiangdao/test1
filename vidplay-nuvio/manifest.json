@@ -1,13 +1,13 @@
 {
   "name": "VidPlay V1 Local Lab",
-  "version": "0.1.3",
-  "description": "Experimental VidPlay V1-only Nuvio resolver: keyless TMDB-to-IMDb lookup, YTHD nested player extraction, signed media API, HLS verification; browser verification may prevent direct streams.",
+  "version": "0.1.4",
+  "description": "V1-only Nuvio provider. Keeps the provider visible with explicitly non-playable diagnostic rows when upstream streams are restricted; 7s timeout, keyless IMDb lookup.",
   "scrapers": [
     {
       "id": "vidplay-direct-lab",
       "name": "VidPlay · V1 (Lab)",
-      "description": "Only VidPlay V1. Resolves keyless IMDb lookup and public YTHD player chain; emits only verified HLS/MP4/DASH, not HTML iframes. Browser-verified streams may be unavailable.",
-      "version": "0.1.3",
+      "description": "V1-only YTHD resolver; verified HLS when accessible, otherwise visible non-playable Status diagnostic (403/verification/timeout). Requires no TMDB key in normal cases.",
+      "version": "0.1.4",
       "author": "VidPlay Lab",
       "supportedTypes": [
         "movie",

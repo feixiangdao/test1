@@ -7,46 +7,26 @@ on:
 jobs:
   research:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 6
     steps:
-      - name: Probe Quasar file candidates
+      - name: Inspect and probe VidBolt Nebula Echo
         shell: bash
         run: |
           set -e
           python3 - <<'PY'
-          import requests,json,re,subprocess,tempfile,os
+          import requests,re,json,urllib.parse
           S=requests.Session();S.headers.update({"User-Agent":"Mozilla/5.0"})
-          cases=[
-            ("Interstellar","https://scraper.vidbolt.xyz/scrape/Quasar/movie/tt0816692?tmdbId=157336"),
-            ("ReacherS01E01","https://scraper.vidbolt.xyz/scrape/Quasar/tv/tt9288030?tmdbId=108978&season=1&episode=1")
-          ]
-          for label,api in cases:
-            print("\n###",label)
-            r=S.get(api,timeout=40,headers={"Accept":"application/json","Referer":"https://vidbolt.xyz/"})
-            print("API",r.status_code,len(r.text))
-            if r.status_code!=200:continue
-            rows=(r.json().get("sources") or [])
-            candidates=[]
-            for row in rows:
-              u=row.get("url",""); typ=str(row.get("type","")).lower()
-              if "m3u8" in u.lower() or typ in ("m3u8","hls"):continue
-              candidates.append(row)
-            print("FILE_ROWS",len(candidates))
-            for idx,row in enumerate(candidates[:12]):
-              u=row.get("url","");h=row.get("headers") or {}
-              h={k:v for k,v in h.items() if k.lower() not in ("range","connection","accept-encoding")}
-              name=row.get("name","")
-              print("\nROW",idx,name,row.get("quality"),row.get("language"))
-              try:
-                rr=S.get(u,timeout=20,headers={**h,"Range":"bytes=0-65535"},stream=True)
-                print("RANGE",rr.status_code,rr.headers.get("content-type"),rr.headers.get("content-range"),rr.headers.get("content-length"),rr.url)
-                data=b""
-                if rr.status_code in (200,206):
-                  for chunk in rr.iter_content(65536):
-                    data+=chunk
-                    if len(data)>=65536:break
-                rr.close()
-                print("BYTES",len(data),data[:16].hex())
-              except Exception as e:
-                print("RANGEERR",repr(e))
+          for name,url in [
+            ("Nebula","https://vidbolt.xyz/assets/vidr-_MrUkJWh.js"),
+            ("Echo","https://vidbolt.xyz/assets/localapiscraper-B_Gz3ANy.js")
+          ]:
+            r=S.get(url,timeout=30,headers={"Referer":"https://vidbolt.xyz/movie/157336"})
+            print("\nMODULE",name,r.status_code,len(r.text))
+            print(r.text[:12000])
+
+          # Extract all server ids/names once, compactly.
+          t=S.get("https://vidbolt.xyz/assets/EmbeddedOnlyEmbedPage-CxGTx3In.js",timeout=30).text
+          print("\nSERVERS")
+          for m in re.finditer(r'\{id:"([^"]+)",name:"([^"]+)",desc:"([^"]*)",cc:"([^"]*)",tag:"([^"]*)",status:"([^"]+)"',t):
+            print(m.groups())
           PY

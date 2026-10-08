@@ -1,13 +1,13 @@
 {
   "name": "CineVibe Local",
-  "version": "0.2.6",
-  "description": "CineVibe.cc direct provider. Current Server 1 chain: CineVibe → vidsrc.wtf API 1 → Viduki V1, resolved to direct CDN media URLs.",
+  "version": "0.2.7",
+  "description": "CineVibe.cc direct provider using Viduki V1 with server-side resolution detection and direct CDN playback.",
   "scrapers": [
     {
       "id": "cinevibe-server1",
       "name": "CineVibe · Server 1",
-      "description": "CineVibe / Viduki V1 portable HLS with master parsing and H.264 SPS probing for real resolution labels.",
-      "version": "0.2.6",
+      "description": "CineVibe / Viduki V1 portable direct streams. Resolution is detected server-side; Nuvio performs no HLS/TS probing.",
+      "version": "0.2.7",
       "author": "CineVibe Local",
       "supportedTypes": [
         "movie",

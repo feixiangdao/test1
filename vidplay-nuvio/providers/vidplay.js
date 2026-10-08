@@ -327,9 +327,26 @@ function makeRow(url,quality,referer){
 }
 function verifyMedia(u,ref){
   return qualifiedMedia(u,ref).then(function(candidate){
-    return fetchText(candidate,{"User-Agent":UA,"Referer":ref,"Accept":"application/vnd.apple.mpegurl,application/x-mpegURL,*/*"})
-      .then(function(t){return extType(candidate)==="hls"?variantsFromMaster(t,candidate,ref):
-        extType(candidate)==="mp4"||extType(candidate)==="dash"?[makeRow(candidate,"Auto",ref)]:[];});
+    var typ=extType(candidate);
+    var h={"User-Agent":UA,"Referer":ref,"Accept":"application/vnd.apple.mpegurl,application/x-mpegURL,*/*"};
+    if(typ==="hls"||typ==="dash"){
+      return fetchText(candidate,h).then(function(t){
+        if(typ==="hls")return variantsFromMaster(t,candidate,ref);
+        if(/<MPD\b/i.test(t))return [makeRow(candidate,"Auto",ref)];
+        throw new Error("non-MPD document");
+      });
+    }
+    if(typ==="mp4"){
+      h.Range="bytes=0-31";
+      return fetch(candidate,{method:"GET",headers:h}).then(function(r){
+        if(!r||!r.ok)throw new Error("MP4 HTTP "+(r&&r.status));
+        var ct=clean(r.headers&&r.headers.get&&r.headers.get("content-type")).toLowerCase();
+        if(!/video\/mp4|application\/octet-stream/.test(ct))throw new Error("not MP4 media");
+        // Never read or buffer the entire video in the plugin.
+        return [makeRow(candidate,"Auto",ref)];
+      });
+    }
+    return [];
   }).catch(function(e){log("V1 media rejected: "+(e&&e.message||e));return[];});
 }
 function resolveYthd(imdb,siteReferer){
@@ -397,13 +414,12 @@ function getStreams(id,mediaType,season,episode){
   season=parseInt(season,10)||0;episode=parseInt(episode,10)||0;
   if(type==="tv"&&(!season||!episode))return Promise.resolve([]);
   return tmdbMeta(tmdb,type).then(function(meta){
-    if(type!=="movie"||!meta||!meta.imdb)return Promise.resolve([]);
-    return resolveYthd(meta.imdb,BASE+"/").catch(function(e){
-      log("V1 YTHD: "+(e&&e.message||e));return[];
-    });
-  }).then(function(rows){
-    if(rows.length)return rows;
-    return tmdbMeta(tmdb,type).then(function(meta){
+    var route=type==="movie"&&meta&&meta.imdb
+      ?resolveYthd(meta.imdb,BASE+"/").catch(function(e){
+        log("V1 YTHD: "+(e&&e.message||e));return[];
+      }):Promise.resolve([]);
+    return route.then(function(rows){
+      if(rows.length)return rows;
       return resolveAjaxV1(tmdb,type,season,episode,meta).catch(function(e){
         log("V1 AJAX: "+(e&&e.message||e));return[];
       });

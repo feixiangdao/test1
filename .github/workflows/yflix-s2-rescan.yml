@@ -6,67 +6,60 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 5
     steps:
-      - name: Verify current VidBolt Orion by HLS duration
+      - name: Probe hidden VidBolt local scrapers
         shell: bash
         run: |
-          curl -fsSL 'https://vidbolt.xyz/assets/darkmatter-HpTILE1p.js' -o /tmp/darkmatter.js
           node - <<'NODE'
-          const fs=require('fs');
-          const src=fs.readFileSync('/tmp/darkmatter.js','utf8');
-          const movieBase=(src.match(/const c="(https:\/\/api\.movy\.lol\/)"\.replace/)||[])[1]||'https://api.movy.lol/';
-          const tvBase=(src.match(/const c="(https:\/\/img\.animecurx\.tech)"\.replace/)||[])[1]||'https://img.animecurx.tech';
-          const keys=[...src.matchAll(/i\(new URL\([^)]*\),"([^"]+)"\)/g)].map(m=>m[1]);
-          const movieKey=keys[0]||'';
-          const tvKey=keys[1]||'';
-          console.log('BASES',movieBase,tvBase,'KEYS_FOUND',keys.length);
-
-          const cases=[
-            {label:'MOVIE',api:movieBase.replace(/\/+$/,'')+'/api/source/157336',key:movieKey,expected:169},
-            {label:'TV',api:tvBase.replace(/\/+$/,'')+'/api/tv/108978/1/1',key:tvKey,expected:54}
-          ];
           const UA='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/138 Mobile Safari/537.36';
-          function abs(base,ref){try{return new URL(ref,base).toString()}catch{return ref}}
-          function sum(txt){let total=0,count=0,m,re=/#EXTINF:([0-9.]+)/g;while((m=re.exec(String(txt||'')))){total+=Number(m[1])||0;count++;}return count?total:0;}
-          async function readHls(url,headers,depth=0){
-            if(depth>4)return{ok:false,error:'depth'};
-            try{
-              const r=await fetch(url,{headers:headers||{},signal:AbortSignal.timeout(15000)});
-              const tx=await r.text();
-              if(!r.ok||!tx.startsWith('#EXTM3U'))return{ok:false,status:r.status,head:tx.slice(0,120)};
-              const sec=sum(tx);
-              if(sec)return{ok:true,status:r.status,seconds:sec,minutes:sec/60,url};
-              let next='';
-              for(const line of tx.replace(/\r/g,'').split('\n')){const s=line.trim();if(s&&!s.startsWith('#')){next=abs(url,s);break;}}
-              if(!next)return{ok:false,error:'no-child'};
-              return readHls(next,headers,depth+1);
-            }catch(e){return{ok:false,error:String(e?.message||e)}}
+          const base='https://vidbolt.xyz/api/proxy?path=';
+          const defs=[
+            ['Halo','Flaxmovies',true],
+            ['VidFastFirst','VidFastFirst',true],
+            ['Vault4K','VidFastPro',true],
+            ['Vidflix','Vidflix',true],
+            ['ShowBox','ShowBox',true],
+            ['Vertex','Peachify',false],
+            ['Blaze','VidRift',true],
+            ['Ember','FSonic',true],
+            ['Omega','CineStream',true]
+          ];
+          function pathFor(scraper,type){
+            const id=type==='movie'?'tt0816692':'tt9288030';
+            const tmdb=type==='movie'?'157336':'108978';
+            const title=type==='movie'?'Interstellar':'Reacher';
+            const year=type==='movie'?'2014':'2022';
+            let q='tmdbId='+tmdb;
+            if(scraper!=='Peachify'){q+='&title='+encodeURIComponent(title)+'&year='+year;}
+            if(type==='tv')q+='&season=1&episode=1';
+            return '/scrape/'+scraper+'/'+type+'/'+id+'?'+q;
           }
-          async function run(){
-            for(const c of cases){
-              const u=c.api+'?api_key='+encodeURIComponent(c.key)+'&apikey='+encodeURIComponent(c.key);
+          async function probe(label,scraper,type){
+            const p=pathFor(scraper,type);
+            const url=base+encodeURIComponent(p);
+            const started=Date.now();
+            try{
+              const r=await fetch(url,{headers:{Accept:'application/json','User-Agent':UA,Referer:'https://vidbolt.xyz/'},signal:AbortSignal.timeout(12000)});
+              const tx=await r.text();
+              let summary={label,scraper,type,status:r.status,ms:Date.now()-started,len:tx.length};
               try{
-                const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':UA},signal:AbortSignal.timeout(20000)});
-                const tx=await r.text();
-                console.log('API_STATUS',c.label,r.status,'LEN',tx.length);
-                if(!r.ok){console.log('API_HEAD',tx.slice(0,200));continue;}
                 const j=JSON.parse(tx);
-                let rows=Array.isArray(j.sources)?j.sources.slice():[];
-                if(!rows.length&&j.m3u8_path){
-                  const base=c.label==='MOVIE'?'https://img.rousav.tech':tvBase;
-                  const p=String(j.m3u8_path);
-                  rows.push({url:p.startsWith('http')?p:base.replace(/\/+$/,'')+'/'+p.replace(/^\/+/,''),quality:'1080p',type:'m3u8',headers:j.headers||{}});
-                }
-                console.log('ROWS',c.label,rows.length);
-                for(let i=0;i<rows.length;i++){
-                  const x=rows[i],u=String(x.url||'');
-                  if(!(String(x.type||'').toLowerCase()==='m3u8'||u.includes('.m3u8')))continue;
-                  const p=await readHls(u,x.headers||{});
-                  console.log('ORION_PROBE',c.label,i,JSON.stringify({quality:x.quality,url:u,probe:p,expected:c.expected}));
-                }
-              }catch(e){console.log('ERR',c.label,String(e?.message||e))}
+                summary.count=Array.isArray(j.sources)?j.sources.length:0;
+                summary.rows=(j.sources||[]).slice(0,6).map(x=>({name:x.name,quality:x.quality,type:x.type,url:String(x.url||'').slice(0,220),workerProxyUrl:String(x.workerProxyUrl||'').slice(0,220),headers:x.headers}));
+              }catch{summary.head=tx.slice(0,160)}
+              console.log('RESULT',JSON.stringify(summary));
+            }catch(e){
+              console.log('RESULT',JSON.stringify({label,scraper,type,error:String(e.message||e),ms:Date.now()-started}));
             }
           }
-          run().catch(e=>{console.error(e);process.exit(1)});
+          async function main(){
+            const jobs=[];
+            for(const [label,scraper,hasTv] of defs){
+              jobs.push(probe(label,scraper,'movie'));
+              if(hasTv&&scraper!=='FSonic')jobs.push(probe(label,scraper,'tv'));
+            }
+            await Promise.all(jobs);
+          }
+          main().catch(e=>{console.error(e);process.exit(1)});
           NODE

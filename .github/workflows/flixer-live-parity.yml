@@ -27,7 +27,7 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: |
-          npm install --no-save binaryen@132.0.0 playwright hermes-parser quickjs-emscripten
+          npm install --no-save binaryen@132.0.0 playwright hermes-parser quickjs-emscripten terser
           npx playwright install --with-deps chromium
       - name: Capture current Flixer encrypted fixture with headed Chromium
         env:
@@ -64,8 +64,21 @@ jobs:
           git fetch origin refs/heads/flixer-local-only-20261008:refs/remotes/origin/flixer-local-only-20261008
           git switch -C flixer-local-only-20261008 origin/flixer-local-only-20261008
           mkdir -p flixer-local/providers
-          cp /tmp/flixer-local-candidate.js flixer-local/providers/flixer-local-live-alpha.js
+          node --input-type=module - <<'NODE'
+          import {readFile,writeFile} from "node:fs/promises";
+          import {minify} from "terser";
+          const input=await readFile("/tmp/flixer-local-candidate.js","utf8");
+          const out=await minify(input,{ecma:2018,module:false,toplevel:false,compress:{passes:2},mangle:{toplevel:false},format:{comments:false}});
+          if(!out.code)throw Error("FLIXER_MINIFY_EMPTY");
+          const bytes=Buffer.byteLength(out.code);
+          if(bytes>=450000)throw Error("FLIXER_MINIFIED_TOO_LARGE_"+bytes);
+          await writeFile("flixer-local/providers/flixer-local-live-alpha.js",out.code+"\n");
+          console.log("FLIXER_PUBLISHED_LOCAL_MINIFIED_BYTES",bytes);
+          NODE
           node --check flixer-local/providers/flixer-local-live-alpha.js
+          FLIXER_SCRIPT_PATH=flixer-local/providers/flixer-local-live-alpha.js node flixer-local/check-quickjs.mjs | tee /tmp/flixer-mini-quickjs.log
+          grep -q 'QUICKJS_KEY_RESULT.*length.*64' /tmp/flixer-mini-quickjs.log
+          if grep -Eq 'QUICKJS_EVALUATION_ERROR|QUICKJS_HOST_EXCEPTION' /tmp/flixer-mini-quickjs.log; then exit 1; fi
           git add flixer-local/providers/flixer-local-live-alpha.js
           if ! git diff --cached --quiet; then
             git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Publish tested standalone Flixer Local Alpha candidate"

@@ -65,3 +65,13 @@ This is not an end-to-end decryption success, so this Local manifest stays disab
 - CI evidence: https://github.com/feixiangdao/test1/actions/runs/37772723652 .
 
 **Keep manifest disabled** until actual media extraction is verified on Nuvio. Do not replace the currently working provider set.
+
+## Hermes parsing milestone (2026-10-08)
+
+- The prototype wasm2js + wasm-bindgen bundle is about 1.29 MB and loads in browser-free Node.js.
+- With compatible `Window`, body, screen, Canvas and monotonic time shims, `get_img_key()` produced a 64-character key in CI.
+- A **1,290,595-byte, non-ESM ordinary JavaScript preview** derived from the bundle was successfully parsed by `hermes-parser` as a script; the run did not report syntax errors.
+- CI: https://github.com/feixiangdao/test1/actions/runs/37773023096
+- This is only a parser-level syntax test; it does **not** establish execution inside Nuvio Hermes, source decrypt success, or video playback. The generated preview is a research output, not a published working Provider.
+
+The final target remains a one-file, locally executing Flixer Nuvio provider. No Playwright, Vercel, remote resolver, or background host may be required at playback time.

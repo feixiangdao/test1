@@ -1,0 +1,45 @@
+# VidPlay Local Lab (Nuvio)
+
+**Status: experimental, playback NOT verified.** This is a standalone Nuvio provider and does not modify any other providers.
+
+## Confirmed mapping
+
+| Type | V1 | V2 | V3 |
+| --- | --- | --- | --- |
+| Movie | `/ajax/mov_vplay.php?embed=<IMDb>` | `/ajax/mov_vplay2.php?embed=<IMDb>` | `/ajax/mov_vplay3.php?embed=<TMDB movie ID>` |
+| TV | `/ajax/tv_vplay.php?embed=<TMDB TV ID>&season=S&episode=E` | `/ajax/tv_vplay2.php?embed=<TMDB TV ID>&season=S&episode=E` | `/ajax/tv_vplay3.php?embed=<TMDB TV ID>&season=S&episode=E` |
+
+Observed on Life (2017), movie TMDB 395992 / IMDb tt5442430, and Abbott Elementary S1E1, TV TMDB 125935. TV site path convention: `/watchseries/<slug>-online-free/season/<season>/episode/<episode>`.
+
+## What this prototype does
+
+- Uses Nuvio's TMDB ID to construct movie V3 and all TV V1/V2/V3 requests.
+- Optional TMDB API key resolves movie IMDb IDs, to construct movie V1/V2.
+- Uses same-origin AJAX request headers and parses direct HLS/MP4/DASH URLs in responses.
+- Follows up to two public iframe hops to detect ordinary non-obfuscated direct media URLs.
+- On HTTP 403, Cloudflare challenge pages, malformed or HTML-only results, returns **zero** streams, not synthetic placeholders.
+- Keeps all VidPlay routes separate from CineVibe / YFlix / YesMovies.
+
+## Blocking issue (as tested 2026-10-08)
+
+A headless Chromium browser opened detail and episode pages successfully (HTTP 200), but **all six** tested movie and TV AJAX routes received HTTP 403 with Cloudflare challenge HTML. A separate browser extraction service returned only `...` for movie AJAX responses. **No actual playback stream URL has been confirmed.**
+
+The working mock tests demonstrate parser behavior only; they are not live end-to-end playback verification. No bypass of Cloudflare is included.
+
+## Files
+
+- `manifest.json`: Nuvio install manifest, version 0.1.0
+- `providers/vidplay.js`: experimental parser/provider
+- `test-provider.cjs`: mock-backed deterministic tests
+- `probe-browser.cjs`, `probe-tv.cjs`, `probe-episode.cjs`, `inspect-ajax.cjs`, `inspect-scripts.cjs`: browser research tools
+
+## Release gate
+
+Do **not** describe the provider as working until at least one legally accessible, real playable media URL has been returned by the VidPlay AJAX endpoint and tested in Nuvio, followed by a movie and a TV episode regression test. Be careful with expiring CDN signatures, player-specific headers, and title/episode mismatch.
+
+## Reference CI runs
+
+- Browser movie AJAX HTTP 403: https://github.com/feixiangdao/test1/actions/runs/37760861548
+- Request header and Cloudflare detail: https://github.com/feixiangdao/test1/actions/runs/37761311539
+- Episode route and TV AJAX structure: https://github.com/feixiangdao/test1/actions/runs/37762337434
+- Mock provider tests: https://github.com/feixiangdao/test1/actions/runs/37762621857

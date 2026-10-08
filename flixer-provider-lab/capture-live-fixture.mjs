@@ -57,6 +57,22 @@ if(serverListCipher) {
  console.log("LIVE_SERVERLIST_FIXTURE_READY",{bytes:serverListCipher.body.length});
 }
 if(chosen){
+ const classification=(()=>{
+   try{const o=JSON.parse(chosen.body);return {looksJson:true,keys:Object.keys(o).slice(0,8)}}
+   catch{return {looksJson:false,isBase64:/^[A-Za-z0-9+/=\\s]+$/.test(chosen.body),charCount:chosen.body.length}}
+ })();
+ console.log("LIVE_MEDIA_CIPHER_SHAPE",classification);
+ const inPage=await page.evaluate(async ({body,key})=>{
+   const m=window.wasmImgData;
+   if(!m || !m.ready || typeof m.process_img_data!=="function")return {ready:false,reason:"WASM_NOT_READY"};
+   try{
+     const data=JSON.parse(await m.process_img_data(body,key));
+     const sources=Array.isArray(data.sources)?data.sources:Array.isArray(data.sources?.sources)?data.sources.sources:[];
+     const urls=sources.filter(x=>typeof x?.url==="string"&&/^https?:/.test(x.url)).length;
+     return {ready:true,decoded:true,sources:sources.length,mediaUrlCount:urls,rootKeys:Object.keys(data).slice(0,8)};
+   }catch(e){return {ready:true,decoded:false,error:String(e).slice(0,90)}}
+ },{body:chosen.body,key:chosen.suppliedKey}).catch(e=>({error:String(e).slice(0,110)}));
+ console.log("BROWSER_WASM_SAME_CIPHER_PARITY",inPage);
  await writeFile("/tmp/flixer-fixture.json",JSON.stringify(chosen));
  console.log("LIVE_MEDIA_CIPHER_FIXTURE_READY",{server:chosen.server,bytes:chosen.body.length});
 }else{

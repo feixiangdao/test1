@@ -22,6 +22,11 @@ jobs:
         run: |
           npm install --no-save playwright
           npx playwright install --with-deps chromium
+      - name: Analyze browser WebAssembly boundary
+        run: |
+          node flixer-provider-lab/inspect-wasm.mjs
+          ls -lh /tmp/flixer-img-data.wasm /tmp/flixer-tmdb-image-enhancer.js || true
+          if command -v wasm2js >/dev/null; then wasm2js --version; fi
       - name: Validate experimental provider and resolver
         run: |
           node --check flixer-provider-lab/resolver.mjs

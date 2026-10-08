@@ -1,7 +1,7 @@
 // Read-only interoperability probe for current public VidSrc player flow.
 // No challenge bypass, cookie reuse, user session forwarding, or token logging.
 const UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/139.0.0.0 Mobile Safari/537.36";
-const BASE="https://vidsrc.sh",PLAYER="https://cloudorchestranova.com";
+const BASE="https://vidsrc.sh",PLAYER="https://stellarconductornexus.com";
 function shape(value){
   try{let u=new URL(value);return {host:u.host,path:u.pathname,keys:[...u.searchParams.keys()]}}catch(e){return null}
 }

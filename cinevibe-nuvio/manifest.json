@@ -1,13 +1,13 @@
 {
   "name": "CineVibe Local",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "CineVibe.cc direct provider. Current Server 1 chain: CineVibe → vidsrc.wtf API 1 → Viduki V1, resolved to direct CDN media URLs.",
   "scrapers": [
     {
       "id": "cinevibe-server1",
       "name": "CineVibe · Server 1",
       "description": "CineVibe / Viduki V1 portable HLS with on-device master playlist expansion into real quality rows when available.",
-      "version": "0.2.4",
+      "version": "0.2.5",
       "author": "CineVibe Local",
       "supportedTypes": [
         "movie",

@@ -1,13 +1,13 @@
 {
   "name": "Flixer Local (Alpha test)",
-  "version": "0.3.1",
-  "description": "Flixer Local Alpha v0.3.1: reduced provider size from 1.30 MB to 329 KB. QuickJS and direct live HLS tests passed. Refresh this repository and ensure scraper is enabled; Android playback remains unverified.",
+  "version": "0.3.2",
+  "description": "Flixer Local Alpha v0.3.2: restored persistent 329 KB QuickJS-validated script and fixed automatic publishing. Android Nuvio source-chip disappearance still requires device diagnostics.",
   "scrapers": [
     {
       "id": "flixer-local-alpha-030",
       "name": "Flixer Local · Alpha",
-      "description": "Local HLS v0.3.1 (329 KB, same scraper ID); requires enabled Local Scrapers. Nuvio mobile playback pending.",
-      "version": "0.3.1",
+      "description": "Pure Local Alpha. QuickJS real-cipher parity and live HLS fetch passed; mobile Android runtime not yet verified. CI now always publishes minified script.",
+      "version": "0.3.2",
       "supportedTypes": [
         "movie",
         "tv"

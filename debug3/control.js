@@ -1,0 +1,2 @@
+function row(label){return [{name:label,title:label,url:"https://example.com/control.m3u8",quality:"Diag",type:"hls",provider:"control",headers:{},subtitles:[]}];}
+function getStreams(){return Promise.resolve(row("CONTROL OK"));} module.exports={getStreams:getStreams};

@@ -1,0 +1,8 @@
+{
+  "bridge_id": "VcnGaML2t80YxAGE",
+  "seq": 8,
+  "action": "install_plugin",
+  "args": {
+    "manifest": "https://raw.githubusercontent.com/feixiangdao/test1/0e8b7c28465d48a1db14966a53a210d62c4e1aa6/debug3/manifest.json"
+  }
+}

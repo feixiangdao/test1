@@ -1,0 +1,18 @@
+{
+  "name": "NOVIPNOAD Debug Safe",
+  "version": "0.1.1",
+  "description": "Minimal safe diagnostics for Nuvio QuickJS fetch and TMDB connectivity.",
+  "scrapers": [
+    {
+      "id": "novipnoad-stage-tmdb-safe",
+      "name": "NOVIPNOAD Stage TMDB Safe",
+      "description": "Minimal TMDB fetch diagnostic. No original provider helpers.",
+      "version": "0.1.1",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "tmdb.js",
+      "enabled": true
+    }
+  ]
+}

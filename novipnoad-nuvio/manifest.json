@@ -8,25 +8,23 @@
       "name": "NOVIPNOAD Local",
       "description": "Runtime probe: returns a fixed stream row to verify Nuvio QuickJS/plugin execution.",
       "version": "0.2.4",
-      "author": "NOVIPNOAD Local Lab",
       "supportedTypes": [
         "movie",
         "tv"
       ],
       "filename": "providers/novipnoad-probe-v024.js",
-      "enabled": true,
-      "formats": [
-        "m3u8",
-        "mp4",
-        "mpd"
+      "enabled": true
+    },
+    {
+      "id": "novipnoad-probe-a",
+      "name": "NOVIPNOAD Probe A",
+      "description": "Binary load probe A: first half of original helper functions + fixed stream.",
+      "version": "0.0.1",
+      "supportedTypes": [
+        "movie"
       ],
-      "contentLanguage": [
-        "zh",
-        "en",
-        "multi"
-      ],
-      "limited": true,
-      "hasSettings": true
+      "filename": "probes/probe-a.js",
+      "enabled": true
     }
   ]
 }

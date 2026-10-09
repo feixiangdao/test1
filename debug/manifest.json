@@ -1,0 +1,29 @@
+{
+  "name": "NOVIPNOAD Debug Lab",
+  "version": "0.1.0",
+  "description": "Temporary Nuvio diagnostics for isolating NOVIPNOAD runtime/network failures.",
+  "scrapers": [
+    {
+      "id": "novipnoad-stage-tmdb",
+      "name": "NOVIPNOAD Stage TMDB",
+      "description": "Stage 1 diagnostic: tests only TMDB metadata request with a 15 second internal timeout.",
+      "version": "0.1.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/eae7f2b2de1d0ed931d993dc9e96c6f0d24b6168/novipnoad-nuvio/probes/stage-tmdb.js",
+      "enabled": true
+    },
+    {
+      "id": "novipnoad-probe-b",
+      "name": "NOVIPNOAD Probe B",
+      "description": "Load-only probe for the second half of original helper functions.",
+      "version": "0.0.1",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/94d1dedf68d1171efcab292899606570ba2c49f0/novipnoad-nuvio/probes/probe-b.js",
+      "enabled": true
+    }
+  ]
+}

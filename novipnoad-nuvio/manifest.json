@@ -25,6 +25,17 @@
       ],
       "filename": "probes/probe-a.js",
       "enabled": true
+    },
+    {
+      "id": "novipnoad-probe-b",
+      "name": "NOVIPNOAD Probe B",
+      "description": "Binary load probe B: second half of original helper functions + fixed stream.",
+      "version": "0.0.1",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "probes/probe-b.js",
+      "enabled": true
     }
   ]
 }

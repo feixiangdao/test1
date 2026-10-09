@@ -1,6 +1,6 @@
 {
   "bridge_id": "VcnGaML2t80YxAGE",
   "seq": 23,
-  "action": "network_wifi_reset",
+  "action": "restart_nuvio",
   "args": {}
 }

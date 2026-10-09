@@ -1,10 +1,8 @@
 {
-  "bridge_id": "l6Q4uZWJEGYcqj7k",
+  "bridge_id": "VcnGaML2t80YxAGE",
   "seq": 3,
-  "action": "test_plugin",
+  "action": "text",
   "args": {
-    "manifest": "https://raw.githubusercontent.com/feixiangdao/test1/main/novipnoad-nuvio/manifest.json",
-    "title": "Spider-Man: No Way Home",
-    "provider": "NOVIPNOAD Local"
+    "value": "https://raw.githubusercontent.com/feixiangdao/test1/main/novipnoad-nuvio/manifest.json"
   }
 }

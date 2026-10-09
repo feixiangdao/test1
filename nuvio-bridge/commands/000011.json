@@ -1,0 +1,8 @@
+{
+  "bridge_id": "VcnGaML2t80YxAGE",
+  "seq": 11,
+  "action": "click_text",
+  "args": {
+    "text": "Install Plugin Repository"
+  }
+}

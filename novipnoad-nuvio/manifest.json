@@ -17,13 +17,13 @@
     },
     {
       "id": "novipnoad-probe-a",
-      "name": "NOVIPNOAD Probe A",
-      "description": "Binary load probe A: first half of original helper functions + fixed stream.",
-      "version": "0.0.1",
+      "name": "NOVIPNOAD Stage TMDB",
+      "description": "Stage 1 diagnostic: tests only TMDB metadata request with a 15 second internal timeout.",
+      "version": "0.1.0",
       "supportedTypes": [
         "movie"
       ],
-      "filename": "probes/probe-a.js",
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/eae7f2b2de1d0ed931d993dc9e96c6f0d24b6168/novipnoad-nuvio/probes/stage-tmdb.js",
       "enabled": true
     },
     {

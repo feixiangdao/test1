@@ -1,0 +1,29 @@
+{
+  "name": "Nuvio Network Debug",
+  "version": "0.1.0",
+  "description": "A/B test for QuickJS network fetch vs no-fetch control.",
+  "scrapers": [
+    {
+      "id": "nuvio-control",
+      "name": "Nuvio Control No Fetch",
+      "description": "No network request. Must return CONTROL OK.",
+      "version": "0.1.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "control.js",
+      "enabled": true
+    },
+    {
+      "id": "nuvio-fetch-example",
+      "name": "Nuvio Fetch Example",
+      "description": "Only fetches https://example.com and reports result.",
+      "version": "0.1.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "fetch.js",
+      "enabled": true
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 {
-  "bridge_id": "l6Q4uZWJEGYcqj7k",
+  "bridge_id": "VcnGaML2t80YxAGE",
   "seq": 6,
-  "action": "click_text",
+  "action": "install_plugin",
   "args": {
-    "text": "Plugins"
+    "manifest": "https://raw.githubusercontent.com/feixiangdao/test1/main/novipnoad-nuvio/manifest.json?v=aacd52c2d80bb626f370784b160bbf0f13266369"
   }
 }

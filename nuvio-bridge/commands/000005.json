@@ -1,8 +1,9 @@
 {
-  "bridge_id": "l6Q4uZWJEGYcqj7k",
+  "bridge_id": "VcnGaML2t80YxAGE",
   "seq": 5,
-  "action": "click_text",
+  "action": "tap",
   "args": {
-    "text": "Content & Discovery"
+    "x": 540,
+    "y": 2250
   }
 }

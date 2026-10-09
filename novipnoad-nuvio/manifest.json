@@ -1,19 +1,19 @@
 {
   "name": "NOVIPNOAD Local Alpha",
-  "version": "0.2.3",
-  "description": "Independent NOVIPNOAD provider using first-party title/episode discovery, TMDB Chinese aliases, and direct player resolution. Uses verified browser sessions and mirrors the upstream Function/eval interception runtime to capture dynamically generated vkey code.",
+  "version": "0.2.4",
+  "description": "NOVIPNOAD runtime probe for validating Nuvio QuickJS plugin execution before restoring full resolver logic.",
   "scrapers": [
     {
       "id": "novipnoad-local",
       "name": "NOVIPNOAD Local",
-      "description": "NOVIPNOAD .ca/.uk/.net search + strict movie/TV/anime/show/Chinese-season matching + direct player quality extraction.",
-      "version": "0.2.3",
+      "description": "Runtime probe: returns a fixed stream row to verify Nuvio QuickJS/plugin execution.",
+      "version": "0.2.4",
       "author": "NOVIPNOAD Local Lab",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/novipnoad-v023.js",
+      "filename": "providers/novipnoad-probe-v024.js",
       "enabled": true,
       "formats": [
         "m3u8",

@@ -1,0 +1,8 @@
+{
+  "bridge_id": "VcnGaML2t80YxAGE",
+  "seq": 18,
+  "action": "click_text",
+  "args": {
+    "text": "Profile"
+  }
+}

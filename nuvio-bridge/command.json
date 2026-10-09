@@ -1,9 +1,6 @@
 {
   "bridge_id": "l6Q4uZWJEGYcqj7k",
-  "seq": 1,
-  "action": "install",
-  "args": {
-    "manifest": "https://raw.githubusercontent.com/feixiangdao/test1/main/novipnoad-nuvio/manifest.json",
-    "ui": true
-  }
+  "seq": 2,
+  "action": "launch",
+  "args": {}
 }

@@ -1,41 +1,32 @@
 {
   "name": "NOVIPNOAD Local Alpha",
-  "version": "0.2.4",
-  "description": "NOVIPNOAD runtime probe for validating Nuvio QuickJS plugin execution before restoring full resolver logic.",
+  "version": "0.2.3",
+  "description": "Independent NOVIPNOAD provider using first-party title/episode discovery, TMDB Chinese aliases, and direct player resolution. Uses verified browser sessions and mirrors the upstream Function/eval interception runtime to capture dynamically generated vkey code.",
   "scrapers": [
     {
       "id": "novipnoad-local",
       "name": "NOVIPNOAD Local",
-      "description": "Runtime probe: returns a fixed stream row to verify Nuvio QuickJS/plugin execution.",
-      "version": "0.2.4",
+      "description": "NOVIPNOAD .ca/.uk/.net search + strict movie/TV/anime/show/Chinese-season matching + direct player quality extraction.",
+      "version": "0.2.3",
+      "author": "NOVIPNOAD Local Lab",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/novipnoad-probe-v024.js",
-      "enabled": true
-    },
-    {
-      "id": "novipnoad-probe-a",
-      "name": "NOVIPNOAD Stage TMDB",
-      "description": "Stage 1 diagnostic: tests only TMDB metadata request with a 15 second internal timeout.",
-      "version": "0.1.0",
-      "supportedTypes": [
-        "movie"
+      "filename": "providers/novipnoad-v023.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mpd"
       ],
-      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/eae7f2b2de1d0ed931d993dc9e96c6f0d24b6168/novipnoad-nuvio/probes/stage-tmdb.js",
-      "enabled": true
-    },
-    {
-      "id": "novipnoad-probe-b",
-      "name": "NOVIPNOAD Probe B",
-      "description": "Binary load probe B: second half of original helper functions + fixed stream.",
-      "version": "0.0.1",
-      "supportedTypes": [
-        "movie"
+      "contentLanguage": [
+        "zh",
+        "en",
+        "multi"
       ],
-      "filename": "probes/probe-b.js",
-      "enabled": true
+      "limited": true,
+      "hasSettings": true
     }
   ]
 }

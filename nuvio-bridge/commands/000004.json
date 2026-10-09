@@ -1,8 +1,8 @@
 {
-  "bridge_id": "l6Q4uZWJEGYcqj7k",
+  "bridge_id": "VcnGaML2t80YxAGE",
   "seq": 4,
   "action": "click_text",
   "args": {
-    "text": "Profile"
+    "text": "Install Plugin Repository"
   }
 }

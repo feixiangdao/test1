@@ -1,0 +1,8 @@
+{
+  "bridge_id": "l6Q4uZWJEGYcqj7k",
+  "seq": 6,
+  "action": "click_text",
+  "args": {
+    "text": "Plugins"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "NOVIPNOAD Search Debug",
+  "version": "0.1.0",
+  "description": "Bypasses TMDB and tests NOVIPNOAD discovery directly with fixed The Matrix (1999) metadata.",
+  "scrapers": [
+    {
+      "id": "novipnoad-search-no-tmdb",
+      "name": "NOVIPNOAD Search No TMDB",
+      "description": "Fixed The Matrix (1999) -> original NOVIPNOAD discoverDetail() only. No TMDB request.",
+      "version": "0.1.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "search.js",
+      "enabled": true
+    }
+  ]
+}

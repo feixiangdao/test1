@@ -220,6 +220,12 @@ mapple 失败时**只返回一条诊断行**（`about:error` / `Status`），标
   该插件没有用户填写的 Cookie/Token，所以重建仓库不会丢设置（scraper `id` 未变）。
 - CI 只做静态检查：manifest 结构、JS 语法、模块加载、`getStreams` 导出、无 ID 守卫。
   CI **不验证**真实解析与播放。
+- v1.3.1 的过期签名过滤已在设备上确认**新代码确实在跑**：刷新仓库后 manifest 显示
+  `Version 1.3.1`，logcat 里 vidbolt 的构建标记变成 `FB1.3.1`，manifest 前缀仍是 GitHub raw 地址。
+  但**该过滤的实际剔除效果未能当场复现** —— 复测时 VidBolt 的 scraper 后端对**所有**片、
+  所有 server 名（`Quasar` / `Vidlink` / `Nova` / `VidFast` / `Videasy` / `VidCore` / `Nebula` / `Vidzee`）
+  都返回 HTTP 404 + `{"sources":[],"cached":false}`，本机 `curl` 复现一致，属上游故障。
+  过滤逻辑本身由本地离线 mock harness 覆盖（16 条断言，见上）。
 
 ### 设备上如何读日志
 

@@ -25,6 +25,7 @@ on:
       - 'cinevibe-nuvio/**'
       - 'kisskh-nuvio/**'
       - 'vidplay-nuvio/**'
+      - 'flixbaba-nuvio/**'
       - '.github/workflows/nuvio-offline-static.yml'
   workflow_dispatch:
 permissions:
@@ -63,7 +64,7 @@ jobs:
           {
             echo '## Nuvio automated regression checks'
             echo ''
-            echo '- Manifest and enabled source path checks: 10 Nuvio projects.'
+            echo '- Manifest and enabled source path checks: 11 Nuvio projects.'
             echo '- JavaScript syntax parse for every enabled Provider (no execution).'
             echo '- Isolated module-load check and getStreams export validation for every enabled Provider.'
             echo '- Offline module loading and missing-identifier handling.'

@@ -82,7 +82,7 @@ var PLAYBACK_HEADERS = {
 
 // Flixbaba wrapper metadata. BUILD is surfaced in every diagnostic row so the
 // device always tells us which build of the module is actually loaded.
-var BUILD = "FB1.3.0";
+var BUILD = "FB1.3.1";
 
 // Why the last playback session failed. Nuvio cannot show us console output, so
 // the reason is carried into the diagnostic row instead.

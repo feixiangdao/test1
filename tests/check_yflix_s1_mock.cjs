@@ -67,6 +67,20 @@ async function main() {
   assert.ok(invalid.every(x=>x.quality==='Status'));
   assert.equal(env.requests.length,0);
   console.log('PASS S1 missing TV coordinates do not fetch');
+  env=setup({ok:true,status:200,json:async()=>({success:true,streams:[]})});
+  const empty=await env.getStreams('157336','movie');
+  assert.ok(empty.length>0 && empty.every(x=>x.quality==='Status' && x.url==='about:error'));
+  console.log('PASS S1 HTTP 200 empty list produces diagnostics only');
+
+  env=setup({ok:true,status:200,json:async()=>({success:false,streams:[]})});
+  const denied=await env.getStreams('157336','movie');
+  assert.ok(denied.every(x=>x.quality==='Status' && x.url==='about:error'));
+  console.log('PASS S1 HTTP 200 upstream failure flag is not playable');
+
+  env=setup({ok:true,status:200,json:async()=>{throw new SyntaxError('mock malformed JSON');}});
+  const badJson=await env.getStreams('157336','movie');
+  assert.ok(badJson.every(x=>x.quality==='Status' && x.url==='about:error'));
+  console.log('PASS S1 JSON parsing exception safely returns diagnostics');
   console.log('NOTE: All HTTP responses are mocked; playback is not tested.');
 }
 main().catch(err=>{console.error('FAIL',err.stack||err);process.exitCode=1;});

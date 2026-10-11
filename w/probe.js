@@ -1,0 +1,4 @@
+// Read-only TMDB WWW diagnostic. No cookies, keys or media URLs.
+function rows(n){var out=[];for(var i=0;i<n;i++)out.push({name:'TMDB WWW PROBE '+n,title:'TMDB WWW PROBE '+n,url:'https://example.com/www-diagnostic-'+i+'.m3u8',quality:'Diagnostic',type:'hls',provider:'tmdb-www-probe',headers:{},subtitles:[]});return out;}
+function getStreams(){return fetch('https://www.themoviedb.org/movie/603?language=en-US',{method:'GET',headers:{'Accept':'text/html,application/xhtml+xml'}}).then(function(r){if(!r)return rows(1);if(!r.ok)return rows(2);return r.text().then(function(html){if(/just a moment|challenge-platform|access denied/i.test(html))return rows(3);if(/the matrix/i.test(html)&&(/<title/i.test(html)||/original.title/i.test(html)))return rows(4);return rows(3);});}).catch(function(){return rows(1);});}
+module.exports={getStreams:getStreams};

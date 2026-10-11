@@ -82,7 +82,46 @@ var PLAYBACK_HEADERS = {
 
 // Flixbaba wrapper metadata. BUILD is surfaced in every diagnostic row so the
 // device always tells us which build of the module is actually loaded.
-var BUILD = "FB1.0.0";
+var BUILD = "FB1.3.0";
+
+// Why the last playback session failed. Nuvio cannot show us console output, so
+// the reason is carried into the diagnostic row instead.
+var SESSION_ERROR = "";
+
+// Nuvio hands us whatever identifier the active catalog uses - often an IMDb id
+// (`tt0816692`) even though the parameter is named tmdbId. Mapple's playback API
+// needs a numeric media id, so an IMDb id is mapped first.
+//
+// The mapping uses Stremio's Cinemeta, deliberately NOT api.themoviedb.org:
+// that host is DNS/TLS-blocked on many mobile networks, so anything depending on
+// it fails before it ever reaches the upstream.
+var CINEMETA = [
+  "https://v3-cinemeta.strem.io",
+  "https://cinemeta-live.strem.io"
+];
+var WRAPPER_UA = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/137 Mobile Safari/537.36";
+
+function resolveTmdbId(rawId, mediaType) {
+  var id = rawId == null ? "" : String(rawId).trim();
+  if (/^\d+$/.test(id)) return Promise.resolve(id);
+  var kind = mediaType === "tv" ? "series" : "movie";
+  var index = 0;
+  function attempt() {
+    if (index >= CINEMETA.length) return Promise.resolve("");
+    var base = CINEMETA[index++];
+    return fetch(base + "/meta/" + kind + "/" + encodeURIComponent(id) + ".json", {
+      headers: { "Accept": "application/json", "User-Agent": WRAPPER_UA }
+    }).then(function (r) {
+      if (!r.ok) return null;
+      return r.json();
+    }).then(function (d) {
+      var m = d && d.meta;
+      if (m && m.moviedb_id) return String(m.moviedb_id);
+      return attempt();
+    }).catch(function () { return attempt(); });
+  }
+  return attempt();
+}
 
 // Diagnostic row. Nuvio cannot show us console output, so the only reliable way
 // to read a failure on-device is to return it as a result row. The URL is
@@ -214,34 +253,41 @@ var CookieJar = class {
     return list.join("; ");
   }
 };
-function fetchMediaDetails(tmdbId, mediaType) {
+function fetchMediaDetails(rawId, mediaType) {
   return __async(this, null, function* () {
-    var _a;
+    const id = String(rawId == null ? "" : rawId).trim();
     try {
-      const endpoint = mediaType === "tv" ? "tv" : "movie";
-      const url = `${TMDB_BASE_URL}/${endpoint}/${tmdbId}?api_key=${TMDB_API_KEY}&append_to_response=external_ids`;
-      const res = yield fetch(url, {
-        headers: {
-          "User-Agent": DEFAULT_USER_AGENT,
-          "Accept": "application/json"
+      // Cinemeta is keyed by IMDb id; a numeric TMDB id cannot be looked up here.
+      // This replaces the previous api.themoviedb.org call, which is unreachable
+      // on many mobile networks and only ever supplied a display title anyway.
+      if (/^tt\d+$/i.test(id)) {
+        const kind = mediaType === "tv" ? "series" : "movie";
+        for (const base of CINEMETA) {
+          const res = yield fetch(`${base}/meta/${kind}/${encodeURIComponent(id)}.json`, {
+            headers: { "User-Agent": WRAPPER_UA, "Accept": "application/json" }
+          });
+          if (!res.ok)
+            continue;
+          const data = yield res.json();
+          const meta = data == null ? void 0 : data.meta;
+          if (meta && meta.name) {
+            return {
+              title: meta.name,
+              year: String(meta.year || "").slice(0, 4),
+              imdbId: id,
+              mediaType
+            };
+          }
         }
-      });
-      if (!res.ok)
-        throw new Error(`TMDB HTTP ${res.status}`);
-      const data = yield res.json();
+      }
       return {
-        title: mediaType === "tv" ? data.name : data.title,
-        year: (mediaType === "tv" ? data.first_air_date : data.release_date || "").substring(0, 4),
-        imdbId: ((_a = data.external_ids) == null ? void 0 : _a.imdb_id) || null,
+        title: id || "Unknown",
+        year: "",
+        imdbId: /^tt\d+$/i.test(id) ? id : null,
         mediaType
       };
     } catch (e) {
-      return {
-        title: `TMDB ${tmdbId}`,
-        year: "",
-        imdbId: null,
-        mediaType
-      };
+      return { title: id, year: "", imdbId: null, mediaType };
     }
   });
 }
@@ -310,12 +356,19 @@ function getPlaybackSession(tmdbId, mediaType, tvSlug, mediaReferer, cookieJar) 
     });
     cookieJar.update(tokenRes);
     console.log("[Flixbaba/Mapple] token status=" + tokenRes.status + " cookie=" + (cookieJar.getCookieString() ? "yes" : "no"));
-    if (!tokenRes.ok)
+    if (!tokenRes.ok) {
+      // A 403 here is normally the upstream Cloudflare challenge, which a
+      // non-browser fetch cannot solve. It is egress dependent: some networks
+      // pass, some (data-centre / proxied exits) do not.
+      SESSION_ERROR = "request-token HTTP " + tokenRes.status;
       return null;
+    }
     const tokenData = yield tokenRes.json();
     const requestToken = tokenData == null ? void 0 : tokenData.token;
-    if (!requestToken)
+    if (!requestToken) {
+      SESSION_ERROR = "request-token returned no token";
       return null;
+    }
     const initPayload = {
       mediaId: Number(tmdbId),
       mediaType,
@@ -334,6 +387,7 @@ function getPlaybackSession(tmdbId, mediaType, tvSlug, mediaReferer, cookieJar) 
     cookieJar.update(playbackRes);
     if (!playbackRes.ok) {
       console.log("[Flixbaba/Mapple] init status=" + playbackRes.status);
+      SESSION_ERROR = "playback-init HTTP " + playbackRes.status;
       return null;
     }
     const initData = yield playbackRes.json();
@@ -446,15 +500,23 @@ function extractHosterStream(hoster, tmdbId, mediaType, tvSlug, mediaReferer, se
 function getStreams(tmdbId, mediaType, seasonNum = null, episodeNum = null) {
   // Offline guard: never touch the network without a usable identifier.
   if (!tmdbId) return Promise.resolve([]);
+  if (mediaType !== "movie" && mediaType !== "tv") return Promise.resolve([]);
   if (mediaType === "tv" && (!seasonNum || !episodeNum)) return Promise.resolve([]);
-  return __async(this, null, function* () {
+  const rawId = String(tmdbId).trim();
+  console.log("[Flixbaba/Mapple] " + BUILD + " id=" + rawId + " type=" + mediaType);
+  return resolveTmdbId(rawId, mediaType).then((resolved) => {
+    if (!resolved)
+      return diag("cannot map " + rawId + " to a TMDB id");
+    // Everything below talks to Mapple, which needs a numeric media id.
+    tmdbId = Number(resolved);
+    return __async(this, null, function* () {
     const type = mediaType === "tv" || mediaType === "series" ? "tv" : "movie";
     const s = seasonNum ? Number(seasonNum) : 1;
     const e = episodeNum ? Number(episodeNum) : 1;
     const tvSlug = type === "tv" ? `${s}-${e}` : "";
     const mediaReferer = type === "tv" ? `${BASE_URL}/tv/${tmdbId}/${s}/${e}` : `${BASE_URL}/movie/${tmdbId}`;
     const [mediaDetails, subtitles] = yield Promise.all([
-      fetchMediaDetails(tmdbId, type),
+      fetchMediaDetails(rawId, type),
       fetchSubtitles(tmdbId, type, s, e)
     ]);
     let mediaTitle = mediaDetails.title || `TMDB ${tmdbId}`;
@@ -465,9 +527,10 @@ function getStreams(tmdbId, mediaType, seasonNum = null, episodeNum = null) {
       mediaTitle += ` S${String(s).padStart(2, "0")}E${String(e).padStart(2, "0")}`;
     }
     const cookieJar = new CookieJar();
+    SESSION_ERROR = "";
     const session = yield getPlaybackSession(tmdbId, type, tvSlug, mediaReferer, cookieJar);
     if (!session)
-      return diag("session failed");
+      return diag("session failed · " + (SESSION_ERROR || "unknown"));
     const allStreams = [];
     var successfulHosters = 0;
     for (const hoster of HOSTERS) {
@@ -510,6 +573,7 @@ function getStreams(tmdbId, mediaType, seasonNum = null, episodeNum = null) {
     if (!uniqueStreams.length)
       return diag("no streams");
     return uniqueStreams;
+    });
   }).catch((err) => {
     const message = err && err.message ? err.message : String(err);
     console.error("[Flixbaba/Mapple] " + BUILD + " " + message);

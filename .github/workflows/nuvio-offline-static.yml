@@ -13,6 +13,7 @@ on:
       - 'tests/check_nuvio_provider_entrypoints.cjs'
       - 'tests/check_yflix_s1_mock.cjs'
       - 'tests/check_nuvio_network_failures.cjs'
+      - 'tests/check_novipnoad_secret_redaction.cjs'
       - 'novipnoad-nuvio/**'
       - 'yesmovies-nuvio/**'
       - 'yflix-nuvio/**'
@@ -45,6 +46,8 @@ jobs:
         run: node tests/check_nuvio_provider_entrypoints.cjs
       - name: Verify provider network failure isolation
         run: node tests/check_nuvio_network_failures.cjs
+      - name: Verify NOVIPNOAD synthetic secrets never leak in offline errors
+        run: node tests/check_novipnoad_secret_redaction.cjs
       - name: Check JavaScript syntax
         run: node --check novipnoad-site-diagnostic/offline-probe.js
       - name: Mock YFlix S1 success and failure responses
@@ -62,6 +65,7 @@ jobs:
             echo '- Isolated module-load check and getStreams export validation for every enabled Provider.'
             echo '- Offline module loading and missing-identifier handling.'
             echo '- Network unavailable: 6 scrapers x movie/TV = 12 scenarios.'
+            echo '- NOVIPNOAD synthetic Cookie and API key are not revealed in offline diagnostics.'
             echo '- YFlix S1: deterministic mocked HTTP response cases.'
             echo '- Offline Runtime Probe: two synthetic rows.'
             echo ''

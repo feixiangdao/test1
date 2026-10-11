@@ -28,7 +28,7 @@
     {
       "id": "flixbaba-mapple",
       "name": "Flixbaba · Mapple",
-      "description": "flixbaba 内嵌的第 4 号播放器（mapple.rip / mapple.fun）本机解析。同样先做 IMDb→TMDB 映射，再走 request-token → playback-init（含 PoW）→ encrypt 会话流程。上游 mapple.fun 挂在 Cloudflare 后面，部分出口（数据中心/代理）会拿到 403 挑战页，此时本插件只返回一条诊断行、不会返回假源。",
+      "description": "flixbaba 内嵌的第 4 号播放器（mapple.rip / mapple.fun）本机解析。同样先做 IMDb→TMDB 映射，再走 request-token → playback-init（含 PoW）→ encrypt 会话流程。上游 mapple.fun 挂在 Cloudflare 后面，非浏览器 fetch 解不了它的挑战：数据中心/代理出口会在第一步 request-token 就拿到 403，此时本插件只返回一条诊断行、不会返回假源。因为 403 取决于出口 IP 信誉、换到干净的家宽可能就通，所以默认关闭而不是删除——若你的网络能过 CF，把 enabled 改回 true 即可。",
       "version": "1.3.1",
       "author": "Flixbaba Local",
       "supportedTypes": [
@@ -36,7 +36,7 @@
         "tv"
       ],
       "filename": "providers/flixbaba-mapple.js",
-      "enabled": true,
+      "enabled": false,
       "formats": [
         "m3u8"
       ],

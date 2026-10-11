@@ -37,7 +37,30 @@ flixbaba.best 是一个 **纯 iframe 聚合站**：它的 Next.js 观看页
 | id | 上游 | 说明 |
 |---|---|---|
 | `flixbaba-vidbolt` | `scraper.vidbolt.xyz` | 直接把 TMDB id 交给 VidBolt scraper：`/scrape/Quasar/{movie\|tv}/{tmdbId}?tmdbId=`，返回签名 HLS / 直链，带 `quality` / `language` / `headers` / `subtitles`，按清晰度排序。电影 14 条→过滤后 8 条、剧集 15 条→过滤后 10 条实测（该次实测早于 v1.3.1 的过期签名过滤；开启后过期行会再被剔掉）。 |
-| `flixbaba-mapple` | `mapple.fun` | `/api/request-token` → `/api/playback-init`（PoW，difficulty 18）→ `/api/encrypt` 会话流程，再逐 hoster 解析，取到 2 个可用 hoster 即停。上游有 Cloudflare 挑战，见下方「网络注意事项」。 |
+| `flixbaba-mapple` | `mapple.fun` | **默认关闭**（`"enabled": false`，见下）。`/api/request-token` → `/api/playback-init`（PoW，difficulty 18）→ `/api/encrypt` 会话流程，再逐 hoster 解析，取到 2 个可用 hoster 即停。上游有 Cloudflare 挑战，见下方「网络注意事项」。 |
+
+### 为什么 mapple 默认关闭
+
+mapple 的失败发生在**第一步** `POST /api/request-token`（`flixbaba-mapple.js` 的
+`getPlaybackSession()`），返回 403。这个 403 不是「站点死了」，而是 **Cloudflare 托管挑战**：
+非浏览器 `fetch` 解不了它，而**放不放行取决于出口 IP 的信誉** —— 数据中心 / 代理出口基本必挂，
+干净的家宽 / 移动网络可能直接通过。
+
+默认关闭的理由是**噪声与可诊断性**的权衡：
+
+- provider 只要返回了行，Nuvio 就会为它建一个 tab。mapple 失败时**故意返回一条诊断行**
+  （`url: "about:error"`、`quality: "Status"`、`type: "diagnostic"`）而不是 `[]`，
+  于是会多出一个只有一条「Status」的 tab。
+- 保留这条诊断行是有意的：它让**没有电脑的人也能在设备上看到失败原因**。
+  相同信息虽然也在 logcat 里（`[Flixbaba/Mapple] token status=403 cookie=no`），但那需要 adb。
+- 但在这类出口上它**永远**只会产出那一条 403 诊断行，纯粹是噪声，所以默认关掉。
+
+**没有删除它**：403 取决于出口 IP，换个网络就可能可用。想启用时把 manifest 里
+`flixbaba-mapple` 的 `"enabled"` 改回 `true`（或直接用带 `"enabled": true` 的副本），
+再在设备上刷新仓库即可。
+
+> 已实测：设备的 Plugins 页**只有仓库级的刷新 / 删除，没有 per-provider 开关**，
+> 所以 `enabled` 是唯一的控制点。仓库里另有 45 个 scraper 用同样的 `"enabled": false` 方式默认关闭。
 
 ### 播放地址：为什么有的行会被丢掉
 

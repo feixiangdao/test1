@@ -1,17 +1,28 @@
 {
-  "name": "NOVIPNOAD Site Reachability Lab",
-  "version": "0.1.0",
-  "description": "Read-only site connectivity diagnostic; output count encodes HTTP/search state, not playable streams.",
+  "name": "Nuvio Read-only Network Diagnostics",
+  "version": "0.1.1",
+  "description": "Two independent no-cookie, no-key connectivity probes for NOVIPNOAD WP API and TMDB HTTPS; synthetic results are not playable streams.",
   "scrapers": [
     {
       "id": "novipnoad-site-probe",
       "name": "NOVIPNOAD Site Probe",
-      "description": "One GET to NOVIPNOAD WordPress search API; no browser cookies or video extraction.",
-      "version": "0.1.0",
+      "description": "Read-only WordPress search; encodes error/status in synthetic row count.",
+      "version": "0.1.1",
       "supportedTypes": [
         "movie"
       ],
       "filename": "probe.js",
+      "enabled": true
+    },
+    {
+      "id": "tmdb-https-probe",
+      "name": "TMDB HTTPS Probe",
+      "description": "Read-only TMDB HTTPS /3/configuration without an API key; HTTP 401 is expected and proves transport reachability.",
+      "version": "0.1.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "tmdb-https-probe.js",
       "enabled": true
     }
   ]

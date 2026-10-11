@@ -245,10 +245,17 @@ mapple 失败时**只返回一条诊断行**（`about:error` / `Status`），标
   CI **不验证**真实解析与播放。
 - v1.3.1 的过期签名过滤已在设备上确认**新代码确实在跑**：刷新仓库后 manifest 显示
   `Version 1.3.1`，logcat 里 vidbolt 的构建标记变成 `FB1.3.1`，manifest 前缀仍是 GitHub raw 地址。
-  但**该过滤的实际剔除效果未能当场复现** —— 复测时 VidBolt 的 scraper 后端对**所有**片、
-  所有 server 名（`Quasar` / `Vidlink` / `Nova` / `VidFast` / `Videasy` / `VidCore` / `Nebula` / `Vidzee`）
-  都返回 HTTP 404 + `{"sources":[],"cached":false}`，本机 `curl` 复现一致，属上游故障。
-  过滤逻辑本身由本地离线 mock harness 覆盖（16 条断言，见上）。
+- **过滤的实际剔除效果也已在生产环境实测复现**（VidBolt 上游短暂整体故障恢复后重测）：
+
+  ```
+  [Flixbaba/VidBolt] FB1.3.1 tmdb=157336 sources=14 streams=4 dropped=10 gated=6 expired=4 subs=12
+  ```
+
+  对照 v1.3.0 的 `streams=8 dropped=6`：多丢掉的 4 条正是 `expired=4`，
+  即那 4 条会返回 `Sign expired` 的 1080p 行；设备 UI 上 Flixbaba 分组**恰好剩 4 条**
+  （`360p · Original` ×3 + `Auto · Original` ×1）。过滤逻辑另有本地离线 mock harness 覆盖（16 条断言，见上）。
+- **mapple 默认关闭后**，设备上确认它**不再被调度**：整段 logcat 无任何 `flixbaba-mapple` 行，
+  源标签栏里 `Flixbaba · VidBolt` 之后也没有 `Flixbaba · Mapple` 标签页。
 
 ### 设备上如何读日志
 
@@ -256,27 +263,36 @@ Nuvio 把 Provider 的 `console.log` 转发到 Android logcat，这是排查本�
 
 ```bash
 adb logcat -c                       # 清空
-# 在 Nuvio 里打开某个影片的播放源页面
-adb logcat -d | grep -iE "flixbaba|PluginRuntime"
+# 在 Nuvio 里打开某个影片的播放源页面，并点一次 ⟳ Refresh streams
+adb logcat -d -b all | grep -iE "flixbaba|PluginRuntime"
 ```
 
-实测输出（FB1.3.0，模拟器 + 星际穿越）：
+> ⚠️ **必须加 `-b all`**。`adb logcat -d | grep flixbaba` 会**什么都查不到** ——
+> `D PluginRuntime:` 这些行不在默认缓冲区里，容易误判成「插件没跑」。
+>
+> ⚠️ 详情页首屏会用缓存直接渲染上次的流列表，**不会重新跑插件**；
+> 要拿到新日志必须显式点 `⟳ Refresh streams`。
+
+实测输出（FB1.3.1，模拟器 + 星际穿越）：
 
 ```
 # 仓库地址为本机 http://127.0.0.1:8899/...
 D PluginRuntime: Plugin:http://127.0.0.1:8899/flixbaba-nuvio/manifest.json:flixbaba-vidbolt [Flixbaba/VidBolt] FB1.3.0 id=tt0816692 type=movie
 D PluginRuntime: Plugin:...:flixbaba-vidbolt [Flixbaba/VidBolt] FB1.3.0 tmdb=157336 sources=14 streams=8 dropped=6 subs=12
-D PluginRuntime: Plugin:...:flixbaba-mapple  [Flixbaba/Mapple] FB1.3.0 id=tt0816692 type=movie
-D PluginRuntime: Plugin:...:flixbaba-mapple  [Flixbaba/Mapple] token status=403 cookie=no
 
-# 同一台设备，仓库地址换成 GitHub raw
+# 同一台设备，仓库地址换成 GitHub raw（v1.3.0，只丢 CF 门控）
 D PluginRuntime: Plugin:https://raw.githubusercontent.com/feixiangdao/test1/main/flixbaba-nuvio/manifest.json:flixbaba-vidbolt [Flixbaba/VidBolt] FB1.3.0 id=tt0816692 type=movie
 D PluginRuntime: Plugin:...:flixbaba-vidbolt [Flixbaba/VidBolt] FB1.3.0 tmdb=157336 sources=14 streams=8 dropped=6 subs=12
+
+# v1.3.1：CF 门控 + 过期签名两类一起丢，mapple 已不再出现
+D PluginRuntime: Plugin:https://raw.githubusercontent.com/feixiangdao/test1/main/flixbaba-nuvio/manifest.json:flixbaba-vidbolt [Flixbaba/VidBolt] FB1.3.1 id=157336 type=movie
+D PluginRuntime: Plugin:...:flixbaba-vidbolt [Flixbaba/VidBolt] FB1.3.1 tmdb=157336 sources=14 streams=4 dropped=10 gated=6 expired=4 subs=12
 ```
 
 `id=tt0816692` 说明 **Nuvio 传进来的 `tmdbId` 参数其实是 IMDb id**，
-插件用 Cinemeta 映射成 `157336` 后才交给 VidBolt。`dropped=6` 即上文被 Cloudflare 挡掉的 6 条。
-v1.3.1 起这一行还多出 `gated=` 与 `expired=` 两个计数，用于区分两类丢弃。
+插件用 Cinemeta 映射成 `157336` 后才交给 VidBolt；从「继续观看」进入时 Nuvio 也可能直接给数字 TMDB id。
+`dropped=6` 是被 Cloudflare 挡掉的 6 条；v1.3.1 起这一行多出 `gated=` 与 `expired=` 两个计数，
+用于区分两类丢弃（`gated` = CF 托管挑战，`expired` = 签名已过期）。
 
 ### VidBolt 只有 `Quasar` 一个有效 server
 

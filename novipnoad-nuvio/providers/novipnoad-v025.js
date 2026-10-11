@@ -486,7 +486,14 @@ function cinemetaMeta(id, mediaType) {
     var host = CINEMETA_HOSTS[i++];
     return withTimeout(
       fetchJson(host + "/meta/" + kind + "/" + enc(id) + ".json", headers(SITE + "/", true))
-        .then(function (j) { return (j && j.meta && j.meta.name) ? { names: [clean(j.meta.name)], year: clean(j.meta.year) } : null; })
+        .then(function (j) {
+          var m = j && j.meta;
+          if (!m || !m.name) return null;
+          // Cinemeta has no `year` field: the year lives in releaseInfo, and for
+          // a series that is a range ("2019–2024").
+          var y = (clean(m.releaseInfo).match(/(?:19|20)\d{2}/) || [])[0] || "";
+          return { names: [clean(m.name)], year: y, moviedbId: clean(m.moviedb_id) };
+        })
         .catch(function () { return null; }),
       CINEMETA_HOST_TIMEOUT_MS
     ).then(function (r) { return r || attempt(); });
@@ -530,20 +537,36 @@ function tmdbMeta(id, mediaType) {
   return withTimeout(attempt(), TMDB_TOTAL_TIMEOUT_MS);
 }
 
-// Cinemeta is consulted only for non-numeric ids. For a numeric TMDB id it
-// cannot help at all: measured 2026-10-11 both hosts 307-redirect into each
-// other and the chain drops the /meta/ prefix and lands on a 404 —
+// Two id shapes arrive here. A numeric id goes straight to TMDB. An IMDb id
+// ("tt…") goes to Cinemeta first, because Cinemeta is the only id->title source
+// for it — and that path is real, not hypothetical: a sibling provider's
+// production logs show Nuvio passing `id=tt0816692` while "continue watching"
+// passes a numeric TMDB id. Cinemeta also returns moviedb_id, and feeding that
+// back into TMDB is what keeps the Chinese aliases available, which is the
+// whole reason the Chinese-only posts ("【美剧】沙丘：预言 06 完结") are findable.
+//
+// Cinemeta is *not* consulted for numeric ids, where it cannot help at all:
+// measured 2026-10-11 both hosts 307-redirect into each other and the chain
+// drops the /meta/ prefix and lands on a 404 —
 //   /meta/movie/693134.json -> 307 -> cinemeta-live/meta/movie/693134.json
 //                           -> 307 -> v3-cinemeta/movie/693134.json -> 404
-// — so running it after a failed TMDB lookup would only add six seconds of
-// guaranteed-dead latency to the failure path.
+// — whereas with an IMDb id the same endpoints answer 200 (tt15398776 ->
+// "Oppenheimer" + moviedb_id 872585).
 function metaFor(id, mediaType) {
-  var numeric = /^\d+$/.test(String(id));
-  return (numeric ? tmdbMeta(id, mediaType) : cinemetaMeta(id, mediaType)).then(function (m) {
+  function finish(m) {
     if (!m || !m.names || !m.names.length) return null;
     // Chinese terms first: they are the precise ones and MAX_QUERIES caps how
     // many searches we get, so they must not be pushed out by English ones.
     return { terms: uniq(m.names).slice(0, 8), year: clean(m.year) };
+  }
+  if (/^\d+$/.test(String(id))) return tmdbMeta(id, mediaType).then(finish);
+  return cinemetaMeta(id, mediaType).then(function (cin) {
+    if (!cin) return null;
+    if (!cin.moviedbId) return finish(cin);
+    return tmdbMeta(cin.moviedbId, mediaType).then(function (tm) {
+      if (!tm) return finish(cin);
+      return finish({ names: (tm.names || []).concat(cin.names), year: clean(tm.year) || clean(cin.year) });
+    });
   });
 }
 

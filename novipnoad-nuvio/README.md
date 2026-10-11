@@ -68,13 +68,23 @@ keystream md5：`cbed7dea6a4c08ab0ebf26a220d452a6`。
 
 ## 元数据：为什么依赖 TMDB
 
-Nuvio 只给 TMDB id，而本站索引的是**中文标题**，所以必须先把 id 换成片名。
+Nuvio 只给一个 id，而本站索引的是**中文标题**，所以必须先把 id 换成片名。
 
-- `https://api.tmdb.org` —— **TMDB 官方别名域名，首选**。实测 200，能拿到中文标题与 CN/HK/TW/SG/MO 别名（`693134` → `沙丘2`；`90228` → `沙丘：预言`）。
+**Nuvio 传进来的 id 有两种形态**——数字 TMDB id，以及 **IMDb id（`tt…`）**。后者不是假设：同仓库另一个 provider 的**生产日志**里出现过 `id=tt0816692`，而从「继续观看」进入时又会是数字 id。两条路都要能走：
+
+| id 形态 | 路径 |
+|---|---|
+| 数字 | `api.tmdb.org` 直接取中文名 + CN/HK/TW/SG/MO 别名 |
+| `tt…` | **Cinemeta 先解析**（IMDb id 唯一可用的 id→片名来源），再用它返回的 **`moviedb_id`** 回查 TMDB，把中文名并进来 |
+
+- `https://api.tmdb.org` —— **TMDB 官方别名域名，首选**。实测 200，能拿到中文标题与地区别名（`693134` → `沙丘2`；`90228` → `沙丘：预言`）。
 - `https://api.themoviedb.org` —— 同一份数据的规范域名，本机出口被代理 `CONNECT 502`，保留为第二跳。
-- Cinemeta —— **对数字 TMDB id 完全不可用**：两台主机 307 互跳，且跳转途中丢掉 `/meta/` 前缀，最终 404。因此只在 id 非数字（IMDb `tt…`）时才会去问它，避免在失败路径上白等 6 秒。
+- Cinemeta —— **只对 `tt…` 有效**。对数字 TMDB id 它帮不上忙：两台主机 307 互跳、跳转途中丢掉 `/meta/` 前缀、最终 404；但对 IMDb id 同一批端点返回 200（`tt15398776` → `Oppenheimer`，`moviedb_id: 872585`）。所以数字 id 完全不碰它，避免在失败路径上白等。
+- Cinemeta **没有 `year` 字段**，年份在 `releaseInfo` 里（剧集是区间，如 `2019–2024`），需从中取前四位年份。
 
 > 早先版本让 Cinemeta 与 TMDB **并行竞争**，结果是被超时放弃的那条链并不会被取消，它继续开 CONNECT 隧道抢代理连接，把后续请求整体拖慢近一倍（`The Wild Robot` 一例 38.8s）。现在改为串行，且每个 host 各自计时。
+>
+> 主 host 在尝试序列里**出现两次**，这是刻意的：新进程的第一个出网 HTTPS 请求要付一次性的 DNS/TLS 代价（本机实测 8.7s，之后每个只要 0.75s），冷启动那一次可能耗尽整个预算，而重试时连接已经热了。
 
 ## 出网 / 格式注意
 
@@ -100,26 +110,28 @@ Nuvio 只给 TMDB id，而本站索引的是**中文标题**，所以必须先�
 
 ## 实测验证（BUILD `NP1.1.0`）
 
-| TMDB id | 类型 | 站点帖子形态 | 结果 |
+| 传入 id | 类型 | 站点帖子形态 | 结果 |
 |---|---|---|---|
-| 872585 | movie | 电影帖 | ✅ 1080P `gzc-download.ftn.qq.com/…` `type=mp4` |
+| 872585 | movie | 电影帖（ftn 源） | ✅ 1080P `gzc-download.ftn.qq.com/…` `type=mp4` |
+| `tt15398776` | movie | 同上，走 IMDb→Cinemeta→TMDB | ✅ 1080P `gzc-download.ftn.qq.com/…` `type=mp4` |
 | 83533 | movie | 电影帖（ali 源） | ✅ 1080P `media.oss-internal.novipnoad.ca/hls/…m3u8` `type=hls` |
+| 693134 | movie | 电影帖（ali 源） | ⛔ `p3 code=404 invalid videoid`（见下） |
 | 90228 | tv S1E6 | 一集一帖（`06 完结`） | ✅ 1080P `njc-download.ftn.qq.com/…` |
+| `tt10466872` | tv S1E6 | 同上，走 IMDb→Cinemeta→TMDB | ✅ 1080P `njc-download.ftn.qq.com/…` |
 | 100088 | tv S2E7 | 一集一帖（`07END`） | ✅ 1080P `gzc-download.ftn.qq.com/…` |
 | 66732 | tv S5E3 | 整剧单帖（8 个按钮） | ✅ 1080P `njc-download.ftn.qq.com/…` |
 | 66732 | tv S5E8 | 整剧单帖（`E08 End`） | ✅ 1080P，与 S5E3 **流 id 不同** |
 | 66732 | tv S5E99 | 越界集 | ⛔ `NOHIT among 5 results`（站点只有 8 集，正确） |
-| 693134 | movie | 电影帖（ali 源） | ⛔ `p3 code=404 invalid videoid`（见下） |
 
 ### 关于 `invalid videoid`
 
-`693134`（沙丘2）与 `1184918`（荒野机器人）解析到 `enc-vod` 时，服务端以 **HTTP 200** 返回 `{"code":404,"msg":"invalid videoid"}`。这是**站点自身内容失效**（帖子还在、源已下架），不是 Provider 缺陷——证据：
+`693134`（沙丘2）、`1184918`（荒野机器人）、`tt1312171` S4（伞学院）解析到 `enc-vod` 时，服务端以 **HTTP 200** 返回 `{"code":404,"msg":"invalid videoid"}`。这是**站点自身内容失效**（帖子还在、源已下架），不是 Provider 缺陷——证据：
 
 1. `player.php`（服务端）自己给出的 jsapi 路径里就是这个 videoid；
-2. 用真实 Chrome 加载真实站点、跑完真实 WASM 鉴权后，拿到的是**同一串** `{"code":404,"msg":"invalid videoid"}`；
-3. 同一条链路的其它 ali 影片（`83533`）当场成功。
+2. 用真实 Chrome 加载真实站点、跑完真实 WASM 鉴权后，拿到的是**同一串** `{"code":404,"msg":"invalid videoid"}`，且浏览器解出的 vkey `{"ref":"/movie/145077.html","ip":"59.57.170.36","time":"1791741153"}` 与本机求解**完全相同**；
+3. 同一条链路的其它 ali 影片（`83533`，2025 年）当场成功，说明 ali 通路本身是通的。
 
-Provider 把该响应原文写进诊断行，不做任何猜测性降级。
+Provider 把该响应原文写进诊断行，不做任何猜测性降级。若同一部电影有多个 `data-vid` 线路，`selectVids()` 会逐条尝试，某条失效不会影响其余。
 
 ## 已知边界
 

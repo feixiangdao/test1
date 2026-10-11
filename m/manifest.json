@@ -1,0 +1,18 @@
+{
+  "name": "AAA TMDB Transport Check",
+  "version": "0.1.0",
+  "description": "Temporary no-key, no-cookie HTTPS diagnostic for Nuvio; synthetic results are not playable.",
+  "scrapers": [
+    {
+      "id": "tmdb-https-transport-check",
+      "name": "TMDB HTTPS Probe",
+      "description": "One read-only GET to TMDB /3/configuration. A 401 is an expected transport-success indicator.",
+      "version": "0.1.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/ecfe17a7d912ae379fcdd3daa03d0a51c7d28308/novipnoad-site-diagnostic/tmdb-https-probe.js",
+      "enabled": true
+    }
+  ]
+}

@@ -7,12 +7,21 @@ on:
       - 'tests/check_nuvio_offline_probe.py'
       - 'tests/check_nuvio_offline_runtime.cjs'
       - 'tests/check_nuvio_provider_manifests.py'
+      - 'tests/nuvio_manifest_projects.json'
+      - 'tests/check_all_enabled_nuvio_syntax.cjs'
       - 'tests/check_nuvio_provider_entrypoints.cjs'
       - 'tests/check_yflix_s1_mock.cjs'
       - 'tests/check_nuvio_network_failures.cjs'
       - 'novipnoad-nuvio/**'
       - 'yesmovies-nuvio/**'
       - 'yflix-nuvio/**'
+      - 'noctratv-nuvio/**'
+      - 'stellar-nuvio/**'
+      - 'cinejoy-nuvio/**'
+      - 'onlyflix-nuvio/**'
+      - 'cinevibe-nuvio/**'
+      - 'kisskh-nuvio/**'
+      - 'vidplay-nuvio/**'
       - '.github/workflows/nuvio-offline-static.yml'
   workflow_dispatch:
 permissions:
@@ -27,6 +36,8 @@ jobs:
         run: python3 tests/check_nuvio_offline_probe.py
       - name: Validate production provider manifests
         run: python3 tests/check_nuvio_provider_manifests.py
+      - name: Parse every enabled Provider JS without execution
+        run: node tests/check_all_enabled_nuvio_syntax.cjs
       - name: Exercise provider entrypoints without network
         run: node tests/check_nuvio_provider_entrypoints.cjs
       - name: Verify provider network failure isolation
@@ -43,7 +54,8 @@ jobs:
           {
             echo '## Nuvio automated regression checks'
             echo ''
-            echo '- Manifest metadata: NOVIPNOAD, YesMovies, YFlix (6 scrapers).'
+            echo '- Manifest and enabled source path checks: 10 Nuvio projects.'
+            echo '- JavaScript syntax parse for every enabled Provider (no execution).'
             echo '- Offline module loading and missing-identifier handling.'
             echo '- Network unavailable: 6 scrapers x movie/TV = 12 scenarios.'
             echo '- YFlix S1: deterministic mocked HTTP response cases.'

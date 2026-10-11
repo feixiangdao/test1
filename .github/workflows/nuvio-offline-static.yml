@@ -7,6 +7,7 @@ on:
       - 'tests/check_nuvio_offline_probe.py'
       - 'tests/check_nuvio_offline_runtime.cjs'
       - 'tests/check_nuvio_provider_manifests.py'
+      - 'tests/check_nuvio_provider_entrypoints.cjs'
       - 'novipnoad-nuvio/**'
       - 'yesmovies-nuvio/**'
       - 'yflix-nuvio/**'
@@ -24,6 +25,8 @@ jobs:
         run: python3 tests/check_nuvio_offline_probe.py
       - name: Validate production provider manifests
         run: python3 tests/check_nuvio_provider_manifests.py
+      - name: Exercise provider entrypoints without network
+        run: node tests/check_nuvio_provider_entrypoints.cjs
       - name: Check JavaScript syntax
         run: node --check novipnoad-site-diagnostic/offline-probe.js
       - name: Exercise offline getStreams output

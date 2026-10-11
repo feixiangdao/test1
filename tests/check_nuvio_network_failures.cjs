@@ -7,7 +7,7 @@ const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
 const files = [
-  'novipnoad-nuvio/providers/novipnoad-v023.js',
+  'novipnoad-nuvio/providers/novipnoad-v025.js',
   'yesmovies-nuvio/providers/yesmovies.js',
   'yflix-nuvio/providers/yflix-server1.js',
   'yflix-nuvio/providers/yflix-server2-v052.js',

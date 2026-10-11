@@ -84,15 +84,71 @@ flixbaba 只把 TMDB id 拼进播放器 URL，**VidBolt 的 scraper 本身也接
 /scrape/Quasar/movie/157336?tmdbId=157336   ← 与用 IMDb id 的返回完全一致
 ```
 
-这一点很重要：实测 `api.themoviedb.org` 在不少移动网络上是 **DNS 解析超时 / TLS 握手被重置**，
+这一点很重要：实测 `api.themoviedb.org` 在不少网络上是 **DNS 投毒**，
 任何依赖 TMDB 的 Provider 都会在拿到流之前就挂掉。v1.0.0 就是因为调了 TMDB 而
 在设备上只拿到 `tmdb 0`（即 `response.status === 0`，请求根本没发出去）。
+
+#### `api.themoviedb.org` 到底怎么了（2026-10-11 查清）
+
+**域名本身完全健康**，是被 DNS 投毒。同一次排查里，本机不同解析路径给出的假 IP
+**每次都不一样**，且全部落在著名境外站点段里：
+
+| 解析路径 | 返回 | 归属 |
+|---|---|---|
+| Windows 系统解析 #1 | `104.244.43.104` | Twitter 段 |
+| Windows 系统解析 #2 | `202.160.130.118` | Twitter 段 |
+| Node c-ares | `69.63.186.31` | Facebook 段 |
+| **Android 模拟器** | `162.125.2.5` | **Dropbox 段** |
+| **真实 DNS（远端解析）** | `13.32.230.36` / `13.32.230.46` | AWS CloudFront ✅ |
+
+「每次不同 + 落在 Twitter/Facebook/Dropbox 段」是 DNS 投毒的教科书特征。
+模拟器同样中招，因为它的 DNS 走宿主机上游。
+
+**决定性对照**（同一个本地 SOCKS5 代理，只改解析方式）：
+
+| 方式 | `api.themoviedb.org` |
+|---|---|
+| `socks5h`（域名交给代理，**远端解析**） | ✅ **401 / 0.48s**（401 只是缺 API key，HTTP 层完全正常） |
+| `socks5`（本地解析成 IP 再交给代理） | ❌ 000 / 9.0s |
+| 直连 | ❌ 000 / 20.0s |
+
+也就是说：**只要让域名在远端解析，这个域名立刻就能用。** 本机之所以失败，是因为
+Proxifier 默认「先在本地把域名解析成 IP 再交给代理」——域名一旦变成 IP，
+代理的远端解析与分流规则全部失效，于是去连投毒 IP，TLS 被中断。
+
+**修复**（二选一，改完必须 `Profile → Save Profile` 并重启目标应用）：
+1. Proxifier → `Profile → Name Resolution...` → 勾选 **Resolve hostnames through proxy**
+2. 或给该域名单独加一条 `Direct` 规则（前提是直连能通；本机直连 20s 超时，所以只能选 1）
+
+**结论：这个问题的正确修法是修代理的解析模式，而不是在 Provider 里绕。**
+本 Provider 选择绕开 TMDB（改用 Cinemeta）只是为了不把可用性绑在一个会被人为破坏的域名上 ——
+即使 DNS 修好了，Cinemeta 方案也不需要维护 API key。
+
+### 其余 10 个播放器：区分「被投毒」与「真死了」
+
+同一个方法（用代理做远端解析，拿真实 DNS 答案）逐个复核后，结论是：
+**除了 `api.themoviedb.org`，其余失败都不是本机 DNS 的问题**，属于站点自身已死或不可本地复现。
+
+| 站点 | 真实 DNS 结论 | 能否解决 |
+|---|---|---|
+| `api.videasy.to` | **`Status: 3` = NXDOMAIN**（权威 `ns1.ddos-guard.net` 明确回不存在） | ❌ 域名已注销，救不了 |
+| `api.themoviedb.org` | `Status: 0` + 真实 IP | ✅ **可救**，见上（修 Proxifier 解析模式） |
+| `peachify.top` | 解析正常 | ❌ Cloudflare `523`，源站挂了 |
+| `zxcstream.xyz` | 解析正常 | ❌ 后端 `/backend_/tigasmukha` 已 404 |
+| `cinemaos.tech` | 解析正常 | ❌ HMAC 签名已完整还原复现，但接口另有服务端闸门，恒 403 |
+| `vidcore.io` | 解析正常 | ❌ 源由 Next.js **Server Action** 服务端生成，本地不可复现 |
+| `play.xpass.top` / `1embed.cc` | 解析正常 | ❌ Cloudflare 挑战 / 不可达 |
+| `multiembed.mov` | 解析正常 | ❌ 302 到 `streamingnow.mov`，无可复现接口 |
+| `vidfast.vc` / `vsembed.ru` | 解析正常 | ❌ 后端混淆 / 末跳需 API token |
+
+即：**DNS 投毒只影响 TMDB 一个域名**；修好 Proxifier 后，任何「依赖 TMDB 但接口本身活着」的
+Provider 都能恢复，但上面这些站点本身已经不产出可播地址，与网络无关。
 
 ## 网络注意事项
 
 | 现象 | 原因 | 影响 |
 |---|---|---|
-| `api.themoviedb.org` 报 `SSLHandshakeException: connection closed` | 该域名在部分网络被 DNS/TLS 阻断 | 本插件已完全规避（改用 Cinemeta） |
+| `api.themoviedb.org` 报 `SSLHandshakeException: connection closed` | **DNS 投毒**（返回 Twitter/Facebook/Dropbox 段假 IP）；Proxifier 本地解析放大了它 | 本插件已完全规避（改用 Cinemeta）；根治办法见上 |
 | `mapple.fun` 返回 403 `Just a moment...` | Cloudflare 挑战页 | 非浏览器 fetch 无法通过；出口不同结果不同 |
 | `mapple.rip` 返回 301 | 跳转到 `mapple.fun` | 同上 |
 | `a.111477.xyz` / `p.111477.xyz` 返回 403 `Just a moment...` | 源站挂 Cloudflare 托管挑战，经 VidBolt 代理透传 | 对应播放行已被 `GATED_ORIGINS` 过滤掉 |

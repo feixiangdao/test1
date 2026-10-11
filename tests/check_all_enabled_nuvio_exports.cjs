@@ -65,3 +65,22 @@ console.log('RESULT', passed, 'loaded,', gated, 'dependency-gated,', failures.le
 if (failures.length) process.exitCode = 1;
 else console.log('PASS no unexpected module-initialization failures in dependency-free cases');
 console.log('NOTE: Dependency-gated cases are NOT verified; no HTTP or Android playback tests.');
+if (process.env.GITHUB_STEP_SUMMARY) {
+  const summary = [
+    '',
+    '### Enabled Provider module initialization',
+    '',
+    '| Outcome | Count |',
+    '|---|---:|',
+    '| Initialised and exported getStreams | ' + passed + ' |',
+    '| Needs native/bundled dependencies (not verified) | ' + gated + ' |',
+    '| Unexpected initialization failures | ' + failures.length + ' |',
+    '',
+    'Runtime-dependent modules are **not** counted as passing the load check.',
+    '',
+    ...needsRuntime.map(item => '- Unverified: \`' + item.replace(/\\/g,'/') + '\`'),
+    '',
+  ].join('\\n');
+  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + '\\n');
+}
+

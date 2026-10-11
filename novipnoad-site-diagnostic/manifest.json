@@ -1,0 +1,18 @@
+{
+  "name": "NOVIPNOAD Site Reachability Lab",
+  "version": "0.1.0",
+  "description": "Read-only site connectivity diagnostic; output count encodes HTTP/search state, not playable streams.",
+  "scrapers": [
+    {
+      "id": "novipnoad-site-probe",
+      "name": "NOVIPNOAD Site Probe",
+      "description": "One GET to NOVIPNOAD WordPress search API; no browser cookies or video extraction.",
+      "version": "0.1.0",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "probe.js",
+      "enabled": true
+    }
+  ]
+}

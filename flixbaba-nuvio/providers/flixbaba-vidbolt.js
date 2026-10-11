@@ -40,8 +40,21 @@
 // A row that can never play is worse than no row, so matching rows are dropped
 // unless that would empty the list (then they are kept, so the caller still has
 // something to show). Delete a zone from GATED_ORIGINS once it works again.
+//
+// EXPIRED SIGNATURES
+// ------------------
+// Every playback URL carries ?auth_key=...&expire=<epoch-ms>. VidBolt's scraper
+// resolves a title once and then keeps handing back that cached playlist, so a
+// row can arrive with a signature that lapsed long ago; the origin answers HTTP
+// 403 with the body "Sign expired". Measured 2026-10-11: pressing "Refresh
+// streams" re-ran this provider and produced a byte-identical auth_key/expire
+// pair, so the staleness is upstream of us and nothing here can re-sign it.
+//
+// The expiry is readable straight off the URL, so these rows are dropped at zero
+// network cost, under the same "keep them if the filter would empty the list"
+// rule as GATED_ORIGINS.
 
-var BUILD = "FB1.3.0";
+var BUILD = "FB1.3.1";
 var SCRAPER = "https://scraper.vidbolt.xyz";
 var SERVER = "Quasar";
 var REFERER = "https://vidbolt.xyz/";
@@ -51,6 +64,11 @@ var DROP_GATED_ORIGINS = true;
 
 // Origin zones observed serving a Cloudflare challenge instead of media.
 var GATED_ORIGINS = ["111477.xyz", "streamflixserver.site"];
+
+// Drop rows whose signature has already lapsed. A row that is about to expire
+// is as good as gone, so a short grace period is subtracted before the compare.
+var DROP_EXPIRED_SIGNS = true;
+var EXPIRY_GRACE_MS = 60000;
 
 // Ordered fallbacks; the first entry also carries the year, which the second
 // does not.
@@ -96,6 +114,32 @@ function isGatedOrigin(u) {
     if (o.indexOf(GATED_ORIGINS[i]) !== -1) return true;
   }
   return false;
+}
+
+// Epoch milliseconds from an `expire=` / `expires=` / `expired=` query param, or
+// 0 when the URL carries none. VidBolt uses milliseconds; seconds are accepted
+// too, so the check survives a change of unit.
+function expiryOf(u) {
+  var s = String(u);
+  var m = s.match(/[?&](?:expire|expires|expired)=(\d{9,14})/i);
+  if (!m) {
+    // The upstream URL can sit percent-encoded inside a /proxy/<kind>/<b64>.
+    try { s = decodeURIComponent(s); } catch (e) { return 0; }
+    m = s.match(/[?&](?:expire|expires|expired)=(\d{9,14})/i);
+  }
+  if (!m) return 0;
+  var n = parseInt(m[1], 10);
+  if (!isFinite(n) || n <= 0) return 0;
+  return m[1].length <= 10 ? n * 1000 : n;
+}
+
+// True when the URL — or the upstream it proxies to — is already past expiry.
+// A URL with no readable expiry is left alone: it cannot be judged from here.
+function isExpiredSign(u) {
+  var t = expiryOf(u);
+  if (!t) t = expiryOf(originOf(u));
+  if (!t) return false;
+  return t - EXPIRY_GRACE_MS <= Date.now();
 }
 
 // Diagnostic row. Nuvio does not surface console output, so the only way to read
@@ -216,21 +260,30 @@ function getStreams(tmdbId, mediaType, season, episode) {
         var kind = clean(row.type).toLowerCase();
         if (kind === "m3u8" || kind === "hls" || /\.m3u8(?:\?|$)/i.test(u)) rowOut.type = "hls";
         rowOut.__gated = isGatedOrigin(u);
+        rowOut.__expired = isExpiredSign(u);
         out.push(rowOut);
       });
 
-      // Prefer rows that can actually play. Keep the gated ones only when the
-      // filter would empty the list outright.
+      // Prefer rows that can actually play. Both filters are advisory: they are
+      // applied only when at least one row survives, so the caller is never left
+      // with an empty list purely because of them.
       var gated = out.filter(function (r) { return r.__gated; }).length;
-      var kept = DROP_GATED_ORIGINS ? out.filter(function (r) { return !r.__gated; }) : out;
+      var expired = out.filter(function (r) { return r.__expired; }).length;
       var dropped = 0;
-      if (kept.length) { dropped = gated; out = kept; }
-      out.forEach(function (r) { delete r.__gated; });
+      if (DROP_GATED_ORIGINS || DROP_EXPIRED_SIGNS) {
+        var playable = out.filter(function (r) {
+          return !(DROP_GATED_ORIGINS && r.__gated) &&
+                 !(DROP_EXPIRED_SIGNS && r.__expired);
+        });
+        if (playable.length) { dropped = out.length - playable.length; out = playable; }
+      }
+      out.forEach(function (r) { delete r.__gated; delete r.__expired; });
 
       out.sort(function (a, b) { return qnum(b.quality) - qnum(a.quality); });
       console.log("[Flixbaba/VidBolt] " + BUILD + " tmdb=" + res.tmdbId +
         " sources=" + src.length + " streams=" + out.length +
-        " dropped=" + dropped + " subs=" + subs.length);
+        " dropped=" + dropped + " gated=" + gated + " expired=" + expired +
+        " subs=" + subs.length);
       if (!out.length) return diag("no streams · tmdb=" + res.tmdbId);
       return out;
     });

@@ -36,7 +36,7 @@ flixbaba.best 是一个 **纯 iframe 聚合站**：它的 Next.js 观看页
 
 | id | 上游 | 说明 |
 |---|---|---|
-| `flixbaba-vidbolt` | `scraper.vidbolt.xyz` | 直接把 TMDB id 交给 VidBolt scraper：`/scrape/Quasar/{movie\|tv}/{tmdbId}?tmdbId=`，返回签名 HLS / 直链，带 `quality` / `language` / `headers` / `subtitles`，按清晰度排序。电影 14 条→过滤后 8 条、剧集 15 条→过滤后 10 条实测。 |
+| `flixbaba-vidbolt` | `scraper.vidbolt.xyz` | 直接把 TMDB id 交给 VidBolt scraper：`/scrape/Quasar/{movie\|tv}/{tmdbId}?tmdbId=`，返回签名 HLS / 直链，带 `quality` / `language` / `headers` / `subtitles`，按清晰度排序。电影 14 条→过滤后 8 条、剧集 15 条→过滤后 10 条实测（该次实测早于 v1.3.1 的过期签名过滤；开启后过期行会再被剔掉）。 |
 | `flixbaba-mapple` | `mapple.fun` | `/api/request-token` → `/api/playback-init`（PoW，difficulty 18）→ `/api/encrypt` 会话流程，再逐 hoster 解析，取到 2 个可用 hoster 即停。上游有 Cloudflare 挑战，见下方「网络注意事项」。 |
 
 ### 播放地址：为什么有的行会被丢掉
@@ -58,7 +58,7 @@ HTTP `403/502/504` + HTML 正文（`Just a moment...`、`server: cloudflare`、
 | 源站 | 形态 | 结果 |
 |---|---|---|
 | `hls.shegu.net` | `/proxy/m3u8/` | ✅ 200 + `#EXTM3U` |
-| `img1.klnwm.com` 等 | 裸 m3u8 | ✅ 200 + `#EXTM3U` |
+| `img1.klnwm.com` 等 | 裸 m3u8 | ✅ 200 + `#EXTM3U`（签名未过期时；过期则 403 `Sign expired`，见下节） |
 | `aapanel.devcorp.me` | `/proxy/m3u8/` **和** `/proxy/segment/`（字幕） | ✅ 200 |
 | `a.111477.xyz` / `p.111477.xyz` | `/proxy/segment/` | ❌ 403 挑战页，7/7 次 |
 | `cf.streamflixserver.site` | `/proxy/segment/` | ❌ 502，2/2 次 |
@@ -74,6 +74,41 @@ HTTP `403/502/504` + HTML 正文（`Just a moment...`、`server: cloudflare`、
 被挡的行默认丢弃，**但若丢弃会导致结果为空则全部保留**，保证调用方永远拿得到东西。
 某个域名恢复后，从 `GATED_ORIGINS` 里删掉即可；整个过滤可用
 `DROP_GATED_ORIGINS = false` 一键关闭。
+
+### 播放地址：签名过期（v1.3.1 新增过滤）
+
+VidBolt 给每条播放地址签了名：`?auth_key=...&expire=<epoch-ms>`。它的 scraper
+**把某个标题解析一次之后就一直回放那份缓存**，所以某一行可能带着早已失效的签名回来，
+源站返回 HTTP `403` + 正文 `Sign expired`。
+
+实测证据（2026-10-11，模拟器）：两条 1080p 行的 `expire` 是 `1791723922113` →
+`13:05:22Z`，而使用时刻约 `13:50Z`，**已过期约 45 分钟**。点「Refresh streams」重新抓取
+（日志确认插件重跑、仍是 `streams=8`）后再点同一条，拿到的 URL **字节完全相同**
+（同一个 `auth_key`、同一个过期 `expire`）—— 说明**陈旧性在上游**，插件侧无法重新签名。
+
+因为过期时间可以直接从 URL 上读出来，这类行在**零网络开销**下被剔除：
+
+- 判据 `isExpiredSign()` 同时看 URL 本身和 `originOf()` 解出的上游
+  （`/proxy/<kind>/<b64>` 里的上游可能是 percent-encoded 的）。
+- `expire` 按毫秒解析，**秒级（10 位）也兼容**，防止上游改单位。
+- 减去 60 秒宽限期（`EXPIRY_GRACE_MS`），把「马上过期」的行一并算作不可用。
+- **读不出 `expire` 的行不动** —— 无法从本地判断就不下结论。
+- 与 `GATED_ORIGINS` 同一套兜底：**若过滤会导致结果为空则全部保留**；
+  整个过滤可用 `DROP_EXPIRED_SIGNS = false` 一键关闭。
+
+> **不要**把 `img1.klnwm.com` / `img1.hbsxcn.com` 加进 `GATED_ORIGINS`。
+> 它们不是 Cloudflare 托管挑战（对比 `Just a moment...`），而是会自愈的**签名过期**，
+> 域名本身是好的。
+
+设备日志会同时给出两个计数，便于区分两类丢弃（下例为格式示意）：
+
+```
+[Flixbaba/VidBolt] FB1.3.1 tmdb=157336 sources=14 streams=6 dropped=8 gated=6 expired=2 subs=12
+```
+
+该逻辑有本地 mock harness 覆盖（不联网，喂造数据），断言包括：新鲜的直连行保留、
+秒级 `expire` 保留、无 `expire` 的行保留、b64 上游过期/未过期分别剔除/保留、
+宽限期内剔除、全过期时兜底保留、无 ID 时不发请求。
 
 ### 关键设计：不依赖 api.themoviedb.org
 
@@ -177,7 +212,12 @@ mapple 失败时**只返回一条诊断行**（`about:error` / `Status`），标
 ## 测试状态
 
 - 解析结果在 **Android 模拟器 + Nuvio 0.5.9-beta** 上实测（真实设备网络出口），不是在 CI 上。
-  已在设备 UI 上确认 Flixbaba 分组正常渲染（`Flixbaba · VidBolt · 1080p · Original · Interstellar (2014)` 等）。
+  已在设备 UI 上确认 Flixbaba 分组正常渲染（`Flixbaba · VidBolt · 1080p · Original · Interstellar (2014)` 等），
+  并点开真实播放成功：`state=READY durationMs=10144336`（≈ 片长 2h49m）、`terminalError=none`、`isPlaying=true`。
+- **从 GitHub raw URL 加载**的端到端验证也做过：在设备上删掉本地 URL 的仓库，改为安装
+  `https://raw.githubusercontent.com/feixiangdao/test1/main/flixbaba-nuvio/manifest.json`，
+  两个 provider 正常注册并执行（日志里的 manifest 前缀即 GitHub 地址，见下）。
+  该插件没有用户填写的 Cookie/Token，所以重建仓库不会丢设置（scraper `id` 未变）。
 - CI 只做静态检查：manifest 结构、JS 语法、模块加载、`getStreams` 导出、无 ID 守卫。
   CI **不验证**真实解析与播放。
 
@@ -194,14 +234,20 @@ adb logcat -d | grep -iE "flixbaba|PluginRuntime"
 实测输出（FB1.3.0，模拟器 + 星际穿越）：
 
 ```
+# 仓库地址为本机 http://127.0.0.1:8899/...
 D PluginRuntime: Plugin:http://127.0.0.1:8899/flixbaba-nuvio/manifest.json:flixbaba-vidbolt [Flixbaba/VidBolt] FB1.3.0 id=tt0816692 type=movie
 D PluginRuntime: Plugin:...:flixbaba-vidbolt [Flixbaba/VidBolt] FB1.3.0 tmdb=157336 sources=14 streams=8 dropped=6 subs=12
 D PluginRuntime: Plugin:...:flixbaba-mapple  [Flixbaba/Mapple] FB1.3.0 id=tt0816692 type=movie
 D PluginRuntime: Plugin:...:flixbaba-mapple  [Flixbaba/Mapple] token status=403 cookie=no
+
+# 同一台设备，仓库地址换成 GitHub raw
+D PluginRuntime: Plugin:https://raw.githubusercontent.com/feixiangdao/test1/main/flixbaba-nuvio/manifest.json:flixbaba-vidbolt [Flixbaba/VidBolt] FB1.3.0 id=tt0816692 type=movie
+D PluginRuntime: Plugin:...:flixbaba-vidbolt [Flixbaba/VidBolt] FB1.3.0 tmdb=157336 sources=14 streams=8 dropped=6 subs=12
 ```
 
 `id=tt0816692` 说明 **Nuvio 传进来的 `tmdbId` 参数其实是 IMDb id**，
 插件用 Cinemeta 映射成 `157336` 后才交给 VidBolt。`dropped=6` 即上文被 Cloudflare 挡掉的 6 条。
+v1.3.1 起这一行还多出 `gated=` 与 `expired=` 两个计数，用于区分两类丢弃。
 
 ### VidBolt 只有 `Quasar` 一个有效 server
 

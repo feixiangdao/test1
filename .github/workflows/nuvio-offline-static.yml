@@ -8,6 +8,7 @@ on:
       - 'tests/check_nuvio_offline_runtime.cjs'
       - 'tests/check_nuvio_provider_manifests.py'
       - 'tests/check_nuvio_provider_entrypoints.cjs'
+      - 'tests/check_yflix_s1_mock.cjs'
       - 'novipnoad-nuvio/**'
       - 'yesmovies-nuvio/**'
       - 'yflix-nuvio/**'
@@ -29,5 +30,7 @@ jobs:
         run: node tests/check_nuvio_provider_entrypoints.cjs
       - name: Check JavaScript syntax
         run: node --check novipnoad-site-diagnostic/offline-probe.js
+      - name: Mock YFlix S1 success and failure responses
+        run: node tests/check_yflix_s1_mock.cjs
       - name: Exercise offline getStreams output
         run: node tests/check_nuvio_offline_runtime.cjs

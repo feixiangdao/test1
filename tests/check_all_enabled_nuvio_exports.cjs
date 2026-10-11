@@ -80,7 +80,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     '',
     ...needsRuntime.map(item => '- Unverified: \`' + item.replace(/\\/g,'/') + '\`'),
     '',
-  ].join('\\n');
-  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + '\\n');
+  ].join('\n');
+  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + '\n');
 }
 

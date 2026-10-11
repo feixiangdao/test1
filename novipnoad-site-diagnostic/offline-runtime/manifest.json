@@ -1,0 +1,18 @@
+{
+  "name": "AAA Offline Nuvio Diagnostic",
+  "version": "0.1.1",
+  "description": "Offline synthetic provider; never plays media",
+  "scrapers": [
+    {
+      "id": "nuvio-offline-probe",
+      "name": "Offline Runtime Probe",
+      "description": "Two local dummy rows, zero network fetch",
+      "version": "0.1.1",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/b85305cb1c9e74a5e85885d7b6963971b4fd9264/novipnoad-site-diagnostic/offline-probe.js",
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+name: Nuvio offline provider static checks
+on:
+  push:
+    paths:
+      - 'novipnoad-site-diagnostic/offline-probe.js'
+      - 'novipnoad-site-diagnostic/offline-runtime/manifest.json'
+      - 'tests/check_nuvio_offline_probe.py'
+      - '.github/workflows/nuvio-offline-static.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate manifest and zero-network diagnostics
+        run: python3 tests/check_nuvio_offline_probe.py
+      - name: Check JavaScript syntax
+        run: node --check novipnoad-site-diagnostic/offline-probe.js

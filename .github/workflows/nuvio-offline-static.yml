@@ -10,6 +10,7 @@ on:
       - 'tests/nuvio_manifest_projects.json'
       - 'tests/check_all_enabled_nuvio_syntax.cjs'
       - 'tests/check_all_enabled_nuvio_exports.cjs'
+      - 'tests/check_all_enabled_nuvio_missing_id.cjs'
       - 'tests/check_nuvio_provider_entrypoints.cjs'
       - 'tests/check_yflix_s1_mock.cjs'
       - 'tests/check_nuvio_network_failures.cjs'
@@ -42,6 +43,8 @@ jobs:
         run: node tests/check_all_enabled_nuvio_syntax.cjs
       - name: Load every enabled Provider module without I/O
         run: node tests/check_all_enabled_nuvio_exports.cjs
+      - name: Audit missing TMDB ID across all enabled providers
+        run: node tests/check_all_enabled_nuvio_missing_id.cjs
       - name: Exercise provider entrypoints without network
         run: node tests/check_nuvio_provider_entrypoints.cjs
       - name: Verify provider network failure isolation

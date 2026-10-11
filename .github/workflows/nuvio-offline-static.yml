@@ -5,6 +5,7 @@ on:
       - 'novipnoad-site-diagnostic/offline-probe.js'
       - 'novipnoad-site-diagnostic/offline-runtime/manifest.json'
       - 'tests/check_nuvio_offline_probe.py'
+      - 'tests/check_nuvio_offline_runtime.cjs'
       - '.github/workflows/nuvio-offline-static.yml'
   workflow_dispatch:
 permissions:
@@ -19,3 +20,5 @@ jobs:
         run: python3 tests/check_nuvio_offline_probe.py
       - name: Check JavaScript syntax
         run: node --check novipnoad-site-diagnostic/offline-probe.js
+      - name: Exercise offline getStreams output
+        run: node tests/check_nuvio_offline_runtime.cjs

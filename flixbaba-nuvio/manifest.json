@@ -1,0 +1,50 @@
+{
+  "name": "Flixbaba Local",
+  "version": "1.0.0",
+  "description": "flixbaba.best 的本地直链解析。flixbaba 本身只是 iframe 聚合站、没有自己的播放接口，所以这里把它内嵌的播放器在 Nuvio 设备本机解析成可直接播放的 HLS/MP4 直链，不经过任何网页播放器。",
+  "scrapers": [
+    {
+      "id": "flixbaba-vidbolt",
+      "name": "Flixbaba · VidBolt",
+      "description": "flixbaba 内嵌的第 5 号播放器（vidbolt.xyz）本机解析。先取 TMDB→IMDb，再调用 VidBolt scraper 后端拿签名 HLS，返回前按清晰度排序。",
+      "version": "1.0.0",
+      "author": "Flixbaba Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/flixbaba-vidbolt.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "logo": "https://vidbolt.xyz/favicon.ico",
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
+    },
+    {
+      "id": "flixbaba-mapple",
+      "name": "Flixbaba · Mapple",
+      "description": "flixbaba 内嵌的第 4 号播放器（mapple.rip / mapple.fun）本机解析。走 request-token → playback-init（含 PoW）→ encrypt 的会话流程，再逐 hoster 取签名 HLS。上游对数据中心出口不友好，因此标记 limited。",
+      "version": "1.0.0",
+      "author": "Flixbaba Local",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/flixbaba-mapple.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "logo": "https://mapple.fun/favicon.ico",
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": true
+    }
+  ]
+}

@@ -1,4 +1,76 @@
-# CURRENT: VidPlay V1 v0.1.8 — works without either binary fetch API (2026-10-08)
+# CURRENT: VidPlay V1 v0.2.0 — TV episodes work; the 15s budget was discarding successful lookups (2026-10-11)
+
+**Root cause of "no playable rows" in v0.1.8: the provider's own watchdog, not the upstream.**
+
+Re-running the published v0.1.8 provider against the live upstream on 2026-10-11 showed the V1 chain
+**already succeeds**, but takes longer than the 15-second `withinBudget()` window that v0.1.8 enforced:
+
+```
+[VidPlay Lab] V1 movie 395992 verified streams=3      <- the real work DID succeed
+[VidPlay Lab] V1 timeout: 查询超过 15 秒               <- ...but the watchdog had already fired
+--- tmdb=395992 (movie) 15047ms rows=1                 <- so only the Status capsule was returned
+   [Status] hls data:application/vnd.apple.mpegurl;base64,...
+```
+
+`withinBudget()` races the work against a timer but never cancels the underlying promise, so the
+lookup kept running in the background and finished *after* the answer had already been discarded.
+Measured phase timings show why 15s was never enough:
+
+| Phase | Observed |
+|---|---|
+| `ythd.org/vs_src.php` | 0.2s – 9.0s |
+| player landing + nested player pages | 0.3s – 9.6s |
+| signed media API (`stream_urls`) | 0.4s – 8.4s |
+| `data.vidsrc.sh/wasm.php` (~7 KB) | 0.3s |
+| CDN `/generate.php` (cold, per file) | **8.2s cold / 0.26s warm** |
+| HLS master | 0.3s – 1.1s |
+
+Latency is dominated by upstream/network variance, not by fixed work, so the budget — not the
+algorithm — was the defect. Nuvio's hard cap was confirmed in the app source:
+`internal const val PLUGIN_TIMEOUT_MS = 60_000L` (`NuvioMedia/NuvioMobile`,
+`composeApp/src/fullCommonMain/kotlin/com/nuvio/app/features/plugins/runtime/PluginRuntime.kt`).
+
+**Changes in v0.2.0 (provider only — no APK change, no proxy, no new server):**
+
+1. **Budget raised 15s → 50s**, still comfortably inside Nuvio's 60s `PLUGIN_TIMEOUT_MS`.
+2. **TV episodes now actually resolve.** v0.1.8 fell through to the Cloudflare-blocked
+   `vidplay.top/ajax/tv_vplay*.php` for every TV lookup and therefore always returned a diagnostic.
+   The V1 chain covers TV natively and needs **no metadata hop**: `ythd.org/embed/<TMDB>/<S>/<E>` →
+   `vs_src.php?type=tv&id=<TMDB>&season=&episode=`. The nested player's `window.CONFIG` for TV differs
+   from the movie shape — it exposes `streamBase` + `season`/`episode` instead of a ready-made `api`
+   URL — and the provider now builds the signed request from either shape.
+3. **One CDN token per lookup.** `/generate.php` is rate-limited and IP-bound, so the token is fetched
+   once for the first CDN origin and reused for every candidate, instead of being re-requested per row.
+4. **The `ythd.org/embed/...` page is no longer fetched.** `vs_src.php` accepts the embed URL directly
+   as its `Referer`; verified live that the whole chain still completes, saving a full page round trip.
+5. **Transient-fault retry** (2 attempts, backoff) for network resets and 5xx only; deterministic 4xx
+   answers are never retried.
+6. **Build marker in the diagnostic capsule** (`诊断[VP0.2.0]`) so a stale device copy is
+   distinguishable from a real failure at a glance.
+
+**Live verification (2026-10-11, real upstream, `node` against the published file):**
+
+| Title | Type | Result | Time |
+|---|---|---|---|
+| Life (2017) | movie | 3 rows — 266p / 534p / 800p | 15.4s |
+| Kung Fu Panda (2008) | movie | 3 rows — 272p / 544p / 816p | 13.9s |
+| Abbott Elementary S01E01 | tv | 2 rows — 360p / 720p | 15.1s |
+| Game of Thrones S01E01 | tv | 2 rows — 360p / 720p | 13.8s |
+
+Each row is a real HLS master whose variant playlists were fetched and confirmed HTTP 200, and whose
+`token=` JWT carries the requester's own `ip_cidr` — so extraction and playback must happen on the
+same device, which is exactly how Nuvio runs it. Worst observed total was 40.4s under heavy
+throttling (a transient `generate.php` failure plus retry), which is why the budget is 50s.
+
+**Install URL unchanged:** `https://raw.githubusercontent.com/feixiangdao/test1/main/vidplay-nuvio/manifest.json`.
+Scraper `id` remains **`vidplay-direct-lab`** and the manifest path is unchanged, so an existing
+install keeps its settings; only the provider `filename` changed (now `providers/vidplay-v020.js`),
+which is also what forces Nuvio to pull the new code. Refresh the existing repository — do **not**
+add a second URL. On-device playback of the returned HLS is still to be confirmed by the user.
+
+---
+
+# VidPlay V1 v0.1.8 — works without either binary fetch API (2026-10-08)
 
 **Phone evidence:** v0.1.7 returned \`播放器阶段[WASM 解密媒体地址]: WASM: native bridge has no binary bodyBase64\`; the earlier v0.1.6 returned \`fetch.arrayBuffer unavailable\`. Thus the installed official Nuvio runtime does not expose either method to this local provider. No APK change or new server is allowed.
 

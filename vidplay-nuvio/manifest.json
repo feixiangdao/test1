@@ -1,25 +1,26 @@
 {
   "name": "VidPlay V1 Local",
-  "version": "0.1.8",
-  "description": "VidPlay V1-only Local Provider for official Nuvio. Supports older mobile builds with neither fetch.arrayBuffer nor native bodyBase64 using validated offline decoder parameters; real HLS tested, on-device playback pending.",
+  "version": "0.2.0",
+  "description": "vidplay.top 的本地直链解析。vidplay.top 自身的页面与 /ajax/ 全部挂在 Cloudflare 交互式挑战后面（非浏览器客户端一律 403 Just a moment...），所以这里复刻它自己 iframe 所用的同一套公开 V1 链路：ythd.org 播放源 -> 服务端签名的单次媒体接口 -> WASM/ChaCha20 解密 stream_urls -> CDN 令牌 -> 真实 HLS 主播放列表。电影与剧集均支持。只返回真正校验通过的 HLS；否则给出明确标注不可播放的诊断胶囊。不做 Cloudflare 绕过，不返回伪造播放源。",
   "scrapers": [
     {
       "id": "vidplay-direct-lab",
-      "name": "VidPlay · V1",
-      "description": "V1 only. Signed server media API with WASM or fallback decoding for older Nuvio; validates HLS and quality choices; fails closed if upstream key rotates. No V2/V3.",
-      "version": "0.1.8",
+      "name": "VidPlay · V1 v0.2.0",
+      "description": "复刻 vidplay.top 的公开服务端 V1 链路。电影：公共免密钥 TMDB->IMDb 映射后走 ythd.org/embed/<IMDb>；剧集：直接用 TMDB id 走 ythd.org/embed/<TMDB>/<S>/<E>。两者都进入站点自用的公开播放器，取得服务端签发的单次 apiToken，调用签名媒体接口拿到加密的 stream_urls，再用上游 WASM 里的 ChaCha20 参数解密出 CDN 地址，最后申请 IP 绑定的 CDN 令牌并校验 HLS 主播放列表。仅返回校验通过的清晰度行；上游轮换密钥或令牌时按失败关闭处理，只给诊断行。",
+      "version": "0.2.0",
       "author": "VidPlay Lab",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/vidplay.js",
+      "filename": "providers/vidplay-v020.js",
       "enabled": true,
       "formats": [
         "m3u8",
         "mp4",
         "mpd"
       ],
+      "logo": "https://vidplay.top/favicon.ico",
       "contentLanguage": [
         "multi"
       ],

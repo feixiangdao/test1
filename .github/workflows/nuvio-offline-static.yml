@@ -9,6 +9,7 @@ on:
       - 'tests/check_nuvio_provider_manifests.py'
       - 'tests/check_nuvio_provider_entrypoints.cjs'
       - 'tests/check_yflix_s1_mock.cjs'
+      - 'tests/check_nuvio_network_failures.cjs'
       - 'novipnoad-nuvio/**'
       - 'yesmovies-nuvio/**'
       - 'yflix-nuvio/**'
@@ -28,6 +29,8 @@ jobs:
         run: python3 tests/check_nuvio_provider_manifests.py
       - name: Exercise provider entrypoints without network
         run: node tests/check_nuvio_provider_entrypoints.cjs
+      - name: Verify provider network failure isolation
+        run: node tests/check_nuvio_network_failures.cjs
       - name: Check JavaScript syntax
         run: node --check novipnoad-site-diagnostic/offline-probe.js
       - name: Mock YFlix S1 success and failure responses

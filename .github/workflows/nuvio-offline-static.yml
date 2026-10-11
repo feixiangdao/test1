@@ -37,3 +37,18 @@ jobs:
         run: node tests/check_yflix_s1_mock.cjs
       - name: Exercise offline getStreams output
         run: node tests/check_nuvio_offline_runtime.cjs
+      - name: Publish verification scope
+        if: always()
+        run: |
+          {
+            echo '## Nuvio automated regression checks'
+            echo ''
+            echo '- Manifest metadata: NOVIPNOAD, YesMovies, YFlix (6 scrapers).'
+            echo '- Offline module loading and missing-identifier handling.'
+            echo '- Network unavailable: 6 scrapers x movie/TV = 12 scenarios.'
+            echo '- YFlix S1: deterministic mocked HTTP response cases.'
+            echo '- Offline Runtime Probe: two synthetic rows.'
+            echo ''
+            echo '**Limitations:** No Android emulator control, live media access, or playback verification.'
+            echo 'Review the individual job steps for pass/fail results.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -141,11 +141,17 @@ Provider 把该响应原文写进诊断行，不做任何猜测性降级。若�
 
 ## 已知边界
 
-- **诊断行在 Nuvio 里可能不可见。** 实测（2026-10-12，模拟器 + Nuvio 0.5.8-beta）：失败时返回的
-  诊断行 `url: "about:error"` **会被 Nuvio 从 Streams 列表里过滤掉**，于是「插件没出源」这件事
-  在界面上**没有任何解释**。设备侧无网时最容易踩到。排查手段：把
-  Settings → Content & Discovery → Plugins 的「**Group plugin providers by repository**」打开，
-  Streams 的筛选 chip 会按仓库列出——**chip 里有没有你的仓库，就等于「有没有产出任何行」**。
+- **诊断行不会被过滤——找不到 chip 时先怀疑 chip 条没滑到。** 2026-10-12 用单变量实验验证过：
+  `url: "about:error"` + `quality: "Status"` + `type: "diagnostic"` 的三种组合**全部会渲染**；
+  断网时本 provider 的 `NO视频 · NP1.1.0 · FATAL · …` 也**完整显示在 Streams 里**（见
+  `../diag-visibility/` 实验与 `device_novipnoad_diagrow_2026-10-12.png`）。真正容易误判的是：
+  装了十几个 provider 时，chip 条要横向滑**九屏**才滑得到 `NOVIPNOAD Local`，而且 chip 条会
+  **吸附回当前选中的 chip**——直接滑常常滑不动，得先点另一个 chip 改变选中项再滑。
+  **「看不到 chip」≠「没出源」。**
+- **诊断行只在「确实返回了行」的前提下才可见。** `getStreams` 开头有三个参数守卫（无 `tmdbId` /
+  `mediaType` 不是 `movie|tv` / `tv` 缺 `season|episode`），它们直接 `return []`，**不产生诊断行**。
+  这是刻意的：Nuvio 会试探性地对多个 provider 发起调用，若这些分支也吐诊断行会刷屏。所以
+  「完全没有任何行」只可能来自这三个守卫，其余任何失败路径都必然带一条可读的诊断行。
 - **成功行的标题不带 BUILD。** `NO视频 · 1080P` 这类真实行里没有版本标记，只有诊断行才有
   `NP1.1.0`。判断设备跑的是哪版，要么靠失败时的诊断行，要么看插件页显示的 manifest 版本。
 - **失效帖**：站点会保留已经播不了的帖子，此时返回一条说明原因的诊断行，而不是空数组。

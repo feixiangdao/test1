@@ -110,6 +110,12 @@ Nuvio 只给一个 id，而本站索引的是**中文标题**，所以必须先�
 
 ## 实测验证（BUILD `NP1.1.0`）
 
+**设备端已实测通过**：Android 模拟器（Pixel 9 / Android 16）+ **官方 Nuvio 0.5.8-beta**，
+Refresh 到 v0.3.0 后搜索《奥本海默》→ Play，Streams 里出现 `NO视频 · 1080P` 并**真实播放**，
+退出后详情页按钮变为 Resume。即 QuickJS 侧解析与 ExoPlayer 侧播放都成立。
+
+下表是本机 Node 对**真实上游**的批量验证（不是 mock）：
+
 | 传入 id | 类型 | 站点帖子形态 | 结果 |
 |---|---|---|---|
 | 872585 | movie | 电影帖（ftn 源） | ✅ 1080P `gzc-download.ftn.qq.com/…` `type=mp4` |
@@ -135,6 +141,13 @@ Provider 把该响应原文写进诊断行，不做任何猜测性降级。若�
 
 ## 已知边界
 
+- **诊断行在 Nuvio 里可能不可见。** 实测（2026-10-12，模拟器 + Nuvio 0.5.8-beta）：失败时返回的
+  诊断行 `url: "about:error"` **会被 Nuvio 从 Streams 列表里过滤掉**，于是「插件没出源」这件事
+  在界面上**没有任何解释**。设备侧无网时最容易踩到。排查手段：把
+  Settings → Content & Discovery → Plugins 的「**Group plugin providers by repository**」打开，
+  Streams 的筛选 chip 会按仓库列出——**chip 里有没有你的仓库，就等于「有没有产出任何行」**。
+- **成功行的标题不带 BUILD。** `NO视频 · 1080P` 这类真实行里没有版本标记，只有诊断行才有
+  `NP1.1.0`。判断设备跑的是哪版，要么靠失败时的诊断行，要么看插件页显示的 manifest 版本。
 - **失效帖**：站点会保留已经播不了的帖子，此时返回一条说明原因的诊断行，而不是空数组。
 - **`ali-*` 可达性**：依赖 `media.oss-internal.novipnoad.ca` 在用户网络下可达。
 - **元数据**：数字 id 完全依赖 TMDB（两个域名）。若两者都不可达，会返回 `FATAL no title for <id>` 诊断行。

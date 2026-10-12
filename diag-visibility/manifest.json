@@ -1,0 +1,67 @@
+{
+  "name": "Diagnostic Row Visibility",
+  "version": "0.1.0",
+  "description": "Which diagnostic-row shapes Nuvio actually renders in the Streams list. Three providers return exactly one row each and differ only in the url scheme / quality / type triple, so the chips that appear identify the field Nuvio filters on. Read-only, no network.",
+  "scrapers": [
+    {
+      "id": "diag-vis-about-error",
+      "name": "Diag A · about:error + diagnostic",
+      "description": "url about:error, quality Status, type diagnostic — the shape the novipnoad provider used before this experiment.",
+      "version": "0.1.0",
+      "author": "Diagnostic Row Visibility",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "a.js",
+      "enabled": true,
+      "formats": [
+        "hls"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
+    },
+    {
+      "id": "diag-vis-https-diagnostic",
+      "name": "Diag B · https + diagnostic",
+      "description": "url https://example.com/..., quality Status, type diagnostic — isolates the url scheme while keeping the novipnoad type and quality.",
+      "version": "0.1.0",
+      "author": "Diagnostic Row Visibility",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "b.js",
+      "enabled": true,
+      "formats": [
+        "hls"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
+    },
+    {
+      "id": "diag-vis-https-hls",
+      "name": "Diag C · https + hls",
+      "description": "url https://example.com/..., quality Diag, type hls — the shape every working diagnostic provider in this repository uses.",
+      "version": "0.1.0",
+      "author": "Diagnostic Row Visibility",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "c.js",
+      "enabled": true,
+      "formats": [
+        "hls"
+      ],
+      "contentLanguage": [
+        "multi"
+      ],
+      "limited": false
+    }
+  ]
+}

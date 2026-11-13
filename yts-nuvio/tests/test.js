@@ -89,14 +89,17 @@ async function main() {
   const results = await good('603', 'movie');
   assert.equal(results.length, 2);
   results.forEach(resultIsValid);
-  assert.match(results[0].name, /1\/2/);
-  assert.match(results[0].name, /Video #2 \(I\)/);
-  assert.equal(results[0].url, 'torrent://' + torrentHash + '/2');
-  assert.match(results[1].name, /Auto/);
-  assert.match(results[1].name, /2\/2/);
-  assert.match(results[1].url, /^magnet:/);
+  const verified = results.find(item => item.infoHash === torrentHash);
+  const auto = results.find(item => item.infoHash === otherHash);
+  assert.ok(verified && auto);
+  assert.match(verified.name, /2\/2/);
+  assert.match(verified.name, /Video #2 \(I\)/);
+  assert.equal(verified.url, 'torrent://' + torrentHash + '/2');
+  assert.match(auto.name, /Auto/);
+  assert.match(auto.name, /1\/2/);
+  assert.match(auto.url, /^magnet:/);
   assert.ok(calls.some(url => url.includes('itorrents.org/torrent/')));
-  assert.ok(!results[0].name.includes('Try File'));
+  assert.ok(!verified.name.includes('Try File'));
   console.log('PASS 1: Verified cache fallback selects MP4 after JPG and subtitles');
 
   const missing = run(async url => {

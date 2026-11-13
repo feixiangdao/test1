@@ -1,14 +1,14 @@
 {
   "name": "YTS Movie Sources for Nuvio Mobile",
-  "version": "0.2.3",
-  "description": "Experimental YTS torrent provider: hash-verified video file selection from YTS metadata or independent metadata caches; falls back to magnet without guessing indices.",
+  "version": "0.2.4",
+  "description": "Diagnostic release: recheck YTS movie_details for missing qualities; known-hash external file-index trial is marked unverified.",
   "author": "Independent community prototype",
   "scrapers": [
     {
       "id": "yts-mobile-movies",
       "name": "YTS Movies (Torrent)",
-      "description": "IMDb-matched movies; verify torrent metadata through YTS / iTorrents / BTcache and select video file index where possible",
-      "version": "0.2.3",
+      "description": "Movie provider: infoHash-verified torrent metadata when possible, movie_details enrichment, diagnostic file #4 trial for one known hash",
+      "version": "0.2.4",
       "filename": "providers/yts.js",
       "supportedTypes": [
         "movie"

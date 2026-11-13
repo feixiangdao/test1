@@ -60,8 +60,29 @@ var rule = {
             }
             return out;
         }
+        function fallback(src){
+            var out=[],seen={},re=/<a\\b([^>]*)href=[\"']([^\"']*\\/(?:video|detail)\\/(\\d+)\\/?[^\"']*)[\"']([^>]*)>([\\s\\S]*?)<\\/a>/gi,m;
+            while((m=re.exec(src))!==null){
+                var id=m[3]; if(seen[id])continue;
+                var attrs=(m[1]||'')+' '+(m[4]||''),inner=m[5]||'',name='';
+                var ta=attrs.match(/(?:title|aria-label)=[\"']([^\"']+)[\"']/i); if(ta)name=txt(ta[1]);
+                if(!name){
+                    var q=txt(inner).match(/《([^》]+)》/); if(q)name=q[1].trim();
+                }
+                if(!name)name=txt(inner);
+                name=name.replace(/^立即(?:播放|观看)/,'').replace(/^(?:播放|观看)/,'').trim();
+                if(!name||/^\\d{1,3}$/.test(name)||name==='收藏'||name==='反馈')continue;
+                var from=Math.max(0,m.index-1200),to=Math.min(src.length,re.lastIndex+1200),near=src.slice(from,to);
+                var ims=[],ir=/<img\\b[^>]*(?:data-src|src)=[\"']([^\"']+)[\"'][^>]*>/gi,im;
+                while((im=ir.exec(near))!==null)ims.push(im[1]);
+                var u=fix(m[2]),pv=ims.length?pic(ims[0]):'';
+                seen[id]=1;out.push({vod_id:u,vod_name:name,vod_pic:pv,vod_remarks:''});
+            }
+            return out;
+        }
         var html=request(rule.host+'/',{headers:rule.headers});
         VODS=parse(html,true);
+        if(!VODS||!VODS.length)VODS=fallback(html);
     `,
 
     一级: `js:
@@ -112,8 +133,25 @@ var rule = {
         }
         var cate=String(MY_CATE||'home').replace(/^\\//,''),pg=parseInt(MY_PAGE||1)||1,target;
         if(cate==='home')target=rule.host+'/';else target=rule.host+'/'+cate+'/'+(pg>1?pg+'/':'');
+        function fallback(src){
+            var out=[],seen={},re=/<a\\b([^>]*)href=[\"']([^\"']*\\/(?:video|detail)\\/(\\d+)\\/?[^\"']*)[\"']([^>]*)>([\\s\\S]*?)<\\/a>/gi,m;
+            while((m=re.exec(src))!==null){
+                var id=m[3];if(seen[id])continue;
+                var attrs=(m[1]||'')+' '+(m[4]||''),inner=m[5]||'',name='';
+                var ta=attrs.match(/(?:title|aria-label)=[\"']([^\"']+)[\"']/i);if(ta)name=txt(ta[1]);
+                if(!name){var q=txt(inner).match(/《([^》]+)》/);if(q)name=q[1].trim();}
+                if(!name)name=txt(inner);
+                name=name.replace(/^立即(?:播放|观看)/,'').replace(/^(?:播放|观看)/,'').trim();
+                if(!name||/^\\d{1,3}$/.test(name)||name==='收藏'||name==='反馈')continue;
+                var from=Math.max(0,m.index-1200),to=Math.min(src.length,re.lastIndex+1200),near=src.slice(from,to);
+                var im=near.match(/<img\\b[^>]*(?:data-src|src)=[\"']([^\"']+)[\"'][^>]*>/i);
+                seen[id]=1;out.push({vod_id:fix(m[2]),vod_name:name,vod_pic:im?pic(im[1]):'',vod_remarks:''});
+            }
+            return out;
+        }
         var html=request(target,{headers:rule.headers});
         VODS=cate.indexOf('rank')>=0?ranks(html):cards(html,cate==='home');
+        if((cate==='home'||cate.indexOf('rank')<0)&&(!VODS||!VODS.length))VODS=fallback(html);
     `,
 
     二级: `js:

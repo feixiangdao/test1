@@ -1,6 +1,6 @@
 # YTS Movie Sources — Nuvio Mobile
 
-Experimental Nuvio Provider v0.2.3 for **Nuvio Android 0.6.12-beta (155), Full build**. Movie-only. Public GitHub hosting does not imply that film distribution is authorized. Access only media you have the right to use.
+Experimental Nuvio Provider v0.2.4 for **Nuvio Android 0.6.12-beta (155), Full build**. Movie-only. Public GitHub hosting does not imply that film distribution is authorized. Access only media you have the right to use.
 
 ## Install
 
@@ -44,3 +44,11 @@ P2P torrent activity can expose the device's public IP to peers and may upload a
 ### Additional privacy note
 
 When the primary YTS .torrent endpoint fails, the plugin sends the public infoHash and your IP to independent metadata cache services to fetch small .torrent metadata. It does not send API keys to those services. The services may be subject to ISP/network restrictions and can be disabled in the provider source if desired.
+
+### 0.2.4 — diagnostic workflow
+
+If `list_movies` supplies only one torrent, the provider makes an additional exact-IMDb-checked call to `movie_details.json` to retrieve any additional available resolutions. The public API returned four records for `tt33764258` during external checks, but results from the user's phone may vary.
+
+For **only** torrent SHA-1 `F566BBF053529BF2432CAFD17ED3FB7C118874E6`, the provider also adds a **`File #4 (unverified external list)`** test source if it could not confirm a video via hashed .torrent metadata. Independent public torrent file lists claim its MP4 is the 5th entry (zero-based index 4). This is a diagnostic hypothesis, **not** a verified filename mapping on the device and **not** a generic torrent solution. If it still cannot play, inspect local P2P engine state/logs rather than guessing another file index. Note that the extra source does not become available for other torrents.
+
+The test source remains an experimental implementation for troubleshooting; only view material you have permission to access.

@@ -1,15 +1,15 @@
 {
-  "name": "YTS Dual-API Integrity for Nuvio Mobile",
-  "version": "0.3.2",
-  "description": "Compares two YTS-compatible API hosts and selects the set with the most distinct valid torrent hashes. Does not verify playback.",
+  "name": "YTS HTTP Integrity Diagnostic for Nuvio Mobile",
+  "version": "0.3.3",
+  "description": "Compares raw HTTP JSON hash diversity with parsed YTS API data, using mobile User-Agent and cache bypass; experimental.",
   "author": "Independent community prototype",
   "scrapers": [
     {
-      "id": "yts-dual-api-032",
-      "name": "YTS Dual-API v0.3.2",
-      "version": "0.3.2",
-      "description": "Cross-check main and backup API responses and report each host's distinct Hash count.",
-      "filename": "providers/yts-api-v032.js",
+      "id": "yts-http-integrity-v033",
+      "name": "YTS HTTP Integrity v0.3.3",
+      "version": "0.3.3",
+      "description": "Show raw-vs-parsed API torrent hash counts from both hosts; movie-only diagnostic.",
+      "filename": "providers/yts-api-v033.js",
       "supportedTypes": [
         "movie"
       ],

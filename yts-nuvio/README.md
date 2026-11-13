@@ -1,64 +1,46 @@
-# YTS API Diagnostic v0.3.0 for Nuvio Android
+# YTS API Integrity Diagnostic v0.3.1 — Nuvio Android Full 0.6.12-beta (155)
 
-> This release deliberately changes the scraper ID and filename to avoid reuse
-> of old provider JavaScript, and removes the metadata-cache/file-number probes
-> from the *active* provider. The old `providers/yts.js` is kept for historical
-> reference but is no longer listed in the manifest.
-
-## Add repository
+## Installation
 
 https://raw.githubusercontent.com/feixiangdao/test1/main/yts-nuvio/manifest.json
 
-Target: Nuvio Android Full 0.6.12-beta (155), movie-only.
+Refresh this repository in Nuvio's Plugins screen. Verify that it says
+**YTS API Integrity Diagnostic for Nuvio Mobile**, version **0.3.1**, and
+that its provider is **YTS API Integrity v0.3.1**. The manifest uses a new
+provider ID and a new script filename to sidestep previous cached code.
 
-In Nuvio **Settings → Content & Discovery → Plugins**, refresh this repository
-and confirm **YTS API Diagnostic for Nuvio Mobile (version 0.3.0)** and provider
-**YTS API Diagnostic v0.3**. If the old provider is still listed, the reload
-has not succeeded. Reinstall this repository if refreshing fails.
+## What to check
 
-## How to read stream labels
+Example provider label:
 
-For example: `YTS 720p x264 | v030 L1/D4 | F566BBF0 | S:100`.
+\`YTS 720p | v031 tt33764258 M79664 L1 D4 V1 U1 R1 A0 | F998565D\`
 
-- `v030`: this exact new provider code is running, not the old cached plugin.
-- `L1`: list_movies API returned one unique torrent for the exact IMDb movie.
-- `D4`: movie_details API returned four torrent records for the exact IMDb movie.
-- `DERR`: movie_details could not be verified from either known API base.
-- `DNOID`: list_movies did not include a usable numeric movie ID.
-- `F566BBF0`: first eight characters of the returned torrent infoHash.
-- `S:100`: API-supplied seeder number, **not** an independently checked live count.
+- \`v031\`: this exact diagnostic code is running.
+- \`tt33764258\`: IMDb ID used by the plugin (must match the intended film).
+- \`M79664\`: YTS numeric movie ID from list_movies (verify matches details).
+- \`L1\`: number of distinct valid hashes from IMDb-matched list_movies results.
+- \`D4\`: *raw record count* in movie_details, not necessarily valid torrents.
+- \`V1\`: detail records with syntactically valid 40-digit hexadecimal hashes.
+- \`U1\`: number of *unique* valid hashes in the detail response.
+- \`R1\`: number of unique hashes in the final list, before Nuvio display.
+- \`A0\`: list_movies used primary API; A1 means fallback API.
+- \`F998565D\`: first 8 digits of that stream's normalized infoHash.
 
-The provider merges distinct infoHash records from both list and detail endpoints
-and sorts them by advertised quality. It does not send traffic to iTorrents,
-BTcache or other metadata caches during stream search.
+Interpretation:
 
-## Diagnosing the previous one-source problem
+* D4 V1 U1 R1 and one card: the other three API records are invalid/duplicates.
+* D4 V4 U4 R4 and one card: the provider returns four distinct results and Nuvio is hiding/filtering three.
+* L1/D4 and IMDb/movie IDs different from public data: the phone is getting different underlying records or is querying a different title.
+* This release does **not** repair P2P playback: it only verifies the source data.
+* Even a well-formed 40-digit infoHash, a nonzero API seeder count, or
+  visible card does not prove that a torrent is authentic or playable.
 
-The developer-verified Nuvio 0.6.12 streaming repository appends all results
-returned by one plugin; it does not impose a hard limit of one stream per provider.
+Source resolution and playback are separate issues. Nuvio 0.6.12-beta's
+PluginRuntime parses a JSON array of source records and StreamsRepository adds
+each converted stream. The provider deliberately issues *no* .torrent
+metadata-cache requests, and it never guesses file indices.
 
-With this diagnostic provider:
-
-- **New provider name absent / no v030** → likely stale plugin installation
-  or refresh failure, not yet evidence about YTS API.
-- **v030 L1/D4 but only one card** → potential Nuvio parsing/UI/filter issue.
-- **v030 L1/DERR, one card** → movie_details unreachable or invalid on the phone.
-- **v030 L1/D1, one card** → both API responses really provide only one record
-  to the phone on that request; compare the API response with a browser request
-  using the same network.
-- **Four v030 cards, no playback** → listing issue resolved. Test the built-in
-  P2P streaming settings/logs separately. This code uses Magnet links and does
-  not claim that the torrent contains a playable movie.
-
-## Safety and limitations
-
-Raw YTS/yifystatus torrent metadata does not establish licensing, file
-authenticity, torrent health, or working playback. Use only works you are
-authorized to access. Torrent P2P may disclose your IP address to other peers.
-
-## Why this is a diagnostic rather than another guessed fix
-
-Earlier builds 0.2.1–0.2.4 attempted to download Torrent file metadata and
-guess/select file indices. The phone observed HTTP404 and invalid/missing video
-metadata. This version isolates source discovery from the P2P playback engine;
-no more speculative file-index changes. 
+**Privacy:** Diagnostic labels reveal the selected movie's IMDb/YTS IDs and
+public torrent hash prefix. No sensitive user account information is added.
+Torrent playback may reveal your IP address to peers, and movie distribution
+rights must be respected.

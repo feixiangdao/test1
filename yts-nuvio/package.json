@@ -1,8 +1,8 @@
 {
   "name": "nuvio-yts-mobile-provider",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
-  "description": "YTS dual API integrity diagnostic for Nuvio Mobile Android",
+  "description": "YTS raw HTTP response and parsed JSON integrity diagnostic for Nuvio Mobile Android",
   "scripts": {
     "test": "node tests/test.js"
   },

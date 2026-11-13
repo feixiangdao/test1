@@ -32,9 +32,9 @@ function detailFilm(ts=torrents){
   return {status:'ok',data:{movie:{id:79664,imdb_code:'tt33764258',torrents:ts}}};
 }
 async function main(){
-  assert.equal(manifest.version,'0.3.0');
-  assert.equal(manifest.scrapers[0].id,'yts-api-diagnostic-030');
-  assert.equal(manifest.scrapers[0].filename,'providers/yts-api-v030.js');
+  assert.equal(manifest.version,'0.3.1');
+  assert.equal(manifest.scrapers[0].id,'yts-api-integrity-031');
+  assert.equal(manifest.scrapers[0].filename,'providers/yts-api-v031.js');
   assert.deepEqual(manifest.scrapers[0].supportedTypes,['movie']);
 
   const calls=[];
@@ -47,7 +47,7 @@ async function main(){
   const full=await success('tt33764258','movie');
   assert.equal(full.length,4);
   assert.match(full[0].name,/YTS 4K/);
-  assert.ok(full.every(x=>x.name.includes('v030 L1/D4')));
+  assert.ok(full.every(x=>x.name.includes('v031 tt33764258 M79664 L1 D4 V4 U4 R4 A0')));
   assert.ok(full.every(x=>x.url.startsWith('magnet:?xt=urn:btih:')));
   assert.ok(calls.some(x=>x.includes('movie_details')));
   assert.equal((new Set(full.map(x=>x.infoHash))).size,4);
@@ -59,7 +59,7 @@ async function main(){
   });
   const partial=await noDetail('tt33764258','movie');
   assert.equal(partial.length,1);
-  assert.match(partial[0].name,/v030 L1\/DERR/);
+  assert.match(partial[0].name,/v031 tt33764258 M79664 L1 DERR/);
   console.log('PASS 2: detail API fails; label shows DERR and preserves list');
 
   const invalidMovie=run(async url=>{
@@ -86,5 +86,21 @@ async function main(){
   });
   assert.equal((await dedup('tt33764258','movie')).length,2);
   console.log('PASS 5: duplicates removed by full infoHash');
+
+  const malformed=run(async url=>{
+    if(url.includes('list_movies'))return response(listFilm([torrents[0]]));
+    if(url.includes('movie_details'))return response(detailFilm([
+      torrents[0],
+      {hash:'not-a-hash',quality:'1080p'},
+      {hash:null,quality:'2160p'},
+      {hash:123,quality:'1080p'}
+    ]));
+    return response({},404);
+  });
+  const one=await malformed('tt33764258','movie');
+  assert.equal(one.length,1);
+  assert.match(one[0].name,/L1 D4 V1 U1 R1/);
+  console.log('PASS 6: Raw D4 with one valid hash yields one stream');
+
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

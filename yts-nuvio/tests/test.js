@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { createHash, webcrypto } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const code = fs.readFileSync(path.join(root, 'providers/yts.js'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
@@ -22,6 +23,7 @@ function makeRuntime(fetchStub, key = 'test-tmdb-key') {
   const moduleObject = { exports: {} };
   const ctx = { module: moduleObject, exports: moduleObject.exports,
     console: { warn() {} }, fetch: fetchStub, Promise, encodeURIComponent,
+    crypto: webcrypto, TextDecoder,
     globalThis: null };
   ctx.globalThis = ctx;
   if (key) ctx.TMDB_API_KEY = key;
@@ -43,7 +45,7 @@ function assertMobileResult(item) {
 }
 
 async function main() {
-  assert.equal(manifest.version, '0.2.0');
+  assert.equal(manifest.version, '0.2.1');
   assert.equal(manifest.scrapers.length, 1);
   assert.deepEqual(manifest.scrapers[0].supportedTypes, ['movie']);
   assert.deepEqual(manifest.scrapers[0].supportedPlatforms, ['android']);
@@ -115,5 +117,46 @@ async function main() {
   const noResults = makeRuntime(() => Promise.resolve(response({ status: 'ok', data: { movie_count: 0 } })), '');
   assert.equal((await noResults('tt0133093', 'movie')).length, 0);
   console.log('PASS 4: Missing key, offline APIs, empty YTS results fail safely');
+
+  // Reproduce an actual multi-file .torrent where its marketing JPG is index 0.
+  // Version 0.2.1 should select MP4 at index 1 rather than returning a bare magnet.
+  function bencode(value) {
+    if (typeof value === 'number') return 'i' + value + 'e';
+    if (typeof value === 'string') return Buffer.byteLength(value) + ':' + value;
+    if (Array.isArray(value)) return 'l' + value.map(bencode).join('') + 'e';
+    return 'd' + Object.keys(value).sort().map(key => bencode(key) + bencode(value[key])).join('') + 'e';
+  }
+  const info = {
+    name: 'Spider-Man',
+    files: [
+      { length: 37000, path: ['YTS.GG - Official site.jpg'] },
+      { length: 1300000000, path: ['Spider-Man.Brand.New.Day.2026.720p.mp4'] },
+      { length: 80000, path: ['Subtitles.srt'] },
+    ],
+    pieces: 'abcdefghijklmnopqrst',
+    'piece length': 262144,
+  };
+  const rawInfo = bencode(info);
+  const torrentHash = createHash('sha1').update(Buffer.from(rawInfo)).digest('hex');
+  const torrentBytes = Buffer.from('d4:info' + rawInfo + 'e');
+  const testTorrentUrl = 'https://yts.gg/torrent/download/test';
+  const selected = makeRuntime(url => {
+    if (url.startsWith(primary)) return Promise.resolve(response(ytsMovies([{
+      imdb_code: 'tt22084616', title: 'Spider-Man', torrents: [{
+        hash: torrentHash, quality: '720p', size: '1.3 GB', url: testTorrentUrl,
+      }],
+    }])));
+    if (url === testTorrentUrl) return Promise.resolve({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(Uint8Array.from(torrentBytes).buffer),
+    });
+    throw new Error('Unexpected URL: ' + url);
+  }, '');
+  const fileResolved = await selected('tt22084616', 'movie');
+  assert.equal(fileResolved.length, 1);
+  assert.equal(fileResolved[0].url, 'torrent://' + torrentHash + '/1');
+  assert.match(fileResolved[0].name, /\| Video/);
+  console.log('PASS 5: Verified torrent infohash and explicit MP4 index skips promotional JPG');
+
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -1,8 +1,8 @@
 {
   "name": "nuvio-yts-mobile-provider",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "private": true,
-  "description": "Experimental YTS movie torrent provider for Nuvio Mobile 0.6.12-beta Full Android",
+  "description": "YTS API diagnostics for Nuvio 0.6.12-beta",
   "scripts": {
     "test": "node tests/test.js",
     "live-check": "node tests/live-check.js"

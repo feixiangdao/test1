@@ -1,6 +1,6 @@
 # YTS Movie Sources — Nuvio Mobile
 
-Experimental Nuvio Provider v0.2.1 for **Nuvio Android 0.6.12-beta (155), Full build**. Movie-only. Public GitHub hosting does not imply that film distribution is authorized. Access only media you have the right to use.
+Experimental Nuvio Provider v0.2.2 for **Nuvio Android 0.6.12-beta (155), Full build**. Movie-only. Public GitHub hosting does not imply that film distribution is authorized. Access only media you have the right to use.
 
 ## Install
 
@@ -12,7 +12,7 @@ Use a Full Android build with the plugin feature enabled. The Play Store build d
 
 ## How it works
 
-Nuvio passes a TMDB movie ID to `getStreams(tmdbId, mediaType, season, episode)`. The provider fetches the movie's IMDb ID from TMDB, searches YTS for the **exact IMDb ID**, and returns one item per valid, distinct torrent with infoHash, title, quality, size and peer counts. It tries to download the associated small .torrent metadata file, verifies the SHA-1 of its info dictionary matches the advertised infoHash, finds the largest MP4/MKV (or other video file), and emits a torrent://hash/index URL recognized by Nuvio 0.6.12-beta. If metadata is unavailable, it falls back to the prior magnet URL and marks the source Auto. It supports movies only, not TV series.
+Nuvio passes a TMDB movie ID to `getStreams(tmdbId, mediaType, season, episode)`. The provider fetches the movie's IMDb ID from TMDB, searches YTS for the **exact IMDb ID**, and returns one item per valid, distinct torrent with infoHash, title, quality, size and peer counts. It tries to download the associated small .torrent metadata file, verifies the SHA-1 of its info dictionary matches the advertised infoHash, finds the largest MP4/MKV (or other video file), and emits a torrent://hash/index URL recognized by Nuvio 0.6.12-beta. If metadata is unavailable, it shows an Auto fallback with a reason and an additional **Try File #1** experimental source, using `torrent://hash/1`. This file index is a guess, not verified, and may not contain the movie. It supports movies only, not TV series.
 
 The script uses two YTS API bases: `https://movies-api.accel.li/api/v2` and the legacy `https://yts.gg/api/v2`. The status page at yifystatus.com is not a video-stream API. An API being listed publicly does not guarantee that it is reachable from your network.
 
@@ -20,13 +20,13 @@ The script uses two YTS API bases: `https://movies-api.accel.li/api/v2` and the 
 
 Requires Node.js 18 or newer. Run `npm test` in this folder for mocked offline tests. Run `npm run live-check` to check the live YTS API without downloading a torrent or starting video playback.
 
-**Verification status:** Offline mocked bencode file-selection and fallback tests passed. Live .torrent metadata retrieval, the phone's QuickJS runtime and physical playback have not been verified. The change addresses suspected JPG selection; it does not establish the cause of a specific failed playback.
+**Verification status:** Offline mocked bencode file-selection and fallback tests passed. Live .torrent metadata retrieval, the phone's QuickJS runtime and physical playback have not been verified. The experimental file index 1 is not guaranteed to be a video and cannot establish the cause of playback failure without device testing.
 
 ## Troubleshooting
 
 - **Cannot add repository:** Confirm this URL loads raw JSON in the phone browser, and you use the Full APK.
 - **Zero streams:** Check the TMDB API key in Nuvio settings, Internet access to api.themoviedb.org and YTS API availability. The built-in Test uses TMDB movie ID 603, and the movie also must exist in the upstream index.
-- **Streams appear but cannot play:** If the source label ends in `| Video`, its .torrent file was checked and an actual video file index selected. If it ends in `| Auto`, metadata could not be checked, so the app chooses a file itself (and might pick a JPG). Check P2P settings/consent, trackers, seeds, Android/network restrictions and codecs. A torrent is not a direct MP4 or m3u8 URL.\n- **Only one source appears:** The provider shows only torrents listed for the exact IMDb ID by the upstream API. More resolutions are not guaranteed; it does not synthesize sources.
+- **Streams appear but cannot play:** `| Video #N` means metadata was verified and a video index is selected. `| Auto (REASON)` identifies why metadata checking failed; examples `NoURL`, `Host`, `HTTP403`, `InvalidTorrent`, `HashMismatch`, `NoVideo`, and `Network`. `| Try File #1` is an unverified experiment and could point to the wrong file. Check P2P settings/consent, trackers, seeds, Android/network restrictions and codecs. A torrent is not a direct MP4 or m3u8 URL.\n- **Only one source appears:** The provider shows only torrents listed for the exact IMDb ID by the upstream API. More resolutions are not guaranteed; it does not synthesize sources.
 - **Plugin update not visible:** Refresh the repository in Nuvio and restart if necessary.
 
 ## Official source used for compatibility review

@@ -1,54 +1,64 @@
-# YTS Movie Sources — Nuvio Mobile
+# YTS API Diagnostic v0.3.0 for Nuvio Android
 
-Experimental Nuvio Provider v0.2.4 for **Nuvio Android 0.6.12-beta (155), Full build**. Movie-only. Public GitHub hosting does not imply that film distribution is authorized. Access only media you have the right to use.
+> This release deliberately changes the scraper ID and filename to avoid reuse
+> of old provider JavaScript, and removes the metadata-cache/file-number probes
+> from the *active* provider. The old `providers/yts.js` is kept for historical
+> reference but is no longer listed in the manifest.
 
-## Install
-
-Copy this exact URL into **Nuvio → Settings → Content & Discovery → Plugins → Add Repository**:
+## Add repository
 
 https://raw.githubusercontent.com/feixiangdao/test1/main/yts-nuvio/manifest.json
 
-Use a Full Android build with the plugin feature enabled. The Play Store build disables third-party plugins. After adding, enable **YTS Movies (Torrent)** and try its built-in Test action. If streams appear, enable/authorize local P2P under Playback settings to test playback. Automatic addon Debrid resolution for plugin streams is not established by the source code.
+Target: Nuvio Android Full 0.6.12-beta (155), movie-only.
 
-## How it works
+In Nuvio **Settings → Content & Discovery → Plugins**, refresh this repository
+and confirm **YTS API Diagnostic for Nuvio Mobile (version 0.3.0)** and provider
+**YTS API Diagnostic v0.3**. If the old provider is still listed, the reload
+has not succeeded. Reinstall this repository if refreshing fails.
 
-Nuvio passes a TMDB movie ID to `getStreams(tmdbId, mediaType, season, episode)`. The provider fetches the movie's IMDb ID from TMDB, searches YTS for the **exact IMDb ID**, and returns one item per valid, distinct torrent with infoHash, title, quality, size and peer counts. It tries to download the associated small .torrent metadata file, verifies the SHA-1 of its info dictionary matches the advertised infoHash, finds the largest MP4/MKV (or other video file), and emits a torrent://hash/index URL recognized by Nuvio 0.6.12-beta. If the YTS `.torrent` URL is unavailable, it tries two publicly documented, hash-addressed metadata caches (iTorrents and BTcache). It validates SHA-1 of the bencoded info dictionary against the official API infoHash before selecting the largest recognized video file. If all checks fail, it falls back to a Magnet without guessing a file index. It supports movies only, not TV series.
+## How to read stream labels
 
-The script uses two YTS API bases: `https://movies-api.accel.li/api/v2` and the legacy `https://yts.gg/api/v2`. The status page at yifystatus.com is not a video-stream API. An API being listed publicly does not guarantee that it is reachable from your network.
+For example: `YTS 720p x264 | v030 L1/D4 | F566BBF0 | S:100`.
 
-## Test
+- `v030`: this exact new provider code is running, not the old cached plugin.
+- `L1`: list_movies API returned one unique torrent for the exact IMDb movie.
+- `D4`: movie_details API returned four torrent records for the exact IMDb movie.
+- `DERR`: movie_details could not be verified from either known API base.
+- `DNOID`: list_movies did not include a usable numeric movie ID.
+- `F566BBF0`: first eight characters of the returned torrent infoHash.
+- `S:100`: API-supplied seeder number, **not** an independently checked live count.
 
-Requires Node.js 18 or newer. Run `npm test` in this folder for mocked offline tests. Run `npm run live-check` to check the live YTS API without downloading a torrent or starting video playback.
+The provider merges distinct infoHash records from both list and detail endpoints
+and sorts them by advertised quality. It does not send traffic to iTorrents,
+BTcache or other metadata caches during stream search.
 
-**Verification status:** Offline mocked bencode file-selection and fallback tests passed. Live .torrent metadata retrieval, the phone's QuickJS runtime and physical playback have not been verified. The last two public metadata caches may be blocked, unavailable, or not yet contain a hash. Hash verification protects against selecting files from the wrong torrent; it does not verify film authenticity or playable peers. Device playback is still unverified.
+## Diagnosing the previous one-source problem
 
-## Troubleshooting
+The developer-verified Nuvio 0.6.12 streaming repository appends all results
+returned by one plugin; it does not impose a hard limit of one stream per provider.
 
-- **Cannot add repository:** Confirm this URL loads raw JSON in the phone browser, and you use the Full APK.
-- **Zero streams:** Check the TMDB API key in Nuvio settings, Internet access to api.themoviedb.org and YTS API availability. The built-in Test uses TMDB movie ID 603, and the movie also must exist in the upstream index.
-- **Streams appear but cannot play:** `Video #N (Y/I/B)` means the video index was verified against the torrent hash using metadata from YTS / iTorrents / BTcache. `Auto (Y404/I404/B404)` means all three metadata fetches failed with HTTP 404; other diagnostic codes include `Hash`, `Invalid`, `NoVideo`, and `Fail`. Auto does **not** guarantee that playback works. This version removes `Try File #1` because a guessed index can refer to subtitles or images.
-- **Plugin update not visible:** Refresh the repository in Nuvio and restart if necessary.
+With this diagnostic provider:
 
-## Official source used for compatibility review
+- **New provider name absent / no v030** → likely stale plugin installation
+  or refresh failure, not yet evidence about YTS API.
+- **v030 L1/D4 but only one card** → potential Nuvio parsing/UI/filter issue.
+- **v030 L1/DERR, one card** → movie_details unreachable or invalid on the phone.
+- **v030 L1/D1, one card** → both API responses really provide only one record
+  to the phone on that request; compare the API response with a browser request
+  using the same network.
+- **Four v030 cards, no playback** → listing issue resolved. Test the built-in
+  P2P streaming settings/logs separately. This code uses Magnet links and does
+  not claim that the torrent contains a playable movie.
 
-https://github.com/NuvioMedia/NuvioMobile/releases/tag/0.6.12-beta
+## Safety and limitations
 
-https://github.com/NuvioMedia/NuvioMobile/blob/0.6.12-beta/composeApp/src/fullCommonMain/kotlin/com/nuvio/app/features/plugins/runtime/PluginRuntime.kt
+Raw YTS/yifystatus torrent metadata does not establish licensing, file
+authenticity, torrent health, or working playback. Use only works you are
+authorized to access. Torrent P2P may disclose your IP address to other peers.
 
-https://github.com/NuvioMedia/NuvioMobile/blob/0.6.12-beta/composeApp/src/commonMain/kotlin/com/nuvio/app/features/streams/StreamFetchSupport.kt
+## Why this is a diagnostic rather than another guessed fix
 
-## Privacy and copyright
-
-P2P torrent activity can expose the device's public IP to peers and may upload as well as download content. Use only sources you are authorized to access; neither this provider nor this repository establishes distribution rights.
-
-### Additional privacy note
-
-When the primary YTS .torrent endpoint fails, the plugin sends the public infoHash and your IP to independent metadata cache services to fetch small .torrent metadata. It does not send API keys to those services. The services may be subject to ISP/network restrictions and can be disabled in the provider source if desired.
-
-### 0.2.4 — diagnostic workflow
-
-If `list_movies` supplies only one torrent, the provider makes an additional exact-IMDb-checked call to `movie_details.json` to retrieve any additional available resolutions. The public API returned four records for `tt33764258` during external checks, but results from the user's phone may vary.
-
-For **only** torrent SHA-1 `F566BBF053529BF2432CAFD17ED3FB7C118874E6`, the provider also adds a **`File #4 (unverified external list)`** test source if it could not confirm a video via hashed .torrent metadata. Independent public torrent file lists claim its MP4 is the 5th entry (zero-based index 4). This is a diagnostic hypothesis, **not** a verified filename mapping on the device and **not** a generic torrent solution. If it still cannot play, inspect local P2P engine state/logs rather than guessing another file index. Note that the extra source does not become available for other torrents.
-
-The test source remains an experimental implementation for troubleshooting; only view material you have permission to access.
+Earlier builds 0.2.1–0.2.4 attempted to download Torrent file metadata and
+guess/select file indices. The phone observed HTTP404 and invalid/missing video
+metadata. This version isolates source discovery from the P2P playback engine;
+no more speculative file-index changes. 

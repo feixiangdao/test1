@@ -1,15 +1,15 @@
 {
-  "name": "YTS HTTP Integrity Diagnostic for Nuvio Mobile",
-  "version": "0.3.3",
-  "description": "Compares raw HTTP JSON hash diversity with parsed YTS API data, using mobile User-Agent and cache bypass; experimental.",
-  "author": "Independent community prototype",
+  "name": "YTS Movies for Nuvio Mobile",
+  "version": "1.0.0",
+  "description": "Movie source provider for Nuvio Android Full: dual YTS API lookup, IMDb matching, magnet streams and clean quality labels. Based on user-tested v0.3.3.",
+  "author": "Independent community provider",
   "scrapers": [
     {
-      "id": "yts-http-integrity-v033",
-      "name": "YTS HTTP Integrity v0.3.3",
-      "version": "0.3.3",
-      "description": "Show raw-vs-parsed API torrent hash counts from both hosts; movie-only diagnostic.",
-      "filename": "providers/yts-api-v033.js",
+      "id": "yts-movies-stable-v1",
+      "name": "YTS Movies",
+      "description": "YTS movie torrent sources with 720p/1080p/4K, mobile API headers and cache bypass. Movie-only; torrent availability varies.",
+      "version": "1.0.0",
+      "filename": "providers/yts-v1.js",
       "supportedTypes": [
         "movie"
       ],

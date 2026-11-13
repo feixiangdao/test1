@@ -1,5 +1,5 @@
 /*
- * YTS Movie Sources for Nuvio Mobile Android (Full build), v0.2.0.
+ * YTS Movie Sources for Nuvio Mobile Android (Full build), v0.2.1.
  * Contract based on NuvioMedia/NuvioMobile tag 0.6.12-beta.
  * getStreams(tmdbId, mediaType, season, episode) returns an array.
  * Each result needs a nonempty string URL; size must be a string.
@@ -130,9 +130,103 @@ function makeMagnet(hash, name) {
   return url;
 }
 
+
+function ytsReadTorrent(buffer) {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  if (bytes.length < 16 || bytes.length > 3000000) throw new Error('Bad torrent metadata length');
+  let p = 0, count = 0, infoRange = null;
+  function scan(depth) {
+    if (++count > 50000 || depth > 24 || p >= bytes.length) throw new Error('Bad bencode');
+    const b = bytes[p];
+    if (b === 105) {
+      let s = ++p;
+      while (p < bytes.length && bytes[p] !== 101) p++;
+      if (p >= bytes.length) throw new Error('Bad integer');
+      let v = '';
+      for (let i = s; i < p; i++) v += String.fromCharCode(bytes[i]);
+      p++;
+      if (!/^-?\d+$/.test(v) || !Number.isSafeInteger(+v)) throw new Error('Invalid integer');
+      return +v;
+    }
+    if (b === 100 || b === 108) {
+      const dict = b === 100;
+      p++;
+      const out = dict ? Object.create(null) : [];
+      while (p < bytes.length && bytes[p] !== 101) {
+        if (dict) {
+          const keyBytes = scan(depth + 1);
+          if (!(keyBytes instanceof Uint8Array) || keyBytes.length > 256) throw new Error('Bad key');
+          let k = '';
+          for (let i = 0; i < keyBytes.length; i++) k += String.fromCharCode(keyBytes[i]);
+          const start = p;
+          const v = scan(depth + 1);
+          if (depth === 0 && k === 'info') infoRange = [start, p];
+          out[k] = v;
+        } else out.push(scan(depth + 1));
+      }
+      if (p >= bytes.length) throw new Error('Bad container');
+      p++;
+      return out;
+    }
+    if (b < 48 || b > 57) throw new Error('Invalid bencode token');
+    let len = 0;
+    while (p < bytes.length && bytes[p] !== 58) {
+      const c = bytes[p++];
+      if (c < 48 || c > 57) throw new Error('Bad string length');
+      len = len * 10 + c - 48;
+      if (len > 3000000) throw new Error('String too large');
+    }
+    if (p >= bytes.length || p + 1 + len > bytes.length) throw new Error('String truncated');
+    p++;
+    const value = bytes.subarray(p, p + len);
+    p += len;
+    return value;
+  }
+  const root = scan(0);
+  if (p !== bytes.length || !infoRange || !root.info) throw new Error('No torrent info');
+  return { root, infoBytes: bytes.subarray(infoRange[0], infoRange[1]) };
+}
+function ytsVideoFile(info) {
+  function name(bytes) { return bytes instanceof Uint8Array && bytes.length <= 4096 ? new TextDecoder().decode(bytes) : ''; }
+  const matches = /\.(mkv|mp4|m4v|avi|mov|webm|ts)$/i;
+  let chosen = null;
+  if (Array.isArray(info.files)) {
+    info.files.forEach(function(file, index) {
+      if (!file || typeof file.length !== 'number') return;
+      const path = file['path.utf-8'] || file.path;
+      if (!Array.isArray(path) || !path.length) return;
+      const filename = name(path[path.length - 1]);
+      if (file.length >= 20000000 && matches.test(filename) && (!chosen || file.length > chosen.length)) {
+        chosen = { index, filename, length: file.length };
+      }
+    });
+  } else {
+    const filename = name(info['name.utf-8'] || info.name);
+    if (info.length >= 20000000 && matches.test(filename)) chosen = { index: 0, filename, length: info.length };
+  }
+  return chosen;
+}
+function ytsVerifiedFileIndex(torrent, hash) {
+  const url = torrent && typeof torrent.url === 'string' ? torrent.url : '';
+  if (!/^https:\/\/(?:[a-z\d-]+\.)*(?:yts\.(?:gg|bz|lt|am|ag|mx)|accel\.li)\//i.test(url)) return Promise.resolve(null);
+  return fetch(url, { headers: {Accept: 'application/x-bittorrent'} })
+    .then(function(r) { if (!r || !r.ok) throw new Error('Torrent HTTP failed'); return r.arrayBuffer(); })
+    .then(function(bytes) {
+      const parsed = ytsReadTorrent(bytes);
+      return crypto.subtle.digest('SHA-1', parsed.infoBytes).then(function(buffer) {
+        const digest = new Uint8Array(buffer);
+        let hex = '';
+        digest.forEach(function(b) { hex += b.toString(16).padStart(2, '0'); });
+        if (hex !== hash) throw new Error('Torrent hash does not match API');
+        return ytsVideoFile(parsed.root.info);
+      });
+    }).catch(function(error) { ytsLog('File index unavailable: ' + (error && error.message || error)); return null; });
+}
+
 function streamItems(movie) {
   if (!movie || !Array.isArray(movie.torrents)) return [];
   var seen = Object.create(null);
+  var originals = Object.create(null);
   var list = [];
   for (var i = 0; i < movie.torrents.length; i++) {
     var torrent = movie.torrents[i];
@@ -166,6 +260,7 @@ function streamItems(movie) {
     if (seeders !== null) item.seeders = seeders;
     if (peers !== null) item.peers = peers;
     list.push(item);
+    originals[hash] = torrent;
   }
 
   var rank = { '4K': 4, '1080p': 3, '720p': 2, '480p': 1 };
@@ -173,7 +268,18 @@ function streamItems(movie) {
     var qualityDelta = (rank[b.quality] || 0) - (rank[a.quality] || 0);
     return qualityDelta || (b.seeders || 0) - (a.seeders || 0);
   });
-  return list;
+  return Promise.all(list.slice(0, 12).map(function(item) {
+    return ytsVerifiedFileIndex(originals[item.infoHash], item.infoHash).then(function(selected) {
+      if (selected) {
+        // In 0.6.12-beta Nuvio does NOT map plugin fileIdx; it parses URL /index.
+        item.url = 'torrent://' + item.infoHash + '/' + selected.index;
+        item.name += ' | Video';
+      } else {
+        item.name += ' | Auto';
+      }
+      return item;
+    });
+  }));
 }
 
 function getStreams(tmdbId, mediaType, season, episode) {

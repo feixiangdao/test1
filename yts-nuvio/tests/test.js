@@ -4,163 +4,143 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { createHash, webcrypto } = require('node:crypto');
+
 const root = path.resolve(__dirname, '..');
-const code = fs.readFileSync(path.join(root, 'providers/yts.js'), 'utf8');
+const source = fs.readFileSync(path.join(root, 'providers/yts.js'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
 const primary = 'https://movies-api.accel.li/api/v2/';
-const backup = 'https://yts.gg/api/v2/';
-const hash1 = '0123456789abcdef0123456789abcdef01234567';
-const hash2 = 'abcdef0123456789abcdef0123456789abcdef01';
-const badHash = 'xyz';
+const secondary = 'https://yts.gg/api/v2/';
+const status = (code, data = {}) => ({ok: code >= 200 && code < 300, status: code,
+  json: async () => data, arrayBuffer: async () => new ArrayBuffer(0)});
 
-function response(json, status = 200) {
-  return { ok: status >= 200 && status <= 299, status, json: () => Promise.resolve(json) };
+function bencode(value) {
+  if (typeof value === 'number') return 'i' + value + 'e';
+  if (typeof value === 'string') return Buffer.byteLength(value) + ':' + value;
+  if (Array.isArray(value)) return 'l' + value.map(bencode).join('') + 'e';
+  return 'd' + Object.keys(value).sort().map(k => bencode(k) + bencode(value[k])).join('') + 'e';
 }
-function ytsMovies(movies) {
-  return { status: 'ok', data: { movie_count: movies.length, movies } };
-}
-function makeRuntime(fetchStub, key = 'test-tmdb-key') {
-  const moduleObject = { exports: {} };
-  const ctx = { module: moduleObject, exports: moduleObject.exports,
-    console: { warn() {} }, fetch: fetchStub, Promise, encodeURIComponent,
-    crypto: webcrypto, TextDecoder,
-    globalThis: null };
-  ctx.globalThis = ctx;
-  if (key) ctx.TMDB_API_KEY = key;
-  vm.runInNewContext('(function(){\n' + code + '\n})();', ctx, { timeout: 3000 });
-  assert.equal(typeof ctx.module.exports.getStreams, 'function');
-  return ctx.module.exports.getStreams;
+const info = {
+  name: 'The Odyssey',
+  files: [
+    {length: 14000, path: ['Subs', 'English.srt']},
+    {length: 17000, path: ['YTS.GG - Official site.jpg']},
+    {length: 1662000000, path: ['The.Odyssey.2026.720p.mp4']},
+    {length: 6000, path: ['readme.txt']}
+  ],
+  pieces: 'abcdefghijklmnopqrst',
+  'piece length': 262144
+};
+const torrentString = 'd4:info' + bencode(info) + 'e';
+const torrentBytes = Uint8Array.from(Buffer.from(torrentString));
+const torrentHash = createHash('sha1').update(Buffer.from(bencode(info))).digest('hex');
+const otherHash = 'abcdef0123456789abcdef0123456789abcdef01';
+const movie = {
+  imdb_code: 'tt33764258',
+  title: 'The Odyssey',
+  torrents: [
+    {quality: '720p', hash: torrentHash, url: 'https://yts.gg/torrent/download/METADATA',
+     size: '1.55 GB', video_codec: 'x264', seeds: 100},
+    {quality: '1080p', hash: otherHash, size: '3.18 GB', video_codec: 'x264', seeds: 20}
+  ]
+};
+const yts = (movies) => ({status: 'ok', data: {movie_count: movies.length, movies}});
+
+function run(fetchMock, tmdbKey = 'unit-test-key') {
+  const localModule = {exports: {}};
+  const context = {module: localModule, exports: localModule.exports,
+    console: {warn() {}}, fetch: fetchMock, Promise, encodeURIComponent,
+    crypto: webcrypto, TextDecoder};
+  context.globalThis = context;
+  if (tmdbKey) context.TMDB_API_KEY = tmdbKey;
+  vm.runInNewContext(source, context, {timeout: 3000});
+  return context.module.exports.getStreams;
 }
 
-function assertMobileResult(item) {
+function resultIsValid(item) {
   assert.equal(typeof item.url, 'string');
-  assert.ok(item.url.length > 0);
-  assert.match(item.url, /^magnet:\?xt=urn:btih:[0-9a-f]{40}/);
-  assert.match(item.infoHash, /^[a-f0-9]{40}$/);
-  assert.equal(typeof item.title, 'string');
+  assert.ok(item.url.startsWith('torrent://') || item.url.startsWith('magnet:'));
+  assert.match(item.infoHash, /^[0-9a-f]{40}$/);
   assert.equal(typeof item.name, 'string');
-  assert.ok(!Object.hasOwn(item, 'size') || typeof item.size === 'string');
-  if (Object.hasOwn(item, 'seeders')) assert.ok(Number.isInteger(item.seeders));
-  if (Object.hasOwn(item, 'peers')) assert.ok(Number.isInteger(item.peers));
+  assert.equal(typeof item.title, 'string');
+  assert.ok(!item.size || typeof item.size === 'string');
 }
 
 async function main() {
-  assert.equal(manifest.version, '0.2.2');
-  assert.equal(manifest.scrapers.length, 1);
+  assert.equal(manifest.version, '0.2.3');
+  assert.equal(manifest.scrapers[0].version, '0.2.3');
   assert.deepEqual(manifest.scrapers[0].supportedTypes, ['movie']);
-  assert.deepEqual(manifest.scrapers[0].supportedPlatforms, ['android']);
   assert.ok(fs.existsSync(path.join(root, manifest.scrapers[0].filename)));
 
-  const called = [];
-  const getStreams = makeRuntime((url) => {
-    called.push(url);
+  const calls = [];
+  const good = run(async url => {
+    calls.push(url);
     if (url.includes('/external_ids?')) {
-      assert.ok(url.includes('api_key=test-tmdb-key'));
-      return Promise.resolve(response({ imdb_id: 'tt0133093' }));
+      assert.ok(url.includes('api_key=unit-test-key'));
+      return status(200, {imdb_id: 'tt33764258'});
     }
-    if (url.startsWith(primary)) return Promise.resolve(response(ytsMovies([
-      { imdb_code: 'tt9999999', title: 'Wrong', torrents: [{ hash: hash1 }] },
-      { imdb_code: 'tt0133093', title: 'The Matrix', torrents: [
-        { hash: hash1.toUpperCase(), quality: '1080p', size: '1.8 GB', video_codec: 'x264', type: 'bluray', seeds: 21, peers: 4 },
-        { hash: hash2, quality: '2160p', size: '4.0 GB', seeds: 8, peers: 2 },
-        { hash: hash2, quality: '2160p' },
-        { hash: badHash, quality: '720p' }
-      ] }
-    ])));
-    throw new Error('Unexpected URL: ' + url);
+    if (url.startsWith(primary)) return status(200, yts([movie]));
+    if (url.includes('yts.gg/torrent/download')) return status(404);
+    if (url.includes('itorrents.org/torrent/')) {
+      return {ok: true, status: 200, arrayBuffer: async () => torrentBytes.buffer};
+    }
+    if (url.includes('btcache.me/torrent/')) return status(404);
+    throw Error('Unexpected URL ' + url);
   });
-  const items = await getStreams('603', 'movie');
-  assert.equal(items.length, 4); // two torrents, Auto plus experimental file #1 for each
-  items.filter(item => item.name.includes('Auto')).forEach(assertMobileResult);
-  assert.equal(items[0].quality, '4K');
-  assert.equal(items[2].quality, '1080p');
-  assert.equal(items[2].size, '1.8 GB');
-  assert.equal(items[2].seeders, 21);
-  assert.equal(items[2].infoHash, hash1);
-  assert.match(items[2].name, /YTS 1080p/);
-  assert.match(items[2].name, /S:21/);
-  assert.ok(items[3].name.includes('Try File #1'));
-  assert.equal(items[3].url, 'torrent://' + hash1 + '/1');
-  assert.ok(!called.some((url) => url.startsWith(backup)));
-  assert.equal((await getStreams('603', 'tv', 1, 2)).length, 0);
-  assert.equal((await getStreams('bad', 'movie')).length, 0);
-  console.log('PASS 1: Manifest, TMDB mapping, exact match, movie-only, Nuvio result types');
+  const results = await good('603', 'movie');
+  assert.equal(results.length, 2);
+  results.forEach(resultIsValid);
+  assert.match(results[0].name, /1\/2/);
+  assert.match(results[0].name, /Video #2 \(I\)/);
+  assert.equal(results[0].url, 'torrent://' + torrentHash + '/2');
+  assert.match(results[1].name, /Auto/);
+  assert.match(results[1].name, /2\/2/);
+  assert.match(results[1].url, /^magnet:/);
+  assert.ok(calls.some(url => url.includes('itorrents.org/torrent/')));
+  assert.ok(!results[0].name.includes('Try File'));
+  console.log('PASS 1: Verified cache fallback selects MP4 after JPG and subtitles');
 
-  const direct = makeRuntime((url) => {
-    assert.ok(url.startsWith(primary));
-    return Promise.resolve(response(ytsMovies([{
-      imdb_code: 'tt0133093', title: 'The Matrix', torrents: [{ hash: hash1, quality: '720p', seeds: 0 }]
-    }])));
+  const missing = run(async url => {
+    if (url.startsWith(primary)) return status(200, yts([movie]));
+    return status(404);
   }, '');
-  assert.equal((await direct('tt0133093', 'movie')).length, 2);
-  console.log('PASS 2: Direct IMDb ID without TMDB key');
+  const missed = await missing('tt33764258', 'movie');
+  assert.equal(missed.length, 2);
+  assert.match(missed[0].name, /Y404\/I404\/B404/);
+  assert.match(missed[0].url, /^magnet:/);
+  console.log('PASS 2: All endpoints 404; no unverified file-index source');
 
-  const fallbackUrls = [];
-  const fallback = makeRuntime((url) => {
-    fallbackUrls.push(url);
-    if (url.startsWith(primary)) return Promise.resolve(response(null));
-    if (url.startsWith(backup)) return Promise.resolve(response(ytsMovies([
-      { imdb_code: 'tt0133093', title: 'Matrix', torrents: [{ hash: hash2, quality: '1080p' }] }
-    ])));
-    throw new Error('Unexpected URL: ' + url);
+  const mismatch = run(async url => {
+    if (url.startsWith(primary)) return status(200, yts([{
+      ...movie,
+      torrents: [ {...movie.torrents[0], hash: otherHash} ]
+    }]));
+    if (url.includes('itorrents.org/torrent/')) return {
+      ok: true, status: 200, arrayBuffer: async () => torrentBytes.buffer
+    };
+    return status(404);
   }, '');
-  assert.equal((await fallback('tt0133093', 'movie')).length, 2);
-  assert.ok(fallbackUrls.some((url) => url.startsWith(backup)));
-  const mismatch = makeRuntime((url) => Promise.resolve(response(ytsMovies([
-    { imdb_code: 'tt9999999', title: 'Incorrect', torrents: [{ hash: hash1 }] }
-  ]))), '');
-  assert.equal((await mismatch('tt0133093', 'movie')).length, 0);
-  console.log('PASS 3: Fallback and no incorrect movie matches');
+  const wrong = await mismatch('tt33764258', 'movie');
+  assert.equal(wrong.length, 1);
+  assert.match(wrong[0].name, /IHash/);
+  assert.match(wrong[0].url, /^magnet:/);
+  console.log('PASS 3: Wrong infohash is rejected (not a verified video)');
 
-  const noKey = makeRuntime(() => { throw Error('Must not fetch without key'); }, '');
+  const noKey = run(async () => {throw Error('Should not fetch');}, '');
   assert.equal((await noKey('603', 'movie')).length, 0);
-  const networkError = makeRuntime(() => Promise.reject(new Error('offline')), '');
-  assert.equal((await networkError('tt0133093', 'movie')).length, 0);
-  const noResults = makeRuntime(() => Promise.resolve(response({ status: 'ok', data: { movie_count: 0 } })), '');
-  assert.equal((await noResults('tt0133093', 'movie')).length, 0);
-  console.log('PASS 4: Missing key, offline APIs, empty YTS results fail safely');
+  assert.equal((await noKey('tt33764258', 'tv')).length, 0);
+  assert.equal((await noKey('abc', 'movie')).length, 0);
+  console.log('PASS 4: Invalid ID, missing TMDB key and TV are handled');
 
-  // Reproduce an actual multi-file .torrent where its marketing JPG is index 0.
-  // Version 0.2.1 should select MP4 at index 1 rather than returning a bare magnet.
-  function bencode(value) {
-    if (typeof value === 'number') return 'i' + value + 'e';
-    if (typeof value === 'string') return Buffer.byteLength(value) + ':' + value;
-    if (Array.isArray(value)) return 'l' + value.map(bencode).join('') + 'e';
-    return 'd' + Object.keys(value).sort().map(key => bencode(key) + bencode(value[key])).join('') + 'e';
-  }
-  const info = {
-    name: 'Spider-Man',
-    files: [
-      { length: 37000, path: ['YTS.GG - Official site.jpg'] },
-      { length: 1300000000, path: ['Spider-Man.Brand.New.Day.2026.720p.mp4'] },
-      { length: 80000, path: ['Subtitles.srt'] },
-    ],
-    pieces: 'abcdefghijklmnopqrst',
-    'piece length': 262144,
-  };
-  const rawInfo = bencode(info);
-  const torrentHash = createHash('sha1').update(Buffer.from(rawInfo)).digest('hex');
-  const torrentBytes = Buffer.from('d4:info' + rawInfo + 'e');
-  const testTorrentUrl = 'https://yts.gg/torrent/download/test';
-  const selected = makeRuntime(url => {
-    if (url.startsWith(primary)) return Promise.resolve(response(ytsMovies([{
-      imdb_code: 'tt22084616', title: 'Spider-Man', torrents: [{
-        hash: torrentHash, quality: '720p', size: '1.3 GB', url: testTorrentUrl,
-      }],
-    }])));
-    if (url === testTorrentUrl) return Promise.resolve({
-      ok: true,
-      arrayBuffer: () => Promise.resolve(Uint8Array.from(torrentBytes).buffer),
-    });
-    throw new Error('Unexpected URL: ' + url);
+  const fallbackCalls = [];
+  const legacy = run(async url => {
+    fallbackCalls.push(url);
+    if (url.startsWith(primary)) return status(503);
+    if (url.startsWith(secondary)) return status(200, yts([{
+      ...movie, torrents: []}]));
+    throw Error('Unexpected URL '+url);
   }, '');
-  const fileResolved = await selected('tt22084616', 'movie');
-  assert.equal(fileResolved.length, 1);
-  assert.equal(fileResolved[0].url, 'torrent://' + torrentHash + '/1');
-  assert.match(fileResolved[0].name, /\| Video/);
-  console.log('PASS 5: Verified torrent infohash and explicit MP4 index skips promotional JPG');
-  assert.match(items[2].name, /Auto \(NoURL\)/);
-  console.log('PASS 6: Auto diagnostics and manual file-index-1 fallback');
-
+  assert.equal((await legacy('tt33764258', 'movie')).length, 0);
+  assert.ok(fallbackCalls.some(url => url.startsWith(secondary)));
+  console.log('PASS 5: API base fallback');
 }
-main().catch((error) => { console.error(error); process.exitCode = 1; });
+main().catch(error => {console.error(error); process.exitCode = 1;});

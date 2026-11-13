@@ -1,5 +1,5 @@
 /*
- * YTS Movie Sources for Nuvio Mobile Android (Full build), v0.2.1.
+ * YTS Movie Sources for Nuvio Mobile Android (Full build), v0.2.2.
  * Contract based on NuvioMedia/NuvioMobile tag 0.6.12-beta.
  * getStreams(tmdbId, mediaType, season, episode) returns an array.
  * Each result needs a nonempty string URL; size must be a string.
@@ -208,19 +208,33 @@ function ytsVideoFile(info) {
 }
 function ytsVerifiedFileIndex(torrent, hash) {
   const url = torrent && typeof torrent.url === 'string' ? torrent.url : '';
-  if (!/^https:\/\/(?:[a-z\d-]+\.)*(?:yts\.(?:gg|bz|lt|am|ag|mx)|accel\.li)\//i.test(url)) return Promise.resolve(null);
-  return fetch(url, { headers: {Accept: 'application/x-bittorrent'} })
-    .then(function(r) { if (!r || !r.ok) throw new Error('Torrent HTTP failed'); return r.arrayBuffer(); })
-    .then(function(bytes) {
-      const parsed = ytsReadTorrent(bytes);
+  if (!url) return Promise.resolve({selected: null, reason: 'NoURL'});
+  if (!/^https:\/\/(?:[a-z\d-]+\.)*(?:yts\.(?:gg|bz|lt|am|ag|mx)|accel\.li)\//i.test(url)) {
+    return Promise.resolve({selected: null, reason: 'Host'});
+  }
+  return fetch(url, { headers: { Accept: 'application/x-bittorrent' } })
+    .then(function(r) {
+      if (!r || !r.ok) return {reason: 'HTTP' + (r && r.status || '0')};
+      return r.arrayBuffer().then(function(bytes) { return {bytes: bytes}; });
+    })
+    .then(function(reply) {
+      if (reply.reason) return {selected: null, reason: reply.reason};
+      var parsed;
+      try { parsed = ytsReadTorrent(reply.bytes); }
+      catch (_e) { return {selected: null, reason: 'InvalidTorrent'}; }
       return crypto.subtle.digest('SHA-1', parsed.infoBytes).then(function(buffer) {
         const digest = new Uint8Array(buffer);
         let hex = '';
         digest.forEach(function(b) { hex += b.toString(16).padStart(2, '0'); });
-        if (hex !== hash) throw new Error('Torrent hash does not match API');
-        return ytsVideoFile(parsed.root.info);
+        if (hex !== hash) return {selected: null, reason: 'HashMismatch'};
+        const selected = ytsVideoFile(parsed.root.info);
+        if (!selected) return {selected: null, reason: 'NoVideo'};
+        return {selected: selected, reason: ''};
       });
-    }).catch(function(error) { ytsLog('File index unavailable: ' + (error && error.message || error)); return null; });
+    }).catch(function(error) {
+      ytsLog('Metadata check failed: ' + (error && error.message || error));
+      return {selected: null, reason: 'Network'};
+    });
 }
 
 function streamItems(movie) {
@@ -269,17 +283,25 @@ function streamItems(movie) {
     return qualityDelta || (b.seeders || 0) - (a.seeders || 0);
   });
   return Promise.all(list.slice(0, 12).map(function(item) {
-    return ytsVerifiedFileIndex(originals[item.infoHash], item.infoHash).then(function(selected) {
-      if (selected) {
-        // In 0.6.12-beta Nuvio does NOT map plugin fileIdx; it parses URL /index.
-        item.url = 'torrent://' + item.infoHash + '/' + selected.index;
-        item.name += ' | Video';
-      } else {
-        item.name += ' | Auto';
+    return ytsVerifiedFileIndex(originals[item.infoHash], item.infoHash).then(function(check) {
+      if (check.selected) {
+        // Nuvio 0.6.12 maps torrent://hash/index to fileIdx.
+        item.url = 'torrent://' + item.infoHash + '/' + check.selected.index;
+        item.name += ' | Video #' + check.selected.index;
+        return [item];
       }
-      return item;
+      // Diagnostic fallback: Auto keeps previous behavior. The second entry
+      // explicitly tests whether the video is file 1; it is NOT verified.
+      item.name += ' | Auto (' + check.reason + ')';
+      const trial = Object.assign({}, item, {
+        name: item.name.replace(/ \| Auto \([^)]+\)$/, ' | Try File #1'),
+        url: 'torrent://' + item.infoHash + '/1'
+      });
+      return [item, trial];
     });
-  }));
+  })).then(function(groups) {
+    return [].concat.apply([], groups);
+  });
 }
 
 function getStreams(tmdbId, mediaType, season, episode) {

@@ -45,7 +45,7 @@ function assertMobileResult(item) {
 }
 
 async function main() {
-  assert.equal(manifest.version, '0.2.1');
+  assert.equal(manifest.version, '0.2.2');
   assert.equal(manifest.scrapers.length, 1);
   assert.deepEqual(manifest.scrapers[0].supportedTypes, ['movie']);
   assert.deepEqual(manifest.scrapers[0].supportedPlatforms, ['android']);
@@ -70,15 +70,17 @@ async function main() {
     throw new Error('Unexpected URL: ' + url);
   });
   const items = await getStreams('603', 'movie');
-  assert.equal(items.length, 2);
-  items.forEach(assertMobileResult);
+  assert.equal(items.length, 4); // two torrents, Auto plus experimental file #1 for each
+  items.filter(item => item.name.includes('Auto')).forEach(assertMobileResult);
   assert.equal(items[0].quality, '4K');
-  assert.equal(items[1].quality, '1080p');
-  assert.equal(items[1].size, '1.8 GB');
-  assert.equal(items[1].seeders, 21);
-  assert.equal(items[1].infoHash, hash1);
-  assert.match(items[1].name, /YTS 1080p/);
-  assert.match(items[1].name, /S:21/);
+  assert.equal(items[2].quality, '1080p');
+  assert.equal(items[2].size, '1.8 GB');
+  assert.equal(items[2].seeders, 21);
+  assert.equal(items[2].infoHash, hash1);
+  assert.match(items[2].name, /YTS 1080p/);
+  assert.match(items[2].name, /S:21/);
+  assert.ok(items[3].name.includes('Try File #1'));
+  assert.equal(items[3].url, 'torrent://' + hash1 + '/1');
   assert.ok(!called.some((url) => url.startsWith(backup)));
   assert.equal((await getStreams('603', 'tv', 1, 2)).length, 0);
   assert.equal((await getStreams('bad', 'movie')).length, 0);
@@ -90,7 +92,7 @@ async function main() {
       imdb_code: 'tt0133093', title: 'The Matrix', torrents: [{ hash: hash1, quality: '720p', seeds: 0 }]
     }])));
   }, '');
-  assert.equal((await direct('tt0133093', 'movie')).length, 1);
+  assert.equal((await direct('tt0133093', 'movie')).length, 2);
   console.log('PASS 2: Direct IMDb ID without TMDB key');
 
   const fallbackUrls = [];
@@ -102,7 +104,7 @@ async function main() {
     ])));
     throw new Error('Unexpected URL: ' + url);
   }, '');
-  assert.equal((await fallback('tt0133093', 'movie')).length, 1);
+  assert.equal((await fallback('tt0133093', 'movie')).length, 2);
   assert.ok(fallbackUrls.some((url) => url.startsWith(backup)));
   const mismatch = makeRuntime((url) => Promise.resolve(response(ytsMovies([
     { imdb_code: 'tt9999999', title: 'Incorrect', torrents: [{ hash: hash1 }] }
@@ -157,6 +159,8 @@ async function main() {
   assert.equal(fileResolved[0].url, 'torrent://' + torrentHash + '/1');
   assert.match(fileResolved[0].name, /\| Video/);
   console.log('PASS 5: Verified torrent infohash and explicit MP4 index skips promotional JPG');
+  assert.match(items[2].name, /Auto \(NoURL\)/);
+  console.log('PASS 6: Auto diagnostics and manual file-index-1 fallback');
 
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

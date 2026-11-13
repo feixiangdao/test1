@@ -66,8 +66,8 @@ function resultIsValid(item) {
 }
 
 async function main() {
-  assert.equal(manifest.version, '0.2.3');
-  assert.equal(manifest.scrapers[0].version, '0.2.3');
+  assert.equal(manifest.version, '0.2.4');
+  assert.equal(manifest.scrapers[0].version, '0.2.4');
   assert.deepEqual(manifest.scrapers[0].supportedTypes, ['movie']);
   assert.ok(fs.existsSync(path.join(root, manifest.scrapers[0].filename)));
 
@@ -145,5 +145,36 @@ async function main() {
   assert.equal((await legacy('tt33764258', 'movie')).length, 0);
   assert.ok(fallbackCalls.some(url => url.startsWith(secondary)));
   console.log('PASS 5: API base fallback');
+
+  const odysseyHash = 'f566bbf053529bf2432cafd17ed3fb7c118874e6';
+  const detailCalls = [];
+  const sparse = run(async url => {
+    detailCalls.push(url);
+    if (url.startsWith(primary) && url.includes('list_movies.json')) {
+      return status(200, yts([{id: 79664, imdb_code: 'tt33764258', title: 'The Odyssey',
+        torrents: [{hash: odysseyHash, quality:'720p'}]}]));
+    }
+    if (url.startsWith(primary) && url.includes('movie_details.json')) {
+      return status(200, {status:'ok', data:{movie:{
+        id:79664, imdb_code:'tt33764258', title:'The Odyssey', torrents:[
+          {hash:odysseyHash, quality:'720p'},
+          {hash:'27dafe2828036f091d63293dce0db0bb148c5172', quality:'1080p'},
+          {hash:'9bf23413ddf666f683c1aea285fe8839d97eac2f', quality:'1080p'},
+          {hash:'e504c0e31a1854f83758e5564575e219fe115e13', quality:'2160p'}
+        ]
+      }}});
+    }
+    return status(404);
+  }, '');
+  const expanded = await sparse('tt33764258', 'movie');
+  assert.equal(expanded.length, 5);
+  assert.ok(detailCalls.some(url => url.includes('movie_details.json')));
+  const trial = expanded.find(item => item.name.includes('File #4 (unverified external list)'));
+  assert.ok(trial);
+  assert.equal(trial.url, 'torrent://' + odysseyHash + '/4');
+  assert.ok(!expanded.filter(item => item.infoHash !== odysseyHash)
+    .some(item => item.name.includes('File #4')));
+  console.log('PASS 6: Spare list expanded through details, scoped diagnostic file #4');
+
 }
 main().catch(error => {console.error(error); process.exitCode = 1;});

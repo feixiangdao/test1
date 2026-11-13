@@ -1,0 +1,25 @@
+{
+  "name": "YTS Movie Sources for Nuvio Mobile",
+  "version": "0.2.0",
+  "description": "Experimental movie-only YTS torrent provider for Nuvio Mobile Android full builds. Requires access to YTS API and authorized content.",
+  "author": "Independent community prototype",
+  "scrapers": [
+    {
+      "id": "yts-mobile-movies",
+      "name": "YTS Movies (Torrent)",
+      "description": "Movie-only: TMDB to IMDb to YTS torrent magnet links",
+      "version": "0.2.0",
+      "filename": "providers/yts.js",
+      "supportedTypes": [
+        "movie"
+      ],
+      "supportedPlatforms": [
+        "android"
+      ],
+      "formats": [
+        "torrent"
+      ],
+      "enabled": true
+    }
+  ]
+}

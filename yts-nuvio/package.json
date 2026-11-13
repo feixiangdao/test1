@@ -1,6 +1,6 @@
 {
   "name": "nuvio-yts-mobile-provider",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "YTS API diagnostics for Nuvio 0.6.12-beta",
   "scripts": {

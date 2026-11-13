@@ -1,15 +1,15 @@
 {
-  "name": "YTS API Integrity Diagnostic for Nuvio Mobile",
-  "version": "0.3.1",
-  "description": "Shows IMDb ID, movie ID, raw/valid/unique YTS torrent counts and final returned source count; experimental diagnostic only.",
+  "name": "YTS Dual-API Integrity for Nuvio Mobile",
+  "version": "0.3.2",
+  "description": "Compares two YTS-compatible API hosts and selects the set with the most distinct valid torrent hashes. Does not verify playback.",
   "author": "Independent community prototype",
   "scrapers": [
     {
-      "id": "yts-api-integrity-031",
-      "name": "YTS API Integrity v0.3.1",
-      "description": "Diagnose list/detail count discrepancy and divergent torrent hashes; movie-only",
-      "version": "0.3.1",
-      "filename": "providers/yts-api-v031.js",
+      "id": "yts-dual-api-032",
+      "name": "YTS Dual-API v0.3.2",
+      "version": "0.3.2",
+      "description": "Cross-check main and backup API responses and report each host's distinct Hash count.",
+      "filename": "providers/yts-api-v032.js",
       "supportedTypes": [
         "movie"
       ],

@@ -1,46 +1,41 @@
-# YTS API Integrity Diagnostic v0.3.1 — Nuvio Android Full 0.6.12-beta (155)
+# YTS Dual-API Integrity Provider v0.3.2
 
-## Installation
+Target: Nuvio Android Full 0.6.12-beta (155).
 
+Install or refresh:
 https://raw.githubusercontent.com/feixiangdao/test1/main/yts-nuvio/manifest.json
 
-Refresh this repository in Nuvio's Plugins screen. Verify that it says
-**YTS API Integrity Diagnostic for Nuvio Mobile**, version **0.3.1**, and
-that its provider is **YTS API Integrity v0.3.1**. The manifest uses a new
-provider ID and a new script filename to sidestep previous cached code.
+After refreshing, the repository should be **YTS Dual-API Integrity for Nuvio Mobile** (v0.3.2), with one **YTS Dual-API v0.3.2** provider. This release changes both the script filename and provider ID to prevent stale-code reuse.
 
-## What to check
+## Reason for this version
 
-Example provider label:
+On-device v0.3.1 observed:
+`v031 tt33764258 M79664 L1 D4 V4 U1 R1 A0 | F998565D`.
 
-\`YTS 720p | v031 tt33764258 M79664 L1 D4 V1 U1 R1 A0 | F998565D\`
+The phone's first successful movie_details result had four syntactically valid hashes but only **one distinct hash**. In an independent public API check, the same IMDb film had four distinct hashes. The earlier code accepted the first successful API and did not compare the fallback host.
 
-- \`v031\`: this exact diagnostic code is running.
-- \`tt33764258\`: IMDb ID used by the plugin (must match the intended film).
-- \`M79664\`: YTS numeric movie ID from list_movies (verify matches details).
-- \`L1\`: number of distinct valid hashes from IMDb-matched list_movies results.
-- \`D4\`: *raw record count* in movie_details, not necessarily valid torrents.
-- \`V1\`: detail records with syntactically valid 40-digit hexadecimal hashes.
-- \`U1\`: number of *unique* valid hashes in the detail response.
-- \`R1\`: number of unique hashes in the final list, before Nuvio display.
-- \`A0\`: list_movies used primary API; A1 means fallback API.
-- \`F998565D\`: first 8 digits of that stream's normalized infoHash.
+v0.3.2 requests movie-list and movie-details records from **both** https://movies-api.accel.li/api/v2/ and https://yts.gg/api/v2/ in parallel batches. It selects the *single* response with the greatest number of unique, valid 40-hex hash values; it does not mix suspicious records from one source into a healthier alternative. Two-list / two-detail API requests may be slower than v0.3.1.
 
-Interpretation:
+## Interpreting source labels
 
-* D4 V1 U1 R1 and one card: the other three API records are invalid/duplicates.
-* D4 V4 U4 R4 and one card: the provider returns four distinct results and Nuvio is hiding/filtering three.
-* L1/D4 and IMDb/movie IDs different from public data: the phone is getting different underlying records or is querying a different title.
-* This release does **not** repair P2P playback: it only verifies the source data.
-* Even a well-formed 40-digit infoHash, a nonzero API seeder count, or
-  visible card does not prove that a torrent is authentic or playable.
+Example:
 
-Source resolution and playback are separate issues. Nuvio 0.6.12-beta's
-PluginRuntime parses a JSON array of source records and StreamsRepository adds
-each converted stream. The provider deliberately issues *no* .torrent
-metadata-cache requests, and it never guesses file indices.
+`YTS 720p | v032 tt33764258 M79664 L1/4 D1/4 R4 PickD1 !DIFF | F566BBF0`
 
-**Privacy:** Diagnostic labels reveal the selected movie's IMDb/YTS IDs and
-public torrent hash prefix. No sensitive user account information is added.
-Torrent playback may reveal your IP address to peers, and movie distribution
-rights must be respected.
+- `L1/4`: distinct hashes from list_movies on primary / backup host.
+- `D1/4`: distinct hashes from movie_details on primary / backup.
+- `R4`: results chosen from the most complete response and passed to Nuvio.
+- `PickD1`: selected the backup movie_details response; `PickD0` would be primary.
+- `!DIFF`: primary and backup details had different counts of distinct hashes.
+- `F566BBF0`: short prefix of the selected torrent infoHash.
+- `tt33764258` and `M79664` identify the query and YTS movie.
+
+If the phone shows `L1/1 D1/1 R1`, both hosts appear to be returning only one unique hash from that network. Compare the raw API JSON responses in the phone browser and check DNS, network proxy, and domain routing. Do **not** assume that a correctly formatted infoHash represents a real or playable video.
+
+This provider returns Magnet links. It does **not** solve P2P engine failure, seed reachability, or video-file selection. For those issues review Nuvio Playback P2P status and diagnostics separately. Respect film distribution rights; BitTorrent peers may see your public IP.
+
+## Tests
+
+Node 18+ in this directory: `npm test`.
+
+The previous releases' JS files are retained as historical references but only `providers/yts-api-v032.js` is active in this manifest.

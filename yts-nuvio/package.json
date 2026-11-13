@@ -1,8 +1,8 @@
 {
   "name": "nuvio-yts-mobile-provider",
-  "version": "0.3.3",
+  "version": "1.0.0",
   "private": true,
-  "description": "YTS raw HTTP response and parsed JSON integrity diagnostic for Nuvio Mobile Android",
+  "description": "Stable YTS movie sources for Nuvio Android Full, based on verified v0.3.3",
   "scripts": {
     "test": "node tests/test.js"
   },

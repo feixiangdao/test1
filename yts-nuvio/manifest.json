@@ -1,15 +1,15 @@
 {
-  "name": "YTS Movie Sources for Nuvio Mobile",
-  "version": "0.2.4",
-  "description": "Diagnostic release: recheck YTS movie_details for missing qualities; known-hash external file-index trial is marked unverified.",
+  "name": "YTS API Diagnostic for Nuvio Mobile",
+  "version": "0.3.0",
+  "description": "Cache-isolated diagnostic provider. Exposes list/detail API counts and hash prefixes. Does not guess torrent file indices or guarantee playback.",
   "author": "Independent community prototype",
   "scrapers": [
     {
-      "id": "yts-mobile-movies",
-      "name": "YTS Movies (Torrent)",
-      "description": "Movie provider: infoHash-verified torrent metadata when possible, movie_details enrichment, diagnostic file #4 trial for one known hash",
-      "version": "0.2.4",
-      "filename": "providers/yts.js",
+      "id": "yts-api-diagnostic-030",
+      "name": "YTS API Diagnostic v0.3",
+      "description": "Shows actual L/D API torrent counts and short hash prefixes; movie magnet sources; experimental",
+      "version": "0.3.0",
+      "filename": "providers/yts-api-v030.js",
       "supportedTypes": [
         "movie"
       ],

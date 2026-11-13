@@ -1,5 +1,5 @@
 /*
- * YTS Movie Sources for Nuvio Mobile Android (Full build), v0.2.3.
+ * YTS Movie Sources for Nuvio Mobile Android (Full build), v0.2.4.
  * Contract based on NuvioMedia/NuvioMobile tag 0.6.12-beta.
  * getStreams(tmdbId, mediaType, season, episode) returns an array.
  * Each result needs a nonempty string URL; size must be a string.
@@ -111,6 +111,25 @@ function findYtsMovie(imdbId) {
     });
   }
   return tryBase(0);
+}
+
+
+function ytsCompleteMovie(movie, imdbId) {
+  if (!movie || !/^\d+$/.test(String(movie.id || ''))) return Promise.resolve(movie);
+  const count = Array.isArray(movie.torrents) ? movie.torrents.length : 0;
+  if (count >= 2) return Promise.resolve(movie);
+  const path = '/movie_details.json?movie_id=' + String(movie.id);
+  function tryNext(i) {
+    if (i >= YTS_API_BASES.length) return Promise.resolve(movie);
+    return fetchJson(YTS_API_BASES[i] + path).then(function(response) {
+      const detail = response && response.data && response.data.movie;
+      if (response.status === 'ok' && detail &&
+          validImdb(detail.imdb_code) === imdbId && Array.isArray(detail.torrents) &&
+          detail.torrents.length > count) return detail;
+      return tryNext(i+1);
+    }, function() { return tryNext(i+1); });
+  }
+  return tryNext(0);
 }
 
 function torrentQuality(torrent) {
@@ -308,16 +327,24 @@ function streamItems(movie) {
     const countTag = (index + 1) + '/' + Math.min(list.length, 12);
     return ytsVerifiedFileIndex(originals[item.infoHash], item.infoHash).then(function(check) {
       if (check.selected) {
-        // Nuvio Android 0.6.12 derives p2pFileIdx from torrent://hash/index.
         item.url = 'torrent://' + item.infoHash + '/' + check.selected.index;
         item.name += ' | ' + countTag + ' | Video #' + check.selected.index + ' (' + check.origin + ')';
-      } else {
-        // Preserve hash-based P2P playback, without guessing file numbers.
-        item.name += ' | ' + countTag + ' | Auto (' + check.reason + ')';
+        return [item];
       }
-      return item;
+      item.name += ' | ' + countTag + ' | Auto (' + check.reason + ')';
+      // One specific hash has a public file listing, from which index 4 is
+      // deduced. This is an explicitly UNVERIFIED diagnostic trial, not a
+      // general torrent rule, and never replaces the original magnet source.
+      if (item.infoHash === 'f566bbf053529bf2432cafd17ed3fb7c118874e6') {
+        const trial = Object.assign({}, item, {
+          name: item.name.replace(/ \| Auto \([^)]+\)$/, '') + ' | File #4 (unverified external list)',
+          url: 'torrent://' + item.infoHash + '/4'
+        });
+        return [item, trial];
+      }
+      return [item];
     });
-  }));
+  })).then(function(groups) { return [].concat.apply([], groups); });
 }
 
 function getStreams(tmdbId, mediaType, season, episode) {
@@ -327,7 +354,9 @@ function getStreams(tmdbId, mediaType, season, episode) {
   return toImdbId(tmdbId)
     .then(function (imdbId) {
       if (!imdbId) return [];
-      return findYtsMovie(imdbId).then(streamItems);
+      return findYtsMovie(imdbId).then(function(movie) {
+        return ytsCompleteMovie(movie, imdbId);
+      }).then(streamItems);
     })
     .catch(function (error) {
       ytsLog('Lookup failed: ' + (error && error.message || error));

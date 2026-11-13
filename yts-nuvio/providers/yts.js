@@ -1,5 +1,5 @@
 /*
- * YTS Movie Sources for Nuvio Mobile Android (Full build), v0.2.2.
+ * YTS Movie Sources for Nuvio Mobile Android (Full build), v0.2.3.
  * Contract based on NuvioMedia/NuvioMobile tag 0.6.12-beta.
  * getStreams(tmdbId, mediaType, season, episode) returns an array.
  * Each result needs a nonempty string URL; size must be a string.
@@ -206,35 +206,57 @@ function ytsVideoFile(info) {
   }
   return chosen;
 }
+
 function ytsVerifiedFileIndex(torrent, hash) {
-  const url = torrent && typeof torrent.url === 'string' ? torrent.url : '';
-  if (!url) return Promise.resolve({selected: null, reason: 'NoURL'});
-  if (!/^https:\/\/(?:[a-z\d-]+\.)*(?:yts\.(?:gg|bz|lt|am|ag|mx)|accel\.li)\//i.test(url)) {
-    return Promise.resolve({selected: null, reason: 'Host'});
+  // Query metadata only (not movie payload). All third-party responses are
+  // validated against the original, full 40-character BitTorrent info hash.
+  const original = torrent && typeof torrent.url === 'string' ? torrent.url : '';
+  const hex = hash.toUpperCase();
+  const sources = [];
+  if (/^https:\/\/(?:[a-z\d-]+\.)*(?:yts\.(?:gg|bz|lt|am|ag|mx)|accel\.li)\//i.test(original)) {
+    sources.push({name: 'Y', url: original});
   }
-  return fetch(url, { headers: { Accept: 'application/x-bittorrent' } })
-    .then(function(r) {
-      if (!r || !r.ok) return {reason: 'HTTP' + (r && r.status || '0')};
-      return r.arrayBuffer().then(function(bytes) { return {bytes: bytes}; });
-    })
-    .then(function(reply) {
-      if (reply.reason) return {selected: null, reason: reply.reason};
-      var parsed;
-      try { parsed = ytsReadTorrent(reply.bytes); }
-      catch (_e) { return {selected: null, reason: 'InvalidTorrent'}; }
-      return crypto.subtle.digest('SHA-1', parsed.infoBytes).then(function(buffer) {
-        const digest = new Uint8Array(buffer);
-        let hex = '';
-        digest.forEach(function(b) { hex += b.toString(16).padStart(2, '0'); });
-        if (hex !== hash) return {selected: null, reason: 'HashMismatch'};
-        const selected = ytsVideoFile(parsed.root.info);
-        if (!selected) return {selected: null, reason: 'NoVideo'};
-        return {selected: selected, reason: ''};
+  // Independent public metadata caches. Files may not be cached or accessible.
+  sources.push({name: 'I', url: 'https://itorrents.org/torrent/' + hex + '.torrent'});
+  sources.push({name: 'B', url: 'https://btcache.me/torrent/' + hex});
+  const fails = [];
+
+  function checkSource(index) {
+    if (index >= sources.length) {
+      return Promise.resolve({selected: null, reason: fails.join('/') || 'NoMetadata'});
+    }
+    const source = sources[index];
+    return fetch(source.url, {headers: {Accept: 'application/x-bittorrent'}})
+      .then(function(response) {
+        if (!response || !response.ok) throw new Error(String(response && response.status || 'HTTP'));
+        return response.arrayBuffer();
+      })
+      .then(function(buffer) {
+        const parsed = ytsReadTorrent(buffer);
+        return crypto.subtle.digest('SHA-1', parsed.infoBytes).then(function(bytes) {
+          const digest = new Uint8Array(bytes);
+          let actual = '';
+          for (let i = 0; i < digest.length; i++) actual += digest[i].toString(16).padStart(2, '0');
+          if (actual !== hash) throw new Error('Hash');
+          const selected = ytsVideoFile(parsed.root.info);
+          if (!selected) throw new Error('NoVideo');
+          return {selected: selected, reason: '', origin: source.name};
+        });
+      })
+      .catch(function(error) {
+        const code = String(error && error.message || 'Error');
+        let label = 'Fail';
+        if (/^4\d\d$|^5\d\d$/.test(code)) label = code;
+        else if (code === 'Hash') label = 'Hash';
+        else if (code === 'NoVideo') label = 'NoVideo';
+        else if (code.indexOf('bencode') !== -1 || code.indexOf('torrent') !== -1 ||
+                 code.indexOf('container') !== -1 || code.indexOf('structure') !== -1 ||
+                 code.indexOf('string') !== -1) label = 'Invalid';
+        fails.push(source.name + label);
+        return checkSource(index + 1);
       });
-    }).catch(function(error) {
-      ytsLog('Metadata check failed: ' + (error && error.message || error));
-      return {selected: null, reason: 'Network'};
-    });
+  }
+  return checkSource(0);
 }
 
 function streamItems(movie) {
@@ -282,26 +304,20 @@ function streamItems(movie) {
     var qualityDelta = (rank[b.quality] || 0) - (rank[a.quality] || 0);
     return qualityDelta || (b.seeders || 0) - (a.seeders || 0);
   });
-  return Promise.all(list.slice(0, 12).map(function(item) {
+  return Promise.all(list.slice(0, 12).map(function(item, index) {
+    const countTag = (index + 1) + '/' + Math.min(list.length, 12);
     return ytsVerifiedFileIndex(originals[item.infoHash], item.infoHash).then(function(check) {
       if (check.selected) {
-        // Nuvio 0.6.12 maps torrent://hash/index to fileIdx.
+        // Nuvio Android 0.6.12 derives p2pFileIdx from torrent://hash/index.
         item.url = 'torrent://' + item.infoHash + '/' + check.selected.index;
-        item.name += ' | Video #' + check.selected.index;
-        return [item];
+        item.name += ' | ' + countTag + ' | Video #' + check.selected.index + ' (' + check.origin + ')';
+      } else {
+        // Preserve hash-based P2P playback, without guessing file numbers.
+        item.name += ' | ' + countTag + ' | Auto (' + check.reason + ')';
       }
-      // Diagnostic fallback: Auto keeps previous behavior. The second entry
-      // explicitly tests whether the video is file 1; it is NOT verified.
-      item.name += ' | Auto (' + check.reason + ')';
-      const trial = Object.assign({}, item, {
-        name: item.name.replace(/ \| Auto \([^)]+\)$/, ' | Try File #1'),
-        url: 'torrent://' + item.infoHash + '/1'
-      });
-      return [item, trial];
+      return item;
     });
-  })).then(function(groups) {
-    return [].concat.apply([], groups);
-  });
+  }));
 }
 
 function getStreams(tmdbId, mediaType, season, episode) {

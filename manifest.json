@@ -7,8 +7,7 @@
   "js": "index.js",
   "css": "style.css",
   "author": "Community-built for SillyDroid",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "minimum_client_version": "1.19.0",
-  "auto_update": false,
-  "homePage": "https://github.com/feixiangdao/test1/tree/sillydroid-selection-dictionary"
+  "auto_update": false
 }

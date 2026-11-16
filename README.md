@@ -1,6 +1,6 @@
 # SillyDroid Selection Dictionary · 划词英语词典
 
-**版本：0.1.1（适配目标 SillyTavern 1.19.0 / SillyDroid 1.0.1.68）**
+**版本：0.1.0（适配目标 SillyTavern 1.19.0 / SillyDroid 1.0.1.68）**
 
 > 说明：已经按 SillyTavern 1.19.0 官方 `getContext().generateRaw()` 和第三方扩展清单实现，并完成静态检查。**尚未在实际 SillyDroid Android WebView 上运行测试**，尤其长按选词和 TTS 取决于手机 WebView 实现。
 
@@ -18,13 +18,7 @@
 
 SillyTavern 官方第三方插件安装器要求 **Git 仓库 URL，而不是 ZIP 或文件名**。此 ZIP 是可上传 GitHub 的完整源码包，不是「角色卡」；切勿从角色管理导入，也不要把它当作 SillyDroid 的「数据迁移 ZIP」导入（后者可能替换你的酒馆数据）。
 
-代码已发布到 GitHub 的独立分支：
-
-- 仓库 URL：`https://github.com/feixiangdao/test1`
-- 分支：`sillydroid-selection-dictionary`
-- **安装时必须填写该分支，而不是使用默认 `main`。**
-
-安装流程：
+如果已经发布到一个 GitHub 仓库：
 
 1. 在 SillyDroid 点击酒馆上方「扩展」→「安装扩展（Install Extension）」。
 2. 粘贴**真实 Git 仓库 URL**，安装到当前用户。
@@ -73,6 +67,10 @@ sillydroid-selection-dictionary/
 - https://github.com/SillyTavern/SillyTavern/tree/1.19.0 （目标版本）
 - https://github.com/jialmaster/SillyDroid （Android 宿主）
 
-## GitHub 说明
+## 本仓库安装参数
 
-此版本位于 `feixiangdao/test1` 仓库的 `sillydroid-selection-dictionary` 分支。该分支根目录只包含插件文件，不修改 `main` 分支及其已有项目。
+这是 `feixiangdao/test1` 仓库中的独立插件分支，不是默认 `main` 分支。
+
+- Git URL：`https://github.com/feixiangdao/test1`
+- 分支名：`sillydroid-selection-dictionary`
+- 在 SillyTavern「扩展 → 安装扩展」中同时填写 URL 和分支名，选仅为当前用户安装。

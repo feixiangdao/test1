@@ -251,6 +251,8 @@
     veil.hidden = false;
     panel.hidden = false;
     hideFloating();
+    // Fixed tab uses a fail-safe inline !important display: hide it over modal.
+    openButton.style.setProperty('display', 'none', 'important');
     askButton.disabled = false;
     if (!input.value) input.focus();
   }
@@ -260,6 +262,7 @@
     panel.hidden = true;
     savedPanel.hidden = true;
     hideFloating();
+    openButton.style.setProperty('display', 'block', 'important');
     // Selected words are cached; never change RPG chat history.
   }
 

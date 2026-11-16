@@ -1,27 +1,14 @@
 {
-  "name": "Nuvio Read-only Network Diagnostics",
+  "display_name": "划词英语词典 · RPG Dictionary",
+  "loading_order": 120,
+  "requires": [],
+  "optional": [],
+  "dependencies": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "Community-built for SillyDroid",
   "version": "0.1.1",
-  "description": "Read-only network testing; fake result URLs must never be played.",
-  "scrapers": [
-    {
-      "id": "novipnoad-site-probe",
-      "name": "NOVIPNOAD Site Probe",
-      "version": "0.1.1",
-      "supportedTypes": [
-        "movie"
-      ],
-      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/ecfe17a7d912ae379fcdd3daa03d0a51c7d28308/novipnoad-site-diagnostic/probe.js",
-      "enabled": true
-    },
-    {
-      "id": "tmdb-https-probe",
-      "name": "TMDB HTTPS Probe",
-      "version": "0.1.0",
-      "supportedTypes": [
-        "movie"
-      ],
-      "filename": "https://raw.githubusercontent.com/feixiangdao/test1/ecfe17a7d912ae379fcdd3daa03d0a51c7d28308/novipnoad-site-diagnostic/tmdb-https-probe.js",
-      "enabled": true
-    }
-  ]
+  "minimum_client_version": "1.19.0",
+  "auto_update": false,
+  "homePage": "https://github.com/feixiangdao/test1/tree/sillydroid-selection-dictionary"
 }

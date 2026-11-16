@@ -1,5 +1,5 @@
 /*
- * SillyDroid Selection Dictionary v0.1.0
+ * SillyDroid Selection Dictionary v0.1.1
  * SillyTavern 1.19.0+ UI extension, no server plugin or external dependencies.
  * Uses SillyTavern.getContext().generateRaw to make isolated lookups through
  * the user's *already configured* model. Never touches chat history or keys.
@@ -158,6 +158,8 @@
 
   function hideFloating() {
     floating.hidden = true;
+    floating.classList.remove('sdrd-floating-top');
+    openButton.hidden = false;
   }
 
   function captureSelection() {
@@ -165,14 +167,22 @@
     if (!captured) { hideFloating(); return; }
     candidate = captured;
     if (!panel.hidden) return;
-    const { rect } = captured;
-    // Position near the selection, stay within viewport on Android WebView.
-    const width = window.innerWidth;
-    const left = Math.min(Math.max(12, (rect.left + rect.right) / 2 - 34), width - 80);
-    const top = rect.top > 60 ? rect.top - 50 : Math.min(window.innerHeight - 80, rect.bottom + 10);
-    floating.style.left = `${left}px`;
-    floating.style.top = `${Math.max(8, top)}px`;
+
+    // Android's native Select/Copy/Translate toolbar is drawn *above* the WebView.
+    // A button beside the selected range can never reliably out-z-index it.
+    // Dock the lookup button away from the selection instead of tracking rect.top.
+    const h = window.visualViewport?.height || window.innerHeight;
+    const rect = captured.rect;
+    const dockBottomY = h - 205;
+    const collidesWithBottomDock = rect.bottom > dockBottomY - 80 && rect.top < dockBottomY + 80;
+    floating.classList.toggle('sdrd-floating-top', h > 470 && collidesWithBottomDock);
+
+    const shortText = captured.text.length > 22 ? `${captured.text.slice(0, 22)}…` : captured.text;
+    floating.textContent = `查词 · ${shortText}`;
+    floating.title = `查询所选英文：${captured.text}`;
     floating.hidden = false;
+    // Don't leave a second '查词' control over the same mobile viewport.
+    openButton.hidden = true;
   }
 
   function openPanel() {

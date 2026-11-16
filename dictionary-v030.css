@@ -1,0 +1,57 @@
+/* Namespaced styles: do not overwrite SillyTavern / character card styling. */
+#sdrd-root { color: #f2f3f7; font: 14px/1.5 system-ui, sans-serif; }
+#sdrd-root [hidden] { display: none !important; }
+#sdrd-root button { cursor: pointer; font-family: inherit; touch-action: manipulation; }
+#sdrd-root button:disabled { opacity: .5; cursor: wait; }
+#sdrd-wand-container .sdrd-menu-entry {
+  display: block; box-sizing: border-box; width: 100%; text-align: left;
+  min-height: 42px; padding: 8px 12px; border: 0; cursor: pointer;
+  background: transparent; color: inherit; font: inherit;
+}
+#sdrd-wand-container .sdrd-menu-entry:active,
+#sdrd-wand-container .sdrd-menu-entry:hover { background: rgba(120,150,220,.18); }
+#sdrd-root .sdrd-auto-row { display:flex; align-items:center; gap:6px;
+  margin:0 0 10px; color:#c2cadc; font-size:13px; }
+#sdrd-root .sdrd-auto-check { width:19px; height:19px; flex:none; }
+#sdrd-root .sdrd-veil { position: fixed; inset: 0; z-index: 2147483644 !important; background: #0205149c; }
+#sdrd-root .sdrd-panel {
+  box-sizing: border-box; position: fixed; z-index: 2147483645 !important;
+  left: 0; right: 0; bottom: 0; max-height: min(82dvh, 780px); overflow: auto; overscroll-behavior: contain;
+  padding: 14px 16px max(18px, calc(env(safe-area-inset-bottom) + 12px));
+  background: #1d2330; color: #f2f3f7; border: 1px solid #596176;
+  border-radius: 20px 20px 0 0; box-shadow: 0 -6px 26px #0008;
+}
+#sdrd-root .sdrd-head { display: flex; align-items: center; justify-content: space-between; font-size: 16px; margin-bottom: 8px; }
+#sdrd-root .sdrd-close { min-width: 40px; min-height: 40px; color: #fff; background: #343c4d; border: none; border-radius: 12px; }
+#sdrd-root .sdrd-hint, #sdrd-root .sdrd-subhelp { color: #c2cadc; font-size: 12px; margin-bottom: 8px; }
+#sdrd-root .sdrd-input, #sdrd-root .sdrd-copyarea {
+  box-sizing: border-box; display: block; width: 100%; background: #111824; color: #fff;
+  border: 1px solid #586580; border-radius: 10px; padding: 10px;
+  font-size: 15px; line-height: 1.5; resize: vertical; margin-bottom: 10px;
+}
+#sdrd-root .sdrd-modes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+#sdrd-root .sdrd-mode, #sdrd-root .sdrd-secondary {
+  color: #eee; background: #343e52; border: 1px solid #5b6680;
+  border-radius: 10px; padding: 7px 11px; min-height: 38px;
+}
+#sdrd-root .sdrd-mode.active { background: #26539c; color: #fff; border-color: #82a8f2; }
+#sdrd-root .sdrd-actions, #sdrd-root .sdrd-bottom { display: flex; gap: 8px; align-items: stretch; margin: 8px 0; }
+#sdrd-root .sdrd-ask { background: #3879db; color: #fff; font-weight: 600; border: none; border-radius: 10px; padding: 9px 14px; min-height: 43px; flex: 1; }
+#sdrd-root .sdrd-status { min-height: 19px; font-size: 12px; color: #a9c9ff; margin: 8px 0; white-space: pre-wrap; }
+#sdrd-root .sdrd-output { padding: 12px; min-height: 64px; background: #141a25; border: 1px solid #384359;
+  border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text;
+}
+#sdrd-root .sdrd-saved { margin-top: 12px; padding: 9px; border: 1px solid #586580; border-radius: 10px; max-height: 32vh; overflow: auto; }
+#sdrd-root .sdrd-saved-header { display:flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-bottom: 7px; }
+#sdrd-root .sdrd-saved-item { display:flex; border-top: 1px solid #465066; align-items: center; justify-content: space-between; padding: 5px 0; }
+#sdrd-root .sdrd-saved-word { background: transparent; color: #d8e6ff; border: none; text-align: left; flex:1; overflow-wrap: anywhere; }
+#sdrd-root .sdrd-remove { background: transparent; color: #f9bac0; border: none; padding: 8px; }
+@media(min-width: 800px) {
+  #sdrd-root .sdrd-panel { max-width: 540px; left: auto; border-radius: 18px 0 0 0; }
+}
+
+#sdrd-root .sdrd-paste { display: block; width: 100%; margin: 0 0 8px; padding: 8px; border: 1px solid #93b7f9; background: #364562; color: #fff; border-radius: 10px; min-height: 40px; }
+
+/* Stacking isolation: always above SillyTavern panes while dialog is open. */
+#sdrd-root .sdrd-veil:not([hidden]) { display: block !important; pointer-events: auto !important; }
+#sdrd-root .sdrd-panel:not([hidden]) { display: block !important; pointer-events: auto !important; visibility: visible !important; }

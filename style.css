@@ -10,9 +10,18 @@
   background: #2357a4e8; box-shadow: 0 3px 12px #0005;
 }
 #sdrd-root .sdrd-floating {
-  position: fixed; z-index: 3250; min-height: 43px; min-width: 65px;
-  padding: 8px 12px; background: #3474e9; color: #fff;
+  /* Fixed action dock avoids the native Android text-selection toolbar,
+     whose overlay sits above all WebView z-index layers. */
+  position: fixed; z-index: 3250;
+  top: auto; left: auto; right: 12px;
+  bottom: max(190px, calc(env(safe-area-inset-bottom) + 170px));
+  max-width: min(78vw, 285px); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; min-height: 46px;
+  padding: 9px 14px; background: #3474e9; color: #fff;
   border: 1px solid #9abcf9; border-radius: 22px; box-shadow: 0 3px 12px #0008;
+}
+#sdrd-root .sdrd-floating.sdrd-floating-top {
+  top: max(130px, calc(env(safe-area-inset-top) + 115px)); bottom: auto;
 }
 #sdrd-root .sdrd-veil { position: fixed; inset: 0; z-index: 3900; background: #0205149c; }
 #sdrd-root .sdrd-panel {

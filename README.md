@@ -1,8 +1,18 @@
 # SillyDroid Selection Dictionary · 划词英语词典
 
-**版本：0.2.0（适配目标 SillyTavern 1.19.0 / SillyDroid 1.0.1.68）**
+**版本：0.2.1（适配目标 SillyTavern 1.19.0 / SillyDroid 1.0.1.68）**
 
 > 说明：已经按 SillyTavern 1.19.0 官方 `getContext().generateRaw()` 和第三方扩展清单实现，并完成静态检查。**尚未在实际 SillyDroid Android WebView 上运行测试**，尤其长按选词和 TTS 取决于手机 WebView 实现。
+
+## v0.2.1 修复（2026-11-16）
+
+- 修复 v0.2.0 在部分安卓 WebView 中找不到固定「查词」按钮的问题的可见性与诊断：固定在屏幕左侧中部，并设置内联备用样式，即使样式表缓存也能看到。
+- 还原标准 `index.js`、`style.css` 入口，清单指向这两个文件；删除以前版本的备用脚本文件可减少混淆。
+- 加入「📋 读取剪贴板」按钮。安卓可先用原生菜单「复制」选中文字，再打开词典读取。若读取权限不可用，长按输入框选「粘贴」。
+- 自动弹出模式默认关闭，作为可选实验功能保留；Android WebView 的原生选择菜单无法被普通网页扩展稳定替换。
+- 固定标签、词典标题包含 v0.2.1；开启脚本时输出 `loaded v0.2.1` 控制台日志。
+- `auto_update=true` 仅允许在宿主升级等检查时自动更新，**不代表重启 App 就能拉取最新代码**。需要点插件更新或重新安装。
+- 这是可验证修复，还未在用户实际 WebView 中复测。
 
 ## v0.2.0 安卓遮挡修复（2026-11-16）
 
@@ -10,7 +20,7 @@
 - 安卓长按选中英文、保持选区约 1 秒后，**自动取消系统选区并打开词典面板**，所选单词、词组或句子已保存在输入框。此操作不自动调用 AI，需要按“AI 查询”。
 - 可在词典面板关闭“安卓长按后自动打开查词”，改为点底部中央固定「查词」按钮。
 - 固定按钮改到输入区上方中央，始终可见；按钮与面板显示 `v0.2`，用来判断更新是否实际生效。
-- `manifest.json` 指向改名后的 `dictionary-v020.js` 和 `dictionary-v020.css`，减轻旧 WebView 缓存影响。
+- `manifest.json` 指向改名后的 `index.js` 和 `style.css`，减轻旧 WebView 缓存影响。
 - 只重启 App **不会更新**仓库插件，因为本插件配置了 `auto_update: false`。必须在扩展管理中执行“更新”或卸载后重新安装并刷新。
 - 已进行静态检查和桌面 Chromium 触摸场景模拟，实际安卓 WebView 行为仍待用户手机验证。
 
@@ -73,8 +83,8 @@ SillyTavern 官方第三方插件安装器要求 **Git 仓库 URL，而不是 ZI
 ```
 sillydroid-selection-dictionary/
 ├── manifest.json
-├── dictionary-v020.js
-├── dictionary-v020.css
+├── index.js
+├── style.css
 └── README.md
 ```
 

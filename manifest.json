@@ -4,10 +4,11 @@
   "requires": [],
   "optional": [],
   "dependencies": [],
-  "js": "dictionary-v020.js",
-  "css": "dictionary-v020.css",
+  "js": "index.js",
+  "css": "style.css",
   "author": "Community-built for SillyDroid",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "minimum_client_version": "1.19.0",
-  "auto_update": false
+  "auto_update": true,
+  "homePage": "https://github.com/feixiangdao/test1/tree/sillydroid-selection-dictionary"
 }

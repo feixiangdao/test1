@@ -4,10 +4,10 @@
   "requires": [],
   "optional": [],
   "dependencies": [],
-  "js": "index.js",
-  "css": "style.css",
+  "js": "dictionary-v020.js",
+  "css": "dictionary-v020.css",
   "author": "Community-built for SillyDroid",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "minimum_client_version": "1.19.0",
   "auto_update": false
 }

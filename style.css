@@ -4,11 +4,18 @@
 #sdrd-root button { cursor: pointer; font-family: inherit; touch-action: manipulation; }
 #sdrd-root button:disabled { opacity: .5; cursor: wait; }
 #sdrd-root .sdrd-fab {
-  position: fixed; z-index: 3000; bottom: max(115px, calc(env(safe-area-inset-bottom) + 92px)); right: 12px;
-  min-height: 43px; min-width: 45px; padding: 6px 9px;
-  border: 1px solid #628de2; border-radius: 14px; color: #fff;
-  background: #2357a4e8; box-shadow: 0 3px 12px #0005;
+  /* Persistent left-edge tab; separate from the Android selection toolbar. */
+  box-sizing: border-box; position: fixed; z-index: 2147483000;
+  left: 8px; top: 52%; right: auto; bottom: auto; transform: none;
+  width: max-content; max-width: 45vw;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-height: 45px; padding: 8px 10px;
+  border: 1px solid #93b7f9; border-radius: 0 12px 12px 0; color: #fff;
+  background: #2357a4; box-shadow: 0 4px 14px #0009;
 }
+#sdrd-root .sdrd-auto-row { display:flex; align-items:center; gap:6px;
+  margin:0 0 10px; color:#c2cadc; font-size:13px; }
+#sdrd-root .sdrd-auto-check { width:19px; height:19px; flex:none; }
 #sdrd-root .sdrd-floating {
   /* Fixed action dock avoids the native Android text-selection toolbar,
      whose overlay sits above all WebView z-index layers. */
@@ -59,3 +66,5 @@
 @media(min-width: 800px) {
   #sdrd-root .sdrd-panel { max-width: 540px; left: auto; border-radius: 18px 0 0 0; }
 }
+
+#sdrd-root .sdrd-paste { display: block; width: 100%; margin: 0 0 8px; padding: 8px; border: 1px solid #93b7f9; background: #364562; color: #fff; border-radius: 10px; min-height: 40px; }

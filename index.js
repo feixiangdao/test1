@@ -1,5 +1,5 @@
 /*
- * SillyDroid Selection Dictionary v0.1.1
+ * SillyDroid Selection Dictionary v0.2.1
  * SillyTavern 1.19.0+ UI extension, no server plugin or external dependencies.
  * Uses SillyTavern.getContext().generateRaw to make isolated lookups through
  * the user's *already configured* model. Never touches chat history or keys.
@@ -9,6 +9,9 @@
 
   const PREFIX = 'sdrd';
   const STORAGE_KEY = 'sdrd.saved.v1';
+  const AUTO_OPEN_KEY = 'sdrd.autoOpen.v2';
+  const VERSION = '0.2.1';
+  const ANDROID_TOUCH = /Android/i.test(navigator.userAgent) || Boolean(window.matchMedia?.('(pointer: coarse)').matches);
   const MAX_SELECTION = 320;
   const MAX_SAVED = 300;
   const TYPES = Object.freeze({
@@ -23,6 +26,7 @@
   let busy = false;
   let latestResult = '';
   let selectionTimer = null;
+  let autoOpenTimer = null;
   let serial = 0;
 
   function el(tag, className, text) {
@@ -72,9 +76,11 @@
   floating.type = 'button';
   floating.title = '查询选中的英文文字';
   floating.hidden = true;
-  const openButton = el('button', `${PREFIX}-fab`, '查词');
+  const openButton = el('button', `${PREFIX}-fab`, '查词 v0.2.1');
   openButton.type = 'button';
   openButton.title = '打开划词词典（支持粘贴输入）';
+  // Fail-safe: keep the entry visible even if old cached CSS is served.
+  openButton.style.cssText = 'position:fixed!important;left:8px!important;top:52%!important;right:auto!important;bottom:auto!important;transform:none!important;z-index:2147483000!important;min-height:45px!important;padding:8px 10px!important;border-radius:0 12px 12px 0!important;background:#2357a4!important;color:white!important;border:1px solid #93b7f9!important;font-size:13px!important;max-width:45vw!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;display:block!important;pointer-events:auto!important';
 
   const veil = el('div', `${PREFIX}-veil`);
   veil.hidden = true;
@@ -84,18 +90,31 @@
   panel.setAttribute('aria-label', '划词英语词典');
   panel.hidden = true;
   const head = el('div', `${PREFIX}-head`);
-  head.append(el('strong', '', '英语划词词典'));
+  head.append(el('strong', '', '英语划词词典 · v0.2.1'));
   const closeButton = el('button', `${PREFIX}-close`, '✕');
   closeButton.type = 'button';
   closeButton.setAttribute('aria-label', '关闭词典');
   head.append(closeButton);
 
-  const hint = el('div', `${PREFIX}-hint`, '长按聊天中的英文单词或句子，再点「查词」。也可以直接输入。');
+  const hint = el('div', `${PREFIX}-hint`, '安卓：可先长按并选中英文，再点击固定「查词」；若原生菜单遮挡，点「复制」后点击查词，即可读取剪贴板。');
+  const autoRow = el('label', `${PREFIX}-auto-row`);
+  const autoCheck = el('input', `${PREFIX}-auto-check`);
+  autoCheck.type = 'checkbox';
+  try { autoCheck.checked = localStorage.getItem(AUTO_OPEN_KEY) === 'true'; }
+  catch { autoCheck.checked = false; }
+  autoRow.append(autoCheck, document.createTextNode(' 实验功能：长按后自动弹出查词（部分安卓 WebView 不支持）'));
+  autoCheck.addEventListener('change', () => {
+    clearTimeout(autoOpenTimer);
+    try { localStorage.setItem(AUTO_OPEN_KEY, String(autoCheck.checked)); } catch {}
+  });
   const input = el('textarea', `${PREFIX}-input`);
   input.placeholder = '选中英文会自动填入这里；也可粘贴单词、词组或句子';
   input.rows = 2;
   input.maxLength = MAX_SELECTION;
   input.setAttribute('aria-label', '查询内容');
+  const pasteButton = el('button', `${PREFIX}-paste`, '📋 读取剪贴板');
+  pasteButton.type = 'button';
+  pasteButton.title = '读取刚才通过安卓系统菜单复制的英文';
   const modeBar = el('div', `${PREFIX}-modes`);
   const modeButtons = {};
   for (const [key, data] of Object.entries(TYPES)) {
@@ -131,13 +150,15 @@
   bottomActions.append(saveButton, savedButton);
   const savedPanel = el('div', `${PREFIX}-saved`);
   savedPanel.hidden = true;
-  panel.append(head, hint, input, modeBar, subhelp, actions, status, output, bottomActions, savedPanel);
+  panel.append(head, hint, autoRow, input, pasteButton, modeBar, subhelp, actions, status, output, bottomActions, savedPanel);
   root.append(floating, openButton, veil, panel);
 
   function mount() {
     if (document.getElementById(root.id)) return;
     document.body.append(root);
     updateMode();
+    console.info('[SillyDroid Dictionary] loaded v' + VERSION);
+    root.dataset.version = VERSION;
     // DOM-based extension: no hooks into ST chat rendering, no chat mutations.
     document.addEventListener('selectionchange', scheduleCapture, { passive: true });
     document.addEventListener('pointerup', scheduleCapture, { passive: true });
@@ -153,41 +174,74 @@
   function scheduleCapture(event) {
     if (event && root.contains(event.target)) return;
     clearTimeout(selectionTimer);
-    selectionTimer = setTimeout(captureSelection, 250);
+    clearTimeout(autoOpenTimer);
+    selectionTimer = setTimeout(captureSelection, 220);
   }
 
   function hideFloating() {
+    // Keep the permanent entry visible; Android system selection toolbar is
+    // an OS overlay that cannot be defeated with CSS z-index.
     floating.hidden = true;
-    floating.classList.remove('sdrd-floating-top');
     openButton.hidden = false;
+    openButton.textContent = '查词 v0.2.1';
   }
 
   function captureSelection() {
+    if (!panel.hidden) return;
     const captured = getSelectionCandidate();
     if (!captured) { hideFloating(); return; }
     candidate = captured;
-    if (!panel.hidden) return;
 
-    // Android's native Select/Copy/Translate toolbar is drawn *above* the WebView.
-    // A button beside the selected range can never reliably out-z-index it.
-    // Dock the lookup button away from the selection instead of tracking rect.top.
-    const h = window.visualViewport?.height || window.innerHeight;
-    const rect = captured.rect;
-    const dockBottomY = h - 205;
-    const collidesWithBottomDock = rect.bottom > dockBottomY - 80 && rect.top < dockBottomY + 80;
-    floating.classList.toggle('sdrd-floating-top', h > 470 && collidesWithBottomDock);
+    // No selection-anchored floating button: the native Android toolbar
+    // covers such buttons even with arbitrarily high z-index.
+    floating.hidden = true;
+    openButton.hidden = false;
+    const shortText = captured.text.length > 16 ? `${captured.text.slice(0, 16)}…` : captured.text;
+    openButton.textContent = '查词 v0.2.1';
+    openButton.title = `查询所选英文：${captured.text}`;
 
-    const shortText = captured.text.length > 22 ? `${captured.text.slice(0, 22)}…` : captured.text;
-    floating.textContent = `查词 · ${shortText}`;
-    floating.title = `查询所选英文：${captured.text}`;
-    floating.hidden = false;
-    // Don't leave a second '查词' control over the same mobile viewport.
-    openButton.hidden = true;
+    clearTimeout(autoOpenTimer);
+    if (ANDROID_TOUCH && autoCheck.checked) {
+      autoOpenTimer = setTimeout(() => {
+        if (!panel.hidden) return;
+        const latest = getSelectionCandidate();
+        // If the user copied/cancelled the selection, don't open unexpectedly.
+        if (!latest) return;
+        candidate = latest;
+        // Dismiss Android's native Copy/Translate/Select All toolbar while
+        // preserving the selected text in 'candidate'.
+        try { window.getSelection()?.removeAllRanges(); } catch {}
+        openPanel();
+      }, 850);
+    }
+  }
+
+  async function readClipboardToInput({ silent = false } = {}) {
+    if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') {
+      if (!silent) status.textContent = '当前 WebView 不允许读取剪贴板，请长按输入框选择「粘贴」。';
+      return false;
+    }
+    try {
+      const text = normalize(await navigator.clipboard.readText());
+      if (!text || text.length > MAX_SELECTION) {
+        if (!silent) status.textContent = '剪贴板为空或超过 320 字，请复制更短的英文再试。';
+        return false;
+      }
+      input.value = text;
+      latestResult = '';
+      current = { text, context: '' };
+      if (!silent) status.textContent = '已读取剪贴板。';
+      return true;
+    } catch (e) {
+      if (!silent) status.textContent = 'WebView 拒绝剪贴板读取，请长按输入框并选择「粘贴」。';
+      return false;
+    }
   }
 
   function openPanel() {
     const latest = getSelectionCandidate();
     if (latest) candidate = latest;
+    if (ANDROID_TOUCH) { try { window.getSelection()?.removeAllRanges(); } catch {} }
     current = candidate || { text: '', context: '' };
     input.value = current.text;
     latestResult = '';
@@ -206,7 +260,7 @@
     panel.hidden = true;
     savedPanel.hidden = true;
     hideFloating();
-    // Do not clear selection or delete the selected text.
+    // Selected words are cached; never change RPG chat history.
   }
 
   function updateMode() {
@@ -391,6 +445,7 @@
   floating.addEventListener('pointerdown', event => event.preventDefault());
   floating.addEventListener('click', openPanel);
   openButton.addEventListener('click', openPanel);
+  pasteButton.addEventListener('click', () => readClipboardToInput());
   closeButton.addEventListener('click', closePanel);
   veil.addEventListener('click', closePanel);
   askButton.addEventListener('click', lookup);

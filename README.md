@@ -1,8 +1,18 @@
 # SillyDroid Selection Dictionary · 划词英语词典
 
-**版本：0.1.1（适配目标 SillyTavern 1.19.0 / SillyDroid 1.0.1.68）**
+**版本：0.2.0（适配目标 SillyTavern 1.19.0 / SillyDroid 1.0.1.68）**
 
 > 说明：已经按 SillyTavern 1.19.0 官方 `getContext().generateRaw()` 和第三方扩展清单实现，并完成静态检查。**尚未在实际 SillyDroid Android WebView 上运行测试**，尤其长按选词和 TTS 取决于手机 WebView 实现。
+
+## v0.2.0 安卓遮挡修复（2026-11-16）
+
+- 彻底取消选区旁临时浮动按钮。因为安卓系统的“翻译、复制、全选”菜单覆盖在网页层之上，即使改定位也可能遮挡。
+- 安卓长按选中英文、保持选区约 1 秒后，**自动取消系统选区并打开词典面板**，所选单词、词组或句子已保存在输入框。此操作不自动调用 AI，需要按“AI 查询”。
+- 可在词典面板关闭“安卓长按后自动打开查词”，改为点底部中央固定「查词」按钮。
+- 固定按钮改到输入区上方中央，始终可见；按钮与面板显示 `v0.2`，用来判断更新是否实际生效。
+- `manifest.json` 指向改名后的 `dictionary-v020.js` 和 `dictionary-v020.css`，减轻旧 WebView 缓存影响。
+- 只重启 App **不会更新**仓库插件，因为本插件配置了 `auto_update: false`。必须在扩展管理中执行“更新”或卸载后重新安装并刷新。
+- 已进行静态检查和桌面 Chromium 触摸场景模拟，实际安卓 WebView 行为仍待用户手机验证。
 
 ## v0.1.1 修复（2026-11-16）
 
@@ -13,8 +23,8 @@
 
 ## 功能
 
-- 在酒馆聊天消息的英文文本中长按并选中一个单词、词组、句子，在聊天区边缘显示避让安卓系统菜单的「查词」浮钮，按钮上会显示选中词的预览。
-- 右下角始终有固定「查词」入口：即使 WebView 不出现选词菜单，仍可手动粘贴英文查询。
+- 在酒馆聊天消息的英文文本中长按并选中一个单词、词组、句子，在安卓上自动打开词典，不再出现被原生菜单遮挡的选区旁浮钮。
+- 聊天区底部中央始终有固定「查词」入口：即使 WebView 不出现选词菜单，仍可手动粘贴英文查询。
 - 词汇释义、句子翻译、句式解析三种模式。
 - 复用 SillyTavern 现有聊天补全模型（例如你配置的 DeepSeek），**不要求额外输入 API Key**。
 - 使用 `generateRaw()` 独立请求，无聊天历史；查词结果不会追加到当前 RPG 对话。
@@ -43,7 +53,7 @@ SillyTavern 官方第三方插件安装器要求 **Git 仓库 URL，而不是 ZI
 ## 使用说明
 
 1. 长按 RPG 回复里的 `mysterious`、`in the distance` 或整句英语，并拖动选区。
-2. 选中后点击附近的小「查词」按钮；若没有出现，用右下角固定的「查词」，也可手动粘贴文本。
+2. 在安卓上等待约 1 秒，词典会自动打开；关闭自动模式后，可点击聊天底部中央固定「查词」按钮。也可粘贴文本。
 3. 选择「词汇释义 / 翻译 / 句式解析」，点击「AI 查询」。
 4. 想收藏时点「☆ 收藏本条」；点击「生词本」查看及复制。
 5. 查询失败、只出现“思考”或正文为空时，检查模型连接、思考模式及输出 token 上限，必要时重试。
@@ -55,7 +65,7 @@ SillyTavern 官方第三方插件安装器要求 **Git 仓库 URL，而不是 ZI
 - 不读取或保存 API Key；不修改任何 SillyTavern 聊天记录、角色卡或世界书。
 - 生词本保存在酒馆 WebView 的 `localStorage` 中；清除该网站数据可能丢失收藏。
 - 音标与例句是模型生成内容，可能出现错误；系统朗读是否可用由 Android WebView 决定。
-- 安卓原生选词工具栏位于 WebView 之上，不能靠调高 z-index 盖住。v0.1.1 改为屏幕边缘停靠浮钮；当选区靠近下方停靠位时，自动移到上方。若设备仍然遮挡，使用固定「查词」按钮。
+- 安卓原生选词工具栏位于 WebView 之上，不能靠调高 z-index 盖住。v0.2.0 改为延迟自动打开词典，并取消系统文本选区；如仍有问题，可以在面板取消自动打开，改为使用聊天底部中央的固定按钮。
 - 本扩展不需要后台服务、Termux 或独立服务器插件，但仍需要酒馆本身连接的 AI 模型可用。
 
 ## 文件结构
@@ -63,8 +73,8 @@ SillyTavern 官方第三方插件安装器要求 **Git 仓库 URL，而不是 ZI
 ```
 sillydroid-selection-dictionary/
 ├── manifest.json
-├── index.js
-├── style.css
+├── dictionary-v020.js
+├── dictionary-v020.css
 └── README.md
 ```
 
@@ -73,11 +83,3 @@ sillydroid-selection-dictionary/
 - https://docs.sillytavern.app/for-contributors/writing-extensions/ （`getContext().generateRaw()`）
 - https://github.com/SillyTavern/SillyTavern/tree/1.19.0 （目标版本）
 - https://github.com/jialmaster/SillyDroid （Android 宿主）
-
-## 本仓库安装参数
-
-这是 `feixiangdao/test1` 仓库中的独立插件分支，不是默认 `main` 分支。
-
-- Git URL：`https://github.com/feixiangdao/test1`
-- 分支名：`sillydroid-selection-dictionary`
-- 在 SillyTavern「扩展 → 安装扩展」中同时填写 URL 和分支名，选仅为当前用户安装。

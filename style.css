@@ -1,39 +1,32 @@
+body.sdrd-tap-enabled #chat .mes_text,
+body.sdrd-tap-enabled #chat .mes_text * {
+  -webkit-user-select:none !important; user-select:none !important;
+  -webkit-touch-callout:none !important;
+}
+#sdrd-tap-settings { margin:10px 0;padding:12px;border:1px solid #596176;border-radius:10px; }
+#sdrd-tap-settings label {display:flex;align-items:center;gap:8px;}
+#sdrd-tap-settings input {width:20px;height:20px;}
+#sdrd-tap-settings div {font-size:12px;opacity:.8;margin:6px 0;}
+
 /* Namespaced styles: do not overwrite SillyTavern / character card styling. */
 #sdrd-root { color: #f2f3f7; font: 14px/1.5 system-ui, sans-serif; }
 #sdrd-root [hidden] { display: none !important; }
 #sdrd-root button { cursor: pointer; font-family: inherit; touch-action: manipulation; }
 #sdrd-root button:disabled { opacity: .5; cursor: wait; }
-#sdrd-root .sdrd-fab {
-  /* Persistent left-edge tab; separate from the Android selection toolbar. */
-  box-sizing: border-box; position: fixed; z-index: 2147483000;
-  left: 8px; top: 52%; right: auto; bottom: auto; transform: none;
-  width: max-content; max-width: 45vw;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  min-height: 45px; padding: 8px 10px;
-  border: 1px solid #93b7f9; border-radius: 0 12px 12px 0; color: #fff;
-  background: #2357a4; box-shadow: 0 4px 14px #0009;
+#sdrd-wand-container .sdrd-menu-entry {
+  display: block; box-sizing: border-box; width: 100%; text-align: left;
+  min-height: 42px; padding: 8px 12px; border: 0; cursor: pointer;
+  background: transparent; color: inherit; font: inherit;
 }
+#sdrd-wand-container .sdrd-menu-entry:active,
+#sdrd-wand-container .sdrd-menu-entry:hover { background: rgba(120,150,220,.18); }
 #sdrd-root .sdrd-auto-row { display:flex; align-items:center; gap:6px;
   margin:0 0 10px; color:#c2cadc; font-size:13px; }
 #sdrd-root .sdrd-auto-check { width:19px; height:19px; flex:none; }
-#sdrd-root .sdrd-floating {
-  /* Fixed action dock avoids the native Android text-selection toolbar,
-     whose overlay sits above all WebView z-index layers. */
-  position: fixed; z-index: 3250;
-  top: auto; left: auto; right: 12px;
-  bottom: max(190px, calc(env(safe-area-inset-bottom) + 170px));
-  max-width: min(78vw, 285px); overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; min-height: 46px;
-  padding: 9px 14px; background: #3474e9; color: #fff;
-  border: 1px solid #9abcf9; border-radius: 22px; box-shadow: 0 3px 12px #0008;
-}
-#sdrd-root .sdrd-floating.sdrd-floating-top {
-  top: max(130px, calc(env(safe-area-inset-top) + 115px)); bottom: auto;
-}
-#sdrd-root .sdrd-veil { position: fixed; inset: 0; z-index: 3900; background: #0205149c; }
+#sdrd-root .sdrd-veil { position: fixed; inset: 0; z-index: 2147483644 !important; background: #0205149c; }
 #sdrd-root .sdrd-panel {
-  box-sizing: border-box; position: fixed; z-index: 3901;
-  left: 0; right: 0; bottom: 0; max-height: min(80dvh, 780px); overflow: auto; overscroll-behavior: contain;
+  box-sizing: border-box; position: fixed; z-index: 2147483645 !important;
+  left: 0; right: 0; bottom: 0; max-height: min(82dvh, 780px); overflow: auto; overscroll-behavior: contain;
   padding: 14px 16px max(18px, calc(env(safe-area-inset-bottom) + 12px));
   background: #1d2330; color: #f2f3f7; border: 1px solid #596176;
   border-radius: 20px 20px 0 0; box-shadow: 0 -6px 26px #0008;
@@ -68,3 +61,7 @@
 }
 
 #sdrd-root .sdrd-paste { display: block; width: 100%; margin: 0 0 8px; padding: 8px; border: 1px solid #93b7f9; background: #364562; color: #fff; border-radius: 10px; min-height: 40px; }
+
+/* Stacking isolation: always above SillyTavern panes while dialog is open. */
+#sdrd-root .sdrd-veil:not([hidden]) { display: block !important; pointer-events: auto !important; }
+#sdrd-root .sdrd-panel:not([hidden]) { display: block !important; pointer-events: auto !important; visibility: visible !important; }

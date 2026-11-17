@@ -24,6 +24,7 @@
   let current = null;
   let selectedMode = 'vocab';
   let busy = false;
+  let rerunWhenIdle = false;
   let latestResult = '';
   let selectionTimer = null;
   let serial = 0;
@@ -404,7 +405,7 @@
   }
 
   async function lookup() {
-    if (busy) return;
+    if (busy) { rerunWhenIdle = true; return; }
     const text = normalize(input.value);
     if (!text || text.length > MAX_SELECTION) {
       status.textContent = '请先选择或输入 1–320 个字符。';
@@ -446,6 +447,10 @@
       busy = false;
       askButton.disabled = false;
       askButton.textContent = 'AI 查询';
+      if (rerunWhenIdle && !panel.hidden) {
+        rerunWhenIdle = false;
+        setTimeout(() => { void lookup(); }, 0);
+      }
     }
   }
 

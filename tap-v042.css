@@ -1,0 +1,47 @@
+/* Android selection stays enabled. The spans only make taps deterministic. */
+body.sdrd-v4-reading #chat .mes_text,
+body.sdrd-v4-reading #chat .mes_text * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+}
+#chat .mes_text .sdrd-v4-word { display:inline; color:inherit; font:inherit; cursor:pointer; }
+#chat .mes_text .sdrd-v4-word:active { background:rgba(80,145,245,.18); }
+#sdrd-v4-wand .sdrd-v4-menu-entry { display:block; width:100%; padding:8px 12px; min-height:42px; text-align:left; background:transparent; color:inherit; border:0; }
+/* Only the chat message prose is affected while tap mode is enabled. */
+#sdrd-v4-root[hidden], #sdrd-v4-root [hidden] { display: none !important; }
+#sdrd-v4-root { position: fixed; inset: 0; z-index: 2147483600; pointer-events: none; font: 15px/1.5 system-ui, sans-serif; color: #f2f4f9; }
+#sdrd-v4-root:not([hidden]) { pointer-events: auto; }
+#sdrd-v4-root .sdrd-v4-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .64); }
+#sdrd-v4-root .sdrd-v4-sheet {
+  box-sizing: border-box; position: absolute; bottom: 0; left: 0; width: 100%;
+  max-height: min(83dvh, 780px); overflow: auto; overscroll-behavior: contain;
+  border-radius: 20px 20px 0 0; background: #202838; color: #f2f4f9;
+  border: 1px solid #546887; padding: 15px 16px max(24px, env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 40px #000b;
+}
+#sdrd-v4-root button, #sdrd-v4-settings button { cursor: pointer; touch-action: manipulation; }
+#sdrd-v4-root .sdrd-v4-head { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:10px; }
+#sdrd-v4-root .sdrd-v4-head strong { font-size: 17px; }
+#sdrd-v4-root .sdrd-v4-close { background: #45516b; border: 0; border-radius: 9px; color:#fff; padding:8px; min-height:40px; }
+#sdrd-v4-root .sdrd-v4-hint { color:#aebfd9; font-size:12px; margin-bottom:10px; }
+#sdrd-v4-root .sdrd-v4-tabs { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:9px; }
+#sdrd-v4-root .sdrd-v4-tab { flex:1; min-width:55px; border:1px solid #6b7999; border-radius:9px; color:#dde5f5; background:#394660; padding:7px; min-height:40px; }
+#sdrd-v4-root .sdrd-v4-tab.active { background:#356ccd; border-color:#9dc0ff; color:#fff; }
+#sdrd-v4-root .sdrd-v4-input { box-sizing:border-box; width:100%; min-height:54px; padding:9px; border-radius:9px; border:1px solid #7389aa; resize:vertical; background:#101a2c; color:#fff; font:14px/1.45 system-ui; }
+#sdrd-v4-root .sdrd-v4-status { min-height:17px; font-size:12px; color:#b1cfff; margin:8px 0; white-space:pre-wrap; }
+#sdrd-v4-root .sdrd-v4-output { min-height:90px; max-height:35vh; overflow:auto; background:#141d2c; border-radius:10px; border:1px solid #465572; padding:12px; overflow-wrap:anywhere; white-space:pre-wrap; -webkit-user-select:text; user-select:text; }
+#sdrd-v4-root .sdrd-v4-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+#sdrd-v4-root .sdrd-v4-actions button { min-height:38px; padding:7px 10px; border-radius:8px; background:#384760; color:#fff; border:1px solid #687a9a; }
+#sdrd-v4-root .sdrd-v4-actions .sdrd-v4-primary { background:#2864c0; border-color:#7bafff; }
+#sdrd-v4-root .sdrd-v4-actions button:disabled { opacity:.6; }
+#sdrd-v4-root .sdrd-v4-saved { margin-top:10px; max-height:23vh; overflow:auto; padding:8px; border:1px solid #536485; border-radius:8px; }
+#sdrd-v4-root .sdrd-v4-saved-item { display:block; padding:7px; width:100%; text-align:left; background:transparent; border:0; border-bottom:1px solid #39455c; color:#c3deff; }
+#sdrd-v4-settings { margin:10px 0; padding:12px; border:1px solid var(--SmartThemeBorderColor,#626979); border-radius:10px; }
+#sdrd-v4-settings label { display:flex; gap:7px; align-items:center; font-weight:600; }
+#sdrd-v4-settings label input { width:19px; height:19px; }
+#sdrd-v4-settings p { margin:5px 0; font-size:12px; opacity:.8; }
+#sdrd-v4-settings .sdrd-v4-settings-action { padding:6px 9px; border-radius:7px; }
+@media(min-width:800px) { #sdrd-v4-root .sdrd-v4-sheet { max-width:540px; left:auto; right:0; border-radius:20px 0 0 0; } }
+/* Guarantee text-only word wrappers do not suppress Android long press. */
+#chat .mes_text .sdrd-v4-word { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }

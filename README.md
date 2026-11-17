@@ -1,36 +1,14 @@
-# SillyDroid Selection Dictionary v0.3.0
+# SillyDroid RPG 点读英语词典 v0.4.0
 
-适配目标：SillyDroid 1.0.1.68 / SillyTavern 1.19.0（仍需用户手机真实环境实测）。
+适配目标：SillyDroid 1.0.1.68 / SillyTavern 1.19.0。
 
-## 关键修复
+- 默认开启点读；轻点 RPG 聊天正文中的英文单词，会自动使用当前模型获取中文释义。
+- 长按英文再松开，尝试查询所在句（安卓 WebView 长按行为因设备而异）。
+- 弹窗可切换词组、翻译、语法解析，保留朗读与生词本。
+- **无常驻按钮**，不再要求通过安卓原生菜单或魔法棒查询。
+- 在顶部「扩展」设置中找到「点读英语词典」，可关闭点读，恢复安卓原生选择/复制；也提供手动查询入口。
+- 只影响聊天正文，不拦截输入框、快捷回复和其他扩展按钮。
 
-- 删除覆盖聊天正文的常驻浮动「查词」按钮。
-- 把入口整合到 SillyTavern **输入框旁的魔法棒菜单**，显示「📖 查词 · 词典 v0.3.0」。
-- 修正点击后按钮消失但查词弹窗不显示：弹窗层级提升到最高、增加明确显隐控制。
-- 避免自动弹出安卓键盘导致 WebView 高度变化，取消自动聚焦输入框。
-- 支持先用安卓系统菜单「复制」，进入魔法棒 → 查词 →「📋 读取剪贴板」。如果 WebView 拒绝读取，手动粘贴。
-- 不自动调用模型，只有点「AI 查询」才发起独立查询，避免意外 API 费用。
+技术说明：通过 CSS 禁止正文原生选择，再用触摸坐标及 caretPositionFromPoint / caretRangeFromPoint 检测英文单词，并非真正改动 Android ActionMode。查询调用当前 SillyTavern generateRaw，不改变 RPG 聊天记录，可能消耗 API 额度。跨行拖动选择暂未实现。已作逻辑检查，仍需要你手机真实 Android WebView 验证。
 
-## 使用方法
-
-1. 打开 RPG 聊天，长按单词或短句，点击安卓系统自带的「复制」。
-2. 点击聊天输入框旁的魔法棒图标（SillyTavern Extensions Menu）。
-3. 选择「📖 查词 · 词典 v0.3.0」。
-4. 在词典中点击「📋 读取剪贴板」；若未获权限，在词典输入框里长按选择「粘贴」。
-5. 选择词汇释义、翻译或句式解析，点击「AI 查询」。查询不加入 RPG 对话。
-
-如果魔法棒菜单中没有本项：检查是否已启用第三方扩展，并刷新 SillyTavern 页面。
-如果点击菜单项仍无弹窗：请检查手机当前 WebView 页面或查看 SillyDroid 的日志；这表示仍有兼容问题。
-
-## API 与隐私
-
-沿用现有 SillyTavern 的模型 API，使用 `generateRaw()` 单独查询；每次发送所选文本和附近故事上下文，不读取密钥。查词会产生模型 API 使用费用。生词本保存在当前酒馆浏览器 localStorage，清除站点数据可能导致丢失。
-
-## 文件清单
-
-- `manifest.json`
-- `dictionary-v030.js`
-- `dictionary-v030.css`
-- `README.md`
-
-SillyTavern 1.19.0 `public/scripts/templates/wandMenu.html` 中定义了 `#extensionsMenu`，通过它集成入口，避免安卓原生文本选择工具栏的覆盖。
+安装：Git 仓库 https://github.com/feixiangdao/test1 ，分支 sillydroid-selection-dictionary。若仍出现旧菜单，卸载**仅本插件**后重新安装、刷新页面。

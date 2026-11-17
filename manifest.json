@@ -1,13 +1,13 @@
 {
-  "display_name": "点读 v0.4.2",
+  "display_name": "点读 v0.4.3",
   "loading_order": 120,
   "requires": [],
   "optional": [],
   "dependencies": [],
-  "js": "tap-v042.js",
-  "css": "tap-v042.css",
+  "js": "tap-v043.js",
+  "css": "tap-v043.css",
   "author": "Community-built for SillyDroid",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "minimum_client_version": "1.19.0",
   "auto_update": true,
   "homePage": "https://github.com/feixiangdao/test1/tree/sillydroid-selection-dictionary"

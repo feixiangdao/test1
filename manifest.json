@@ -1,13 +1,13 @@
 {
-  "display_name": "划词英语词典 · RPG Dictionary",
+  "display_name": "划词英语词典 · RPG Tap Dictionary",
   "loading_order": 120,
   "requires": [],
   "optional": [],
   "dependencies": [],
-  "js": "dictionary-v030.js",
-  "css": "dictionary-v030.css",
+  "js": "index.js",
+  "css": "style.css",
   "author": "Community-built for SillyDroid",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "minimum_client_version": "1.19.0",
   "auto_update": true,
   "homePage": "https://github.com/feixiangdao/test1/tree/sillydroid-selection-dictionary"

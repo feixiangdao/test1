@@ -1,5 +1,5 @@
 /*
- * SillyDroid Selection Dictionary v0.2.1
+ * SillyDroid RPG Tap Dictionary v0.4.0
  * SillyTavern 1.19.0+ UI extension, no server plugin or external dependencies.
  * Uses SillyTavern.getContext().generateRaw to make isolated lookups through
  * the user's *already configured* model. Never touches chat history or keys.
@@ -9,12 +9,12 @@
 
   const PREFIX = 'sdrd';
   const STORAGE_KEY = 'sdrd.saved.v1';
-  const AUTO_OPEN_KEY = 'sdrd.autoOpen.v2';
-  const VERSION = '0.2.1';
+  const VERSION = '0.4.0';
   const ANDROID_TOUCH = /Android/i.test(navigator.userAgent) || Boolean(window.matchMedia?.('(pointer: coarse)').matches);
   const MAX_SELECTION = 320;
   const MAX_SAVED = 300;
   const TYPES = Object.freeze({
+    phrase: { title: '词组解释', help: '解释单词附近词组及搭配。' },
     vocab: { title: '词汇释义', help: '结合故事解释词义、搭配、词性与一个简单例句。' },
     translate: { title: '翻译', help: '把所选词组或句子翻译成自然中文。' },
     grammar: { title: '句式解析', help: '解释句子结构、语法与实际用法。' },
@@ -26,7 +26,6 @@
   let busy = false;
   let latestResult = '';
   let selectionTimer = null;
-  let autoOpenTimer = null;
   let serial = 0;
 
   function el(tag, className, text) {
@@ -72,15 +71,6 @@
 
   const root = el('div', `${PREFIX}-root`);
   root.id = 'sdrd-root';
-  const floating = el('button', `${PREFIX}-floating`, '查词');
-  floating.type = 'button';
-  floating.title = '查询选中的英文文字';
-  floating.hidden = true;
-  const openButton = el('button', `${PREFIX}-fab`, '查词 v0.2.1');
-  openButton.type = 'button';
-  openButton.title = '打开划词词典（支持粘贴输入）';
-  // Fail-safe: keep the entry visible even if old cached CSS is served.
-  openButton.style.cssText = 'position:fixed!important;left:8px!important;top:52%!important;right:auto!important;bottom:auto!important;transform:none!important;z-index:2147483000!important;min-height:45px!important;padding:8px 10px!important;border-radius:0 12px 12px 0!important;background:#2357a4!important;color:white!important;border:1px solid #93b7f9!important;font-size:13px!important;max-width:45vw!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;display:block!important;pointer-events:auto!important';
 
   const veil = el('div', `${PREFIX}-veil`);
   veil.hidden = true;
@@ -90,23 +80,14 @@
   panel.setAttribute('aria-label', '划词英语词典');
   panel.hidden = true;
   const head = el('div', `${PREFIX}-head`);
-  head.append(el('strong', '', '英语划词词典 · v0.2.1'));
+  head.append(el('strong', '', '点读英语词典 · v0.4.0'));
   const closeButton = el('button', `${PREFIX}-close`, '✕');
   closeButton.type = 'button';
   closeButton.setAttribute('aria-label', '关闭词典');
   head.append(closeButton);
 
-  const hint = el('div', `${PREFIX}-hint`, '安卓：可先长按并选中英文，再点击固定「查词」；若原生菜单遮挡，点「复制」后点击查词，即可读取剪贴板。');
-  const autoRow = el('label', `${PREFIX}-auto-row`);
-  const autoCheck = el('input', `${PREFIX}-auto-check`);
-  autoCheck.type = 'checkbox';
-  try { autoCheck.checked = localStorage.getItem(AUTO_OPEN_KEY) === 'true'; }
-  catch { autoCheck.checked = false; }
-  autoRow.append(autoCheck, document.createTextNode(' 实验功能：长按后自动弹出查词（部分安卓 WebView 不支持）'));
-  autoCheck.addEventListener('change', () => {
-    clearTimeout(autoOpenTimer);
-    try { localStorage.setItem(AUTO_OPEN_KEY, String(autoCheck.checked)); } catch {}
-  });
+  const hint = el('div', `${PREFIX}-hint`, '轻点英文单词自动解释，长按可查询所在句。切换下方词组、翻译、语法可以继续学习。');
+
   const input = el('textarea', `${PREFIX}-input`);
   input.placeholder = '选中英文会自动填入这里；也可粘贴单词、词组或句子';
   input.rows = 2;
@@ -126,6 +107,10 @@
         selectedMode = key;
         latestResult = '';
         updateMode();
+        if (candidate?.word) {
+          input.value = selectedMode === 'vocab' ? candidate.word : selectedMode === 'phrase' ? candidate.phrase : candidate.sentence;
+          void lookup();
+        }
       }
     });
     modeBar.append(b);
@@ -150,16 +135,161 @@
   bottomActions.append(saveButton, savedButton);
   const savedPanel = el('div', `${PREFIX}-saved`);
   savedPanel.hidden = true;
-  panel.append(head, hint, autoRow, input, pasteButton, modeBar, subhelp, actions, status, output, bottomActions, savedPanel);
-  root.append(floating, openButton, veil, panel);
+  panel.append(head, hint, input, pasteButton, modeBar, subhelp, actions, status, output, bottomActions, savedPanel);
+  root.append(veil, panel);
+
+  // Inject a command into the native SillyTavern magic-wand tool menu.
+  // This does not cover the game text or rely on Android's selection toolbar.
+  let menuObserver = null;
+  function mountMenuCommand() {
+    const menu = document.getElementById('extensionsMenu');
+    if (!menu) return false;
+    if (document.getElementById('sdrd-wand-container')) return true;
+    const container = el('div', 'extension_container');
+    container.id = 'sdrd-wand-container';
+    const action = el('button', 'sdrd-menu-entry', `📖 查词 · 词典 v${VERSION}`);
+    action.id = 'sdrd-wand-action';
+    action.type = 'button';
+    action.title = '打开英语词典，读取选中的英语或剪贴板';
+    action.addEventListener('click', openPanel);
+    container.append(action);
+    menu.append(container);
+    return true;
+  }
+
+  function mountMenuEventually() {
+    if (mountMenuCommand()) return;
+    menuObserver = new MutationObserver(() => {
+      if (mountMenuCommand()) {
+        menuObserver.disconnect();
+        menuObserver = null;
+      }
+    });
+    menuObserver.observe(document.body, {childList: true, subtree: true});
+    window.setTimeout(() => { if (menuObserver) {menuObserver.disconnect(); menuObserver=null;} }, 15000);
+  }
+
+
+  // Tap-to-read replaces native text selection *only in chat prose*. Not an
+  // Android ActionMode replacement: normal selection returns when disabled.
+  const TAP_MODE_KEY = 'sdrd.tapmode.enabled.v4';
+  let tapEnabled = true;
+  try { tapEnabled = localStorage.getItem(TAP_MODE_KEY) !== 'false'; } catch {}
+  let tapState = null, longTimer = null, longHit = null, pendingOpen = null;
+
+  function setTapMode(on) {
+    tapEnabled = Boolean(on);
+    document.body.classList.toggle('sdrd-tap-enabled', tapEnabled);
+    try { localStorage.setItem(TAP_MODE_KEY, String(tapEnabled)); } catch {}
+    document.querySelectorAll('.sdrd-tap-checkbox').forEach(c => { c.checked = tapEnabled; });
+  }
+  function installTapSettings() {
+    if (document.getElementById('sdrd-tap-settings')) return;
+    const parent = document.querySelector('#extensions_settings2, #extensions_settings');
+    if (!parent) return;
+    const box = el('div', 'sdrd-tap-settings');
+    box.id = 'sdrd-tap-settings';
+    const label = el('label', '', '点读英语词典 v0.4.0：开启轻点查词');
+    const check = el('input', 'sdrd-tap-checkbox');
+    check.type = 'checkbox'; check.checked = tapEnabled;
+    check.addEventListener('change', () => setTapMode(check.checked));
+    label.prepend(check);
+    const help = el('div', '', '仅作用于游戏聊天正文。关闭后恢复安卓长按选择、复制。');
+    const manual = el('button', '', '手动打开词典');
+    manual.type = 'button'; manual.addEventListener('click', openPanel);
+    box.append(label, help, manual);
+    parent.append(box);
+  }
+  function findChatTarget(e) {
+    if (!tapEnabled || !panel.hidden || !(e.target instanceof Element)) return null;
+    if (e.target.closest('a,button,input,textarea,select,pre,code,[contenteditable],#sdrd-root')) return null;
+    return e.target.closest('#chat .mes_text');
+  }
+  function hitAt(x, y, box) {
+    const caret = document.caretPositionFromPoint?.(x,y);
+    let node = caret?.offsetNode, offset = caret?.offset;
+    if (!node || node.nodeType !== Node.TEXT_NODE) {
+      const range = document.caretRangeFromPoint?.(x,y);
+      node = range?.startContainer;offset = range?.startOffset;
+    }
+    if (node?.nodeType !== Node.TEXT_NODE || !box.contains(node)) return null;
+    const text = node.textContent || '';
+    const words = [...text.matchAll(/[A-Za-z]+(?:['’\-][A-Za-z]+)*/g)];
+    const hit = words.find(w=>offset>=w.index && offset<w.index+w[0].length) ||
+      words.find(w=>offset===w.index+w[0].length);
+    if (!hit) return null;
+    let pos = hit.index;
+    try {
+      const range=document.createRange();range.selectNodeContents(box);
+      range.setEnd(node,hit.index);pos=range.toString().length;
+    } catch {}
+    const full=box.textContent || '';
+    let start=0;
+    for (let i=0;i<pos;i++) if (/[.!?。！？\n]/.test(full[i])) start=i+1;
+    let end=full.length;
+    for(let i=pos;i<full.length;i++) if (/[.!?。！？\n]/.test(full[i])) {end=i+1;break;}
+    const sentence=normalize(full.slice(start,end)).slice(0,320) || hit[0];
+    const seg=[...sentence.matchAll(/[A-Za-z]+(?:['’\-][A-Za-z]+)*/g)];
+    const idx=Math.max(0,seg.findIndex(w=>w[0]===hit[0]));
+    const lo=Math.max(0,idx-2),hi=Math.min(seg.length,idx+4);
+    const phrase=seg.length?normalize(sentence.slice(seg[lo].index,seg[hi-1].index+seg[hi-1][0].length)):hit[0];
+    return {word:hit[0],phrase,sentence,context:normalize(full.slice(Math.max(0,pos-110),pos+160)).slice(0,280)};
+  }
+  function scheduleTapLookup(hit,mode) {
+    // Android sends a synthetic click after pointerup; defer the dialog until
+    // that click has passed, or it could immediately close via the veil.
+    clearTimeout(pendingOpen);
+    pendingOpen=setTimeout(()=>{
+      candidate={text:mode==='vocab'?hit.word:mode==='phrase'?hit.phrase:hit.sentence,
+        word:hit.word,phrase:hit.phrase,sentence:hit.sentence,context:hit.context,capturedAt:Date.now()};
+      selectedMode=mode;
+      updateMode();
+      openPanel();
+      void lookup();
+    },80);
+  }
+  function tapDown(e) {
+    clearTimeout(longTimer);longHit=null;tapState=null;
+    const target=findChatTarget(e);
+    if (!target || e.button!==0) return;
+    tapState={id:e.pointerId,x:e.clientX,y:e.clientY,target};
+    if (e.pointerType==='touch'||e.pointerType==='pen') {
+      longTimer=setTimeout(()=>{
+        if(tapState) longHit=hitAt(tapState.x,tapState.y,tapState.target);
+      },580);
+    }
+  }
+  function tapMove(e) {
+    if(tapState && e.pointerId===tapState.id && Math.hypot(e.clientX-tapState.x,e.clientY-tapState.y)>14) {
+      clearTimeout(longTimer);tapState=null;
+    }
+  }
+  function tapUp(e) {
+    clearTimeout(longTimer);
+    if(!tapState || e.pointerId!==tapState.id)return;
+    const down=tapState;tapState=null;
+    if(longHit){scheduleTapLookup(longHit,'translate');longHit=null;return;}
+    if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>14)return;
+    const hit=hitAt(e.clientX,e.clientY,down.target);
+    if(hit)scheduleTapLookup(hit,'vocab');
+  }
 
   function mount() {
     if (document.getElementById(root.id)) return;
     document.body.append(root);
     updateMode();
+    const settingsWatch=new MutationObserver(()=>{if(document.getElementById('sdrd-tap-settings'))settingsWatch.disconnect();else installTapSettings();});
+    settingsWatch.observe(document.body,{childList:true,subtree:true});
+    installTapSettings();
+    setTapMode(tapEnabled);
     console.info('[SillyDroid Dictionary] loaded v' + VERSION);
     root.dataset.version = VERSION;
     // DOM-based extension: no hooks into ST chat rendering, no chat mutations.
+    document.addEventListener('pointerdown', tapDown, { capture: true, passive: true });
+    document.addEventListener('pointermove', tapMove, { capture: true, passive: true });
+    document.addEventListener('pointerup', tapUp, { capture: true, passive: true });
+    document.addEventListener('pointercancel', () => { clearTimeout(longTimer);tapState=null; }, { capture: true, passive: true });
+    document.addEventListener('contextmenu', e => { if (findChatTarget(e)) e.preventDefault(); }, true);
     document.addEventListener('selectionchange', scheduleCapture, { passive: true });
     document.addEventListener('pointerup', scheduleCapture, { passive: true });
     document.addEventListener('touchend', scheduleCapture, { passive: true });
@@ -174,46 +304,17 @@
   function scheduleCapture(event) {
     if (event && root.contains(event.target)) return;
     clearTimeout(selectionTimer);
-    clearTimeout(autoOpenTimer);
     selectionTimer = setTimeout(captureSelection, 220);
   }
 
   function hideFloating() {
-    // Keep the permanent entry visible; Android system selection toolbar is
-    // an OS overlay that cannot be defeated with CSS z-index.
-    floating.hidden = true;
-    openButton.hidden = false;
-    openButton.textContent = '查词 v0.2.1';
+    // No floating controls. Selection information is cached for menu lookup.
   }
 
   function captureSelection() {
     if (!panel.hidden) return;
     const captured = getSelectionCandidate();
-    if (!captured) { hideFloating(); return; }
-    candidate = captured;
-
-    // No selection-anchored floating button: the native Android toolbar
-    // covers such buttons even with arbitrarily high z-index.
-    floating.hidden = true;
-    openButton.hidden = false;
-    const shortText = captured.text.length > 16 ? `${captured.text.slice(0, 16)}…` : captured.text;
-    openButton.textContent = '查词 v0.2.1';
-    openButton.title = `查询所选英文：${captured.text}`;
-
-    clearTimeout(autoOpenTimer);
-    if (ANDROID_TOUCH && autoCheck.checked) {
-      autoOpenTimer = setTimeout(() => {
-        if (!panel.hidden) return;
-        const latest = getSelectionCandidate();
-        // If the user copied/cancelled the selection, don't open unexpectedly.
-        if (!latest) return;
-        candidate = latest;
-        // Dismiss Android's native Copy/Translate/Select All toolbar while
-        // preserving the selected text in 'candidate'.
-        try { window.getSelection()?.removeAllRanges(); } catch {}
-        openPanel();
-      }, 850);
-    }
+    if (captured) candidate = { ...captured, capturedAt: Date.now() };
   }
 
   async function readClipboardToInput({ silent = false } = {}) {
@@ -238,32 +339,41 @@
     }
   }
 
+  function setModalOpen(open) {
+    veil.hidden = !open;
+    panel.hidden = !open;
+    // Explicit inline styles protect the modal against old CSS caches and
+    // overlapping SillyTavern drawers. Restore the hidden attribute on close.
+    for (const element of [veil, panel]) {
+      if (open) {
+        element.style.setProperty('display', 'block', 'important');
+        element.style.setProperty('visibility', 'visible', 'important');
+      } else {
+        element.style.removeProperty('display');
+        element.style.removeProperty('visibility');
+      }
+    }
+    document.body.classList.toggle('sdrd-modal-open', open);
+  }
+
   function openPanel() {
     const latest = getSelectionCandidate();
-    if (latest) candidate = latest;
-    if (ANDROID_TOUCH) { try { window.getSelection()?.removeAllRanges(); } catch {} }
-    current = candidate || { text: '', context: '' };
+    if (latest) candidate = { ...latest, capturedAt: Date.now() };
+    current = (candidate && Date.now() - candidate.capturedAt < 60000)
+      ? candidate : { text: '', context: '' };
     input.value = current.text;
     latestResult = '';
-    output.textContent = '请选择查询方式，点击「AI 查询」获取解释。';
+    output.textContent = '选择查询方式后点击「AI 查询」，可获得中文释义。不会发送到 RPG 对话。';
     status.textContent = '';
     savedPanel.hidden = true;
-    veil.hidden = false;
-    panel.hidden = false;
-    hideFloating();
-    // Fixed tab uses a fail-safe inline !important display: hide it over modal.
-    openButton.style.setProperty('display', 'none', 'important');
     askButton.disabled = false;
-    if (!input.value) input.focus();
+    setModalOpen(true);
+    // Do not focus the input automatically. On Android this opens the keyboard
+    // and shrinks the viewport, making the dialog appear to disappear.
   }
 
   function closePanel() {
-    veil.hidden = true;
-    panel.hidden = true;
-    savedPanel.hidden = true;
-    hideFloating();
-    openButton.style.setProperty('display', 'block', 'important');
-    // Selected words are cached; never change RPG chat history.
+    setModalOpen(false);
   }
 
   function updateMode() {
@@ -282,6 +392,7 @@
       '用清晰的简体中文回答，篇幅简短。',
     ].join('\n');
     const tasks = {
+      phrase: '请解释词组含义、固定搭配及一个简单例句与翻译。',
       vocab: '请给出：①词性与该语境下的中文意思；②如适用，给出英文原形、常见搭配；③一句简短英文例句及中文翻译；④如词义有歧义，说明更可能的意思。单词可提供 IPA，但不确定时略去。',
       translate: '请将所选内容自然、准确地翻译为中文；若有固定词组或隐含含义，用一行解释。不要续写故事。',
       grammar: '请简要说明句子的主干、关键语法结构和自然中文意思。如所选内容不是完整句子，说明它的短语结构。提供一个更简单的英文改写（A1–A2）及中文翻译。',
@@ -445,9 +556,6 @@
   });
 
   // Prevent mouse/touch-down on the toolbar from collapsing native selection first.
-  floating.addEventListener('pointerdown', event => event.preventDefault());
-  floating.addEventListener('click', openPanel);
-  openButton.addEventListener('click', openPanel);
   pasteButton.addEventListener('click', () => readClipboardToInput());
   closeButton.addEventListener('click', closePanel);
   veil.addEventListener('click', closePanel);
